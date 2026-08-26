@@ -527,12 +527,37 @@
 
 
     <section class="settings-section">
-      <div class="section-heading"><div><h3>Notifications</h3><p class="muted">Low filament, out-of-stock items, due orders, and sync issues.</p></div></div>
-      <div class="row">
-        <button class="secondary" type="button" id="enableNotificationsBtn">Enable browser notifications</button>
-        <button class="secondary" type="button" id="openNotificationsFromSettingsBtn">Open notification center</button>
+      <div class="section-heading">
+        <div>
+          <h3>Mobile Push Notifications</h3>
+          <p class="muted">Get low-filament, out-of-stock, and order reminders even when PrintBook is closed.</p>
+        </div>
+        <span class="badge" id="pushStatusBadge">Not enabled</span>
       </div>
-      <p class="muted tiny-note">Browser alerts work while PrintBook is open. The in-app notification center always works.</p>
+
+      <div class="push-status-card">
+        <div class="push-status-icon">↗</div>
+        <div>
+          <strong id="pushStatusTitle">Push notifications are off</strong>
+          <small id="pushStatusText">Sign in, install PrintBook to your Home Screen on iPhone, then enable push.</small>
+        </div>
+      </div>
+
+      <div class="row push-action-row">
+        <button class="primary" type="button" id="enableNotificationsBtn">Enable Mobile Push</button>
+        <button class="secondary hidden" type="button" id="testPushBtn">Send test push</button>
+        <button class="secondary hidden" type="button" id="disablePushBtn">Disable push</button>
+      </div>
+
+      <div class="push-help hidden" id="iosPushHelp">
+        <strong>iPhone setup</strong>
+        <p>Open PrintBook in Safari → Share → Add to Home Screen. Then launch PrintBook from the new Home Screen icon and come back here.</p>
+      </div>
+
+      <div class="row">
+        <button class="secondary" type="button" id="openNotificationsFromSettingsBtn">Open in-app notification center</button>
+      </div>
+      <p class="muted tiny-note">The in-app notification center still works too. Mobile push requires the new Supabase push backend included with this update.</p>
     </section>
 
     <section class="settings-section">

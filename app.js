@@ -18,7 +18,7 @@ const defaultPresets=[
 ];
 const defaultSettings={
   supabaseUrl:"",supabaseKey:"",defaultPresetId:"normal",
-  browserNotifications:false,lowFilamentPct:15
+  browserNotifications:false,pushEnabled:false,lowFilamentPct:15
 };
 
 function migrateArray(newKey,oldKeys,fallback=[]){
@@ -416,17 +416,174 @@ function renderNotificationsBadge(){
 function openNotifications(){
   const n=generateNotifications();$("notificationList").innerHTML=n.length?n.map(x=>`<div class="notice-card ${x.type}"><div class="notice-icon">${x.icon}</div><div><h4>${safe(x.title)}</h4><p>${safe(x.text)}</p></div></div>`).join(""):`<div class="empty-state"><h3>All clear</h3><p>Nothing needs your attention right now.</p></div>`;$("notificationsDialog").showModal()
 }
-async function enableBrowserNotifications(){
-  if(!("Notification" in window))return toast("Browser notifications aren't supported here");
-  const p=await Notification.requestPermission();settings.browserNotifications=p==="granted";persist();toast(p==="granted"?"Browser notifications enabled":"Notification permission not granted")
+function maybeBrowserNotify(){/* superseded by real Web Push in v4.2 */}
+
+function isIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 }
-function maybeBrowserNotify(notices){
-  if(!settings.browserNotifications||!("Notification" in window)||Notification.permission!=="granted"||document.visibilityState!=="visible")return;
-  let seen=[];try{seen=JSON.parse(localStorage.getItem(K.notified)||"[]")}catch{}
-  const fresh=notices.filter(n=>!seen.includes(n.id));if(fresh.length){const n=fresh[0];new Notification(`PrintBook: ${n.title}`,{body:n.text});seen=[...new Set([...seen,...fresh.map(x=>x.id)])].slice(-100);localStorage.setItem(K.notified,JSON.stringify(seen))}
+function isStandalonePWA(){
+  return window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    window.navigator.standalone===true;
+}
+function pushSupported(){
+  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+function urlBase64ToUint8Array(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+function pushFunctionUrl(){
+  return `${String(settings.supabaseUrl||"").replace(/\/$/,"")}/functions/v1/push-notifications`;
+}
+async function getPushPublicKey(){
+  if(!settings.supabaseUrl) throw new Error("Supabase URL is missing.");
+  const headers={"Content-Type":"application/json"};
+  if(settings.supabaseKey) headers.apikey=settings.supabaseKey;
+  const res=await fetch(pushFunctionUrl(),{method:"GET",headers});
+  let data={};try{data=await res.json()}catch{}
+  if(!res.ok) throw new Error(data.error||`Push backend returned ${res.status}`);
+  if(!data.publicKey) throw new Error("VAPID public key is not configured in Supabase.");
+  return data.publicKey;
+}
+async function getCurrentPushSubscription(){
+  if(!pushSupported())return null;
+  const reg=await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+function deviceLabel(){
+  if(isIOS())return isStandalonePWA()?"iPhone / iPad Home Screen":"iPhone / iPad";
+  if(/Android/i.test(navigator.userAgent))return "Android";
+  if(/Windows/i.test(navigator.userAgent))return "Windows";
+  if(/Macintosh/i.test(navigator.userAgent))return "Mac";
+  return "Web device";
+}
+async function savePushSubscription(subscription){
+  if(!currentUser||!supabaseClient)throw new Error("Sign in to PrintBook first.");
+  const row={
+    user_id:currentUser.id,
+    endpoint:subscription.endpoint,
+    subscription:subscription.toJSON(),
+    device_name:deviceLabel(),
+    user_agent:navigator.userAgent,
+    active:true,
+    last_seen_at:new Date().toISOString(),
+    updated_at:new Date().toISOString()
+  };
+  const {error}=await supabaseClient.from("push_subscriptions").upsert(row,{onConflict:"user_id,endpoint"});
+  if(error)throw error;
+}
+async function refreshPushStatus(){
+  const badge=$("pushStatusBadge"),title=$("pushStatusTitle"),text=$("pushStatusText");
+  if(!badge||!title||!text)return;
+  badge.className="badge";
+  $("iosPushHelp").classList.add("hidden");
+  $("testPushBtn").classList.add("hidden");
+  $("disablePushBtn").classList.add("hidden");
+
+  if(!currentUser){
+    badge.textContent="Sign in first";badge.classList.add("problem");
+    title.textContent="Push needs your PrintBook account";
+    text.textContent="Sign in under Cloud Sync first so this device can be linked to your account.";
+    $("enableNotificationsBtn").disabled=false;$("enableNotificationsBtn").textContent="Enable Mobile Push";return;
+  }
+  if(!pushSupported()){
+    badge.textContent="Unsupported";badge.classList.add("problem");
+    title.textContent="Push isn't available in this browser";
+    text.textContent=isIOS()?"On iPhone, install PrintBook to the Home Screen and open it from the icon.":"This browser does not expose the Web Push APIs.";
+    if(isIOS())$("iosPushHelp").classList.remove("hidden");
+    $("enableNotificationsBtn").disabled=false;return;
+  }
+  if(isIOS()&&!isStandalonePWA()){
+    badge.textContent="Install app";badge.classList.add("problem");
+    title.textContent="Add PrintBook to your iPhone Home Screen";
+    text.textContent="Apple enables Web Push for installed Home Screen web apps. Open the installed icon, then enable notifications here.";
+    $("iosPushHelp").classList.remove("hidden");$("enableNotificationsBtn").disabled=false;return;
+  }
+
+  const sub=await getCurrentPushSubscription().catch(()=>null);
+  if(sub&&Notification.permission==="granted"){
+    badge.textContent="Enabled";badge.classList.add("enabled");
+    title.textContent="Mobile push is enabled on this device";
+    text.textContent=`${deviceLabel()} is registered. PrintBook can receive background alerts when the site is closed.`;
+    $("enableNotificationsBtn").textContent="Push Enabled";$("enableNotificationsBtn").disabled=true;
+    $("testPushBtn").classList.remove("hidden");$("disablePushBtn").classList.remove("hidden");
+    settings.pushEnabled=true;
+  }else{
+    badge.textContent=Notification.permission==="denied"?"Blocked":"Not enabled";
+    if(Notification.permission==="denied")badge.classList.add("problem");
+    title.textContent=Notification.permission==="denied"?"Notifications are blocked for PrintBook":"Push notifications are ready to set up";
+    text.textContent=Notification.permission==="denied"?"Allow notifications for PrintBook in your device/browser settings, then return here.":"Tap Enable Mobile Push. Your browser will ask for notification permission.";
+    $("enableNotificationsBtn").textContent="Enable Mobile Push";
+    $("enableNotificationsBtn").disabled=Notification.permission==="denied";
+    settings.pushEnabled=false;
+  }
+  localStorage.setItem(K.settings,JSON.stringify(settings));
+}
+async function enableBrowserNotifications(){
+  try{
+    if(!currentUser)return toast("Sign in to Cloud Sync first");
+    if(!pushSupported()){
+      if(isIOS())$("iosPushHelp").classList.remove("hidden");
+      return toast(isIOS()?"Add PrintBook to your Home Screen first":"This browser does not support Web Push");
+    }
+    if(isIOS()&&!isStandalonePWA()){
+      $("iosPushHelp").classList.remove("hidden");
+      return toast("On iPhone, open PrintBook from its Home Screen icon first");
+    }
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted"){
+      settings.pushEnabled=false;persist();await refreshPushStatus();
+      return toast("Notification permission wasn't granted");
+    }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      const publicKey=await getPushPublicKey();
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
+    }
+    await savePushSubscription(sub);
+    settings.pushEnabled=true;settings.browserNotifications=false;persist();await refreshPushStatus();
+    toast("Mobile push is enabled");
+  }catch(err){
+    console.error(err);settings.pushEnabled=false;persist();await refreshPushStatus().catch(()=>{});
+    toast(err?.message||"Couldn't enable push notifications");
+  }
+}
+async function disablePush(){
+  try{
+    const sub=await getCurrentPushSubscription();
+    if(sub&&currentUser&&supabaseClient){
+      await supabaseClient.from("push_subscriptions").delete().eq("user_id",currentUser.id).eq("endpoint",sub.endpoint);
+    }
+    if(sub)await sub.unsubscribe();
+    settings.pushEnabled=false;persist();await refreshPushStatus();toast("Push disabled on this device");
+  }catch(err){console.error(err);toast("Couldn't disable push")}
+}
+async function sendTestPush(){
+  try{
+    if(!currentUser||!supabaseClient)return toast("Sign in first");
+    const session=(await supabaseClient.auth.getSession()).data.session;
+    if(!session?.access_token)return toast("Your session expired — sign in again");
+    const res=await fetch(pushFunctionUrl(),{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`,...(settings.supabaseKey?{apikey:settings.supabaseKey}:{})},
+      body:JSON.stringify({action:"test"})
+    });
+    let data={};try{data=await res.json()}catch{}
+    if(!res.ok)throw new Error(data.error||`Test failed (${res.status})`);
+    toast(data.sent?`Test push sent to ${data.sent} device${data.sent===1?"":"s"}`:"No registered push device found");
+  }catch(err){console.error(err);toast(err?.message||"Couldn't send test push")}
 }
 
-function openSettings(){$("supabaseUrlInput").value=settings.supabaseUrl||"";$("supabaseKeyInput").value=settings.supabaseKey||"";renderPresets();updateCloudUI();$("enableNotificationsBtn").textContent=settings.browserNotifications?"Browser notifications enabled":"Enable browser notifications";$("settingsDialog").showModal()}
+function openSettings(){
+  $("supabaseUrlInput").value=settings.supabaseUrl||"";
+  $("supabaseKeyInput").value=settings.supabaseKey||"";
+  renderPresets();updateCloudUI();refreshPushStatus().catch(()=>{});
+  $("settingsDialog").showModal()
+}
 function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();persist();setupSupabase();$("settingsDialog").close();toast("Settings saved")}
 
 function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
@@ -505,7 +662,7 @@ document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>showView(b.datas
 $("menuBtn").onclick=openMenu;$("mobileMenuBtn").onclick=openMenu;$("closeMenuBtn").onclick=closeMenu;$("drawerBackdrop").onclick=closeMenu;
 $("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=toggleCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};
 $("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=toggleCustomerMode;$("exitCustomerModeBtn").onclick=toggleCustomerMode;
-$("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;
+$("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
 $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
 $("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
@@ -520,6 +677,7 @@ $("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDia
 $("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;
 $("closeSettings").onclick=()=>$("settingsDialog").close();$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
 window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshPushStatus().catch(()=>{})});
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&$("sideDrawer").classList.contains("open")) closeMenu();
 });

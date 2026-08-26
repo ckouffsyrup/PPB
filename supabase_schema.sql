@@ -145,3 +145,52 @@ using (bucket_id='print-images' and (storage.foldername(name))[1]=auth.uid()::te
 drop policy if exists "Users delete own print images" on storage.objects;
 create policy "Users delete own print images" on storage.objects for delete to authenticated
 using (bucket_id='print-images' and (storage.foldername(name))[1]=auth.uid()::text);
+
+
+-- PrintBook v4.2: Web Push
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null,
+  subscription jsonb not null,
+  device_name text,
+  user_agent text,
+  active boolean not null default true,
+  last_seen_at timestamptz default now(),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_id, endpoint)
+);
+
+create table if not exists public.push_notification_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  notification_key text not null,
+  title text,
+  body text,
+  sent_at timestamptz default now(),
+  unique(user_id, notification_key)
+);
+
+alter table public.push_subscriptions enable row level security;
+alter table public.push_notification_log enable row level security;
+
+drop policy if exists "own_select_push_subscriptions" on public.push_subscriptions;
+create policy "own_select_push_subscriptions" on public.push_subscriptions
+for select using (auth.uid() = user_id);
+
+drop policy if exists "own_insert_push_subscriptions" on public.push_subscriptions;
+create policy "own_insert_push_subscriptions" on public.push_subscriptions
+for insert with check (auth.uid() = user_id);
+
+drop policy if exists "own_update_push_subscriptions" on public.push_subscriptions;
+create policy "own_update_push_subscriptions" on public.push_subscriptions
+for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own_delete_push_subscriptions" on public.push_subscriptions;
+create policy "own_delete_push_subscriptions" on public.push_subscriptions
+for delete using (auth.uid() = user_id);
+
+drop policy if exists "own_select_push_log" on public.push_notification_log;
+create policy "own_select_push_log" on public.push_notification_log
+for select using (auth.uid() = user_id);

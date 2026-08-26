@@ -275,3 +275,32 @@ body.menu-open{overflow:hidden!important;position:fixed;width:100%;left:0;right:
   .shop-card-photo{min-height:120px}
   .shop-summary span{font-size:9px}
 }
+
+/* v4.2 real Web Push */
+.push-status-card{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr);
+  gap:11px;
+  align-items:center;
+  border:1px solid var(--line);
+  background:#0e0c13;
+  border-radius:15px;
+  padding:12px;
+  margin:10px 0 12px;
+}
+.push-status-icon{
+  width:42px;height:42px;border-radius:13px;
+  display:grid;place-items:center;
+  background:var(--panel3);color:var(--purpleSoft);font-weight:900
+}
+.push-status-card strong{display:block}
+.push-status-card small{display:block;color:var(--muted);font-size:11px;line-height:1.45;margin-top:3px}
+.push-action-row{flex-wrap:wrap;margin-bottom:10px}
+.push-help{border:1px solid #544078;background:#20182f;border-radius:13px;padding:11px 12px;margin:10px 0;color:var(--purpleSoft)}
+.push-help p{margin:4px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+#pushStatusBadge.enabled{color:var(--green);border-color:#275440;background:#102119}
+#pushStatusBadge.problem{color:var(--red);border-color:#5d2f3a;background:#251219}
+@media(max-width:560px){
+  .push-action-row{display:grid;grid-template-columns:1fr}
+  .push-action-row button{width:100%;min-height:46px}
+}
