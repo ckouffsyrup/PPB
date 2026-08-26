@@ -17,7 +17,7 @@
 <div class="app-shell">
   <header class="topbar">
     <div class="brand-wrap">
-      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">☰</button>
+      <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Open menu">☰</button>
       <div>
         <p class="eyebrow">3D PRINT SHOP</p>
         <h1>PrintBook</h1>
@@ -68,6 +68,14 @@
 
     <!-- SHOP / HOME -->
     <section class="view active" data-view="shop">
+      <div class="customer-mode-bar hidden" id="customerModeBar">
+        <div>
+          <strong>Customer Store Mode</strong>
+          <small>Costs, profit, admin controls, and management pages are hidden.</small>
+        </div>
+        <button class="secondary" id="exitCustomerModeBtn" type="button">Exit Store Mode</button>
+      </div>
+
       <section class="shop-hero">
         <div>
           <p class="eyebrow">YOUR SHOP</p>
@@ -75,7 +83,7 @@
           <p class="muted">This is the clean storefront-style home. Tap any item to open its details, edit stock, or record a sale.</p>
         </div>
         <div class="shop-hero-actions">
-          <button class="secondary" id="customerModeBtn">◫ Customer Store Mode</button>
+          <button class="secondary" id="customerModeBtn" type="button">◫ Customer Store Mode</button>
           <button class="primary admin-only" id="shopAddBtn">+ Add product</button>
         </div>
       </section>
@@ -218,8 +226,8 @@
 
   <nav class="bottom-nav">
     <button class="nav-item active" data-nav="shop"><span>⌂</span><small>Home</small></button>
-    <button class="nav-item" id="mobileMenuBtn"><span>☰</span><small>Menu</small></button>
-    <button class="nav-item center-add" id="mobileAddBtn"><span>＋</span></button>
+    <button class="nav-item" id="mobileMenuBtn" type="button"><span>☰</span><small>Menu</small></button>
+    <button class="nav-item center-add" id="mobileAddBtn" type="button"><span>＋</span></button>
     <button class="nav-item" data-nav="prints"><span>▦</span><small>Prints</small></button>
     <button class="nav-item" data-nav="orders"><span>☷</span><small>Orders</small></button>
   </nav>

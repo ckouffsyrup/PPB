@@ -123,8 +123,28 @@ function setSyncState(state,msg,last=null){
   if($("modeBadge"))$("modeBadge").textContent=currentUser?(state==="synced"?"Cloud synced":msg||"Connected"):"Local";
 }
 
-function openMenu(){$("sideDrawer").classList.add("open");$("drawerBackdrop").classList.add("open");$("sideDrawer").setAttribute("aria-hidden","false")}
-function closeMenu(){$("sideDrawer").classList.remove("open");$("drawerBackdrop").classList.remove("open");$("sideDrawer").setAttribute("aria-hidden","true")}
+let menuScrollY=0;
+function openMenu(){
+  if($("sideDrawer").classList.contains("open")) return;
+  menuScrollY=window.scrollY||0;
+  document.body.style.top=`-${menuScrollY}px`;
+  document.body.classList.add("menu-open");
+  $("sideDrawer").classList.add("open");
+  $("drawerBackdrop").classList.add("open");
+  $("sideDrawer").setAttribute("aria-hidden","false");
+  $("sideDrawer").scrollTop=0;
+}
+function closeMenu(){
+  const wasOpen=$("sideDrawer").classList.contains("open");
+  $("sideDrawer").classList.remove("open");
+  $("drawerBackdrop").classList.remove("open");
+  $("sideDrawer").setAttribute("aria-hidden","true");
+  if(wasOpen){
+    document.body.classList.remove("menu-open");
+    document.body.style.top="";
+    window.scrollTo(0,menuScrollY);
+  }
+}
 function showView(name){
   currentView=name;
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.dataset.view===name));
@@ -174,7 +194,8 @@ function renderShop(){
   const cats=[...new Set(items.map(i=>i.category).filter(Boolean))].sort(),cur=$("shopCategoryFilter").value;
   $("shopCategoryFilter").innerHTML=`<option value="">All categories</option>`+cats.map(c=>`<option ${c===cur?"selected":""}>${safe(c)}</option>`).join("");
   $("customerModeBtn").textContent=customerMode?"← Exit Customer Mode":"◫ Customer Store Mode";
-  $("drawerCustomerBtn").textContent=customerMode?"← Exit Customer Mode":"◫ Customer Store Mode";
+  $("drawerCustomerBtn").textContent=customerMode?"← Exit Customer Store Mode":"◫ Customer Store Mode";
+  $("customerModeBar").classList.toggle("hidden",!customerMode);
   document.body.classList.toggle("customer-mode",customerMode);
 }
 
@@ -361,7 +382,15 @@ function openCustomerProduct(id){
   $("customerVariantList").innerHTML=(i.variants||[]).map(v=>`<div class="customer-variant"><span>${safe(v.name)}</span><strong>${money(variantPrice(i,v.id))} · ${v.stock||0} available</strong></div>`).join("");
   const stock=itemStock(i);$("customerAvailability").textContent=stock>0?`${stock} available right now`:"Currently out of stock";$("customerAvailability").classList.toggle("out",stock<=0);$("customerProductDialog").showModal()
 }
-function toggleCustomerMode(){customerMode=!customerMode;closeMenu();showView("shop");toast(customerMode?"Customer Store Mode on":"Back to admin mode")}
+function toggleCustomerMode(){
+  customerMode=!customerMode;
+  closeMenu();
+  currentView="shop";
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.dataset.view==="shop"));
+  renderAll();
+  window.scrollTo({top:0,behavior:"auto"});
+  toast(customerMode?"Customer Store Mode on — admin info hidden":"Back to admin mode");
+}
 
 function generateNotifications(){
   const notices=[];
@@ -475,7 +504,7 @@ document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>showView(b.data
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>showView(b.dataset.go));
 $("menuBtn").onclick=openMenu;$("mobileMenuBtn").onclick=openMenu;$("closeMenuBtn").onclick=closeMenu;$("drawerBackdrop").onclick=closeMenu;
 $("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=toggleCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};
-$("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=toggleCustomerMode;
+$("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=toggleCustomerMode;$("exitCustomerModeBtn").onclick=toggleCustomerMode;
 $("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
 $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
@@ -491,5 +520,8 @@ $("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDia
 $("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;
 $("closeSettings").onclick=()=>$("settingsDialog").close();$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
 window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&$("sideDrawer").classList.contains("open")) closeMenu();
+});
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 populatePresetSelects();renderAll();setupSupabase();showView("shop");

@@ -100,3 +100,178 @@ dialog{border:0;padding:0;background:transparent;color:var(--text);max-width:non
 .sync-detail{display:flex;flex-direction:column;gap:3px;border:1px solid var(--line);background:#0e0c13;border-radius:13px;padding:10px 12px;margin-bottom:12px}.sync-detail small{color:var(--muted)}.tiny-note{font-size:11px}
 @media(max-width:900px){.colorway-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.variant-row{grid-template-columns:1fr 1fr}.variant-row .variant-name,.variant-row .variant-colorway{grid-column:1/-1}.variant-row .remove-variant{grid-column:2;justify-self:end}}
 @media(max-width:560px){.shop-hero-actions{width:100%;flex-direction:column}.shop-hero-actions button{width:100%}.colorway-grid{grid-template-columns:1fr}.variant-row{grid-template-columns:1fr 1fr}.customer-mode .shop-controls{grid-template-columns:1fr}.customer-mode .topbar .header-actions{display:flex}.sync-pill{display:none}}
+
+/* v4.1 mobile stability + layout pass */
+html,body{max-width:100%;overflow-x:hidden}
+body.menu-open{overflow:hidden!important;position:fixed;width:100%;left:0;right:0}
+.topbar{position:sticky;top:0;z-index:65;padding:10px 0;background:linear-gradient(180deg,rgba(11,9,16,.96),rgba(11,9,16,.83) 72%,rgba(11,9,16,0));backdrop-filter:blur(12px)}
+.side-drawer{
+  top:0;
+  bottom:auto;
+  height:100dvh;
+  max-height:100dvh;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  padding-top:max(20px,env(safe-area-inset-top));
+  padding-bottom:max(22px,env(safe-area-inset-bottom));
+}
+.drawer-header{position:sticky;top:calc(-1 * max(20px,env(safe-area-inset-top)));z-index:2;background:#100d16;padding-top:max(20px,env(safe-area-inset-top))}
+.drawer-nav{flex:0 0 auto}
+.drawer-sync-card{margin-top:12px}
+.drawer-actions{margin-top:9px;flex:0 0 auto}
+.drawer-link,.drawer-actions button{min-height:48px}
+.drawer-backdrop{touch-action:none}
+.sheet{
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.customer-mode-bar{
+  position:sticky;
+  top:72px;
+  z-index:55;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+  padding:12px 14px;
+  border:1px solid #4f3a70;
+  background:rgba(31,23,45,.96);
+  backdrop-filter:blur(14px);
+  border-radius:15px;
+}
+.customer-mode-bar strong{display:block;color:var(--purpleSoft)}
+.customer-mode-bar small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.customer-mode-bar button{flex:0 0 auto}
+
+@media(max-width:560px){
+  .app-shell{padding:8px 12px 28px}
+  .topbar{
+    margin:0 -2px 14px;
+    padding:10px 2px 12px;
+    min-height:64px;
+  }
+  .brand-wrap{gap:9px}
+  .topbar h1{font-size:22px}
+  .topbar .eyebrow{font-size:8px}
+  .menu-btn{width:46px;height:46px;flex:0 0 46px}
+  .header-actions{display:flex;gap:6px}
+  .header-actions .icon-btn{width:42px;height:42px}
+  .header-actions #helpPriceBtn,.header-actions #syncBtn,.header-actions #settingsBtn,.header-actions .sync-pill{display:none}
+  .notification-btn{display:grid!important}
+
+  /* Mobile uses hamburger navigation only. The old floating nav was the main source of cramped/odd behavior. */
+  .bottom-nav{display:none!important}
+
+  .side-drawer{
+    width:min(356px,92vw);
+    padding-left:14px;
+    padding-right:14px;
+  }
+  .drawer-header{margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px}
+  .drawer-nav{gap:5px;padding:12px 0}
+  .drawer-link{padding:10px}
+  .drawer-link>span{width:38px;height:38px;flex:0 0 38px}
+  .drawer-link strong{font-size:15px}
+  .drawer-link small{font-size:11px}
+
+  .shop-hero{
+    padding:17px;
+    border-radius:19px;
+    margin-bottom:12px;
+  }
+  .shop-hero h2{font-size:30px;line-height:1.03;margin:4px 0 7px}
+  .shop-hero p{font-size:12px;line-height:1.45}
+  .shop-hero-actions{display:grid;grid-template-columns:1fr;gap:8px;width:100%}
+  .shop-hero-actions button{min-height:46px;width:100%}
+
+  .shop-controls{margin:12px 0;gap:8px}
+  input,textarea,select{font-size:16px}
+  .search-wrap input{font-size:16px}
+  .shop-summary{gap:6px;margin-bottom:10px}
+  .shop-summary span{padding:6px 8px;font-size:10px}
+
+  /* Compact product rows instead of giant cards on a phone. */
+  .shop-grid{display:flex;flex-direction:column;gap:9px}
+  .shop-card{
+    display:grid;
+    grid-template-columns:112px minmax(0,1fr);
+    min-height:126px;
+    border-radius:16px;
+  }
+  .shop-card-photo{height:100%;min-height:126px}
+  .shop-card-body{padding:11px;min-width:0}
+  .shop-card-body h3{font-size:16px;line-height:1.15;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .shop-card-body p{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .shop-card-footer{margin-top:9px;padding-top:8px}
+  .shop-price{font-size:19px}
+  .shop-stock{font-size:9px}
+  .price-chip{right:7px;bottom:7px;font-size:13px;padding:5px 7px}
+  .fav-chip{right:7px;top:7px;padding:5px 6px}
+  .out-badge{left:7px;top:7px;font-size:8px;padding:5px 6px}
+  .shop-deal{font-size:9px;padding:4px 6px;margin-top:5px}
+
+  .page-title{align-items:center;margin:4px 0 14px}
+  .page-title h2{font-size:27px}
+  .page-title .primary{padding:10px 12px}
+  .stats-grid,.dashboard-stats{grid-template-columns:1fr 1fr}
+  .stat-card{border-radius:14px;padding:11px}
+  .stat-card strong{font-size:19px}
+  .panel{border-radius:16px;padding:12px;min-height:0}
+
+  .print-grid,.filament-grid,.colorway-grid{grid-template-columns:1fr}
+  .card-photo{height:190px}
+  .filament-card,.print-card,.colorway-card{border-radius:16px}
+  .order-card{padding:12px}
+
+  dialog{
+    height:100dvh;
+    max-height:100dvh;
+    overflow:hidden;
+  }
+  dialog[open]{display:flex;align-items:flex-end}
+  .sheet{
+    width:100%;
+    max-width:100%;
+    max-height:calc(100dvh - max(12px,env(safe-area-inset-top)));
+    border-radius:22px 22px 0 0;
+    padding:16px 14px max(18px,env(safe-area-inset-bottom));
+  }
+  .sheet-header{position:sticky;top:-16px;z-index:3;background:#121019;padding:12px 0 9px;margin-top:-12px}
+  .sheet-actions{position:sticky;bottom:calc(-1 * max(18px,env(safe-area-inset-bottom)));z-index:3;background:#121019;padding:10px 0 max(18px,env(safe-area-inset-bottom));margin-bottom:calc(-1 * max(18px,env(safe-area-inset-bottom)))}
+  .sheet-actions button{min-height:45px}
+  .form-grid{gap:10px}
+  .usage-row{padding:8px}
+  .recommend-card{padding:12px}
+
+  .customer-mode-bar{
+    top:67px;
+    border-radius:13px;
+    padding:10px;
+    align-items:flex-start;
+  }
+  .customer-mode-bar small{max-width:190px}
+  .customer-mode-bar button{font-size:11px;padding:9px 10px}
+  .customer-mode .menu-btn{display:none!important}
+  .customer-mode .notification-btn{display:none!important}
+  .customer-mode .brand-wrap:before{
+    content:"STORE";
+    display:grid;
+    place-items:center;
+    width:46px;height:46px;
+    border:1px solid #4f3a70;
+    border-radius:13px;
+    color:var(--purpleSoft);
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:.08em;
+  }
+}
+
+@media(max-width:365px){
+  .shop-card{grid-template-columns:96px minmax(0,1fr)}
+  .shop-card-photo{min-height:120px}
+  .shop-summary span{font-size:9px}
+}
