@@ -77,6 +77,7 @@ let pendingPhotoFile=null,pendingPhotoData="",editorFavorite=false,currentView="
 let savePrintInFlight=false;
 let supabaseClient=null,currentUser=null,realtimeChannel=null,realtimeTimer=null;
 let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=false,currentMakePrintId=null;
+const pendingLocalProductIds=new Set();
 
 function persist(){
   localStorage.setItem(K.items,JSON.stringify(items));
@@ -392,6 +393,8 @@ async function savePrint(){
 
     // LOCAL FIRST: make Save feel instant on mobile. Do not wait for photo upload
     // or Supabase before closing the editor.
+    // Protect this product from an older realtime cloud snapshot until upload finishes.
+    pendingLocalProductIds.add(id);
     const idx=items.findIndex(i=>i.id===id);
     if(idx>=0)items[idx]=item;
     else items.unshift(item);
@@ -453,7 +456,10 @@ async function savePrint(){
             photo_url:String(latest.photo_url||"").startsWith("data:") ? (cloudPhoto||"") : latest.photo_url
           };
           const ok=await syncUpsert("prints",dbPrint(cloudRecord));
-          if(ok!==false)setSyncState("synced","Synced",nowISO());
+          if(ok!==false){
+            pendingLocalProductIds.delete(id);
+            setSyncState("synced","Synced",nowISO());
+          }
         }catch(err){
           console.error("Background print sync failed",err);
           setSyncState("error","Print saved locally — cloud/photo sync failed");
@@ -464,6 +470,7 @@ async function savePrint(){
 
   }catch(err){
     console.error("Save print failed",err);
+    if(editingId)pendingLocalProductIds.delete(editingId);
     toast("Couldn't save this print");
     savePrintInFlight=false;
     saveBtn.disabled=false;
@@ -792,6 +799,49 @@ async function pushLocal(){
   for(const c of colorways)await syncUpsert("colorways",{...c,user_id:currentUser.id});
   setSyncState("synced","Synced",nowISO());toast("Local data uploaded");await pullCloud(false)
 }
+function rowTime(row){
+  const raw=row?.updated_at||row?.created_at||"";
+  const t=Date.parse(raw);
+  return Number.isFinite(t)?t:0;
+}
+function mergeCloudCollection(localRows,remoteRows,{normalize=x=>x,preferLocalIds=null}={}){
+  // Never replace the whole local list with a cloud snapshot.
+  // A realtime pull can arrive before a newly-created product finishes uploading.
+  // Merge by id instead so local-only/newer rows survive.
+  const merged=new Map();
+
+  for(const raw of localRows||[]){
+    const row=normalize(raw);
+    if(row?.id)merged.set(row.id,row);
+  }
+
+  for(const raw of remoteRows||[]){
+    const remote=normalize(raw);
+    if(!remote?.id)continue;
+
+    const local=merged.get(remote.id);
+    if(!local){
+      merged.set(remote.id,remote);
+      continue;
+    }
+
+    if(preferLocalIds?.has(remote.id)){
+      continue;
+    }
+
+    const localTime=rowTime(local);
+    const remoteTime=rowTime(remote);
+
+    // Equal timestamps favor local to prevent a same-moment cloud snapshot
+    // from stripping recently-entered local fields.
+    if(remoteTime>localTime){
+      merged.set(remote.id,remote);
+    }
+  }
+
+  return [...merged.values()].sort((a,b)=>rowTime(b)-rowTime(a));
+}
+
 async function pullCloud(showToast=true){
   if(!currentUser||!supabaseClient)return;if(!navigator.onLine){setSyncState("offline","Offline — using local data");return}
   setSyncState("syncing","Syncing…");
@@ -806,8 +856,21 @@ async function pullCloud(showToast=true){
   const remoteHasData=[pr.data,fi.data,sa.data,or.data,cw.data].some(a=>a&&a.length);
   const localHasData=[items,filaments,sales,orders,colorways].some(a=>a&&a.length);
   if(!remoteHasData&&localHasData){setSyncState("synced","Cloud empty — upload local data",nowISO());if(showToast)toast("Cloud is empty — use Upload local data");return}
-  items=(pr.data||[]).map(({user_id,...x})=>({...x,variants:x.variants||[],filament_usage:x.filament_usage||[]}));
-  filaments=(fi.data||[]).map(({user_id,...x})=>x);sales=(sa.data||[]).map(({user_id,...x})=>x);orders=(or.data||[]).map(({user_id,...x})=>({...x,print_id:x.print_id||""}));colorways=(cw.data||[]).map(({user_id,...x})=>x);
+  const remoteItems=(pr.data||[]).map(({user_id,...x})=>({...x,variants:x.variants||[],filament_usage:x.filament_usage||[]}));
+  const remoteFilaments=(fi.data||[]).map(({user_id,...x})=>x);
+  const remoteSales=(sa.data||[]).map(({user_id,...x})=>x);
+  const remoteOrders=(or.data||[]).map(({user_id,...x})=>({...x,print_id:x.print_id||""}));
+  const remoteColorways=(cw.data||[]).map(({user_id,...x})=>x);
+
+  items=mergeCloudCollection(items,remoteItems,{
+    normalize:x=>({...x,variants:x.variants||[],filament_usage:x.filament_usage||[]}),
+    preferLocalIds:pendingLocalProductIds
+  });
+  filaments=mergeCloudCollection(filaments,remoteFilaments);
+  sales=mergeCloudCollection(sales,remoteSales);
+  orders=mergeCloudCollection(orders,remoteOrders,{normalize:x=>({...x,print_id:x.print_id||""})});
+  colorways=mergeCloudCollection(colorways,remoteColorways);
+
   persist();setSyncState("synced","Synced",nowISO());if(showToast)toast("Synced")
 }
 function startRealtime(){
