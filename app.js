@@ -667,6 +667,22 @@ async function savePushSubscription(subscription){
   const {error}=await supabaseClient.from("push_subscriptions").upsert(row,{onConflict:"user_id,endpoint"});
   if(error)throw error;
 }
+async function resolveCurrentUser(){
+  if(currentUser)return currentUser;
+  if(!supabaseClient)return null;
+  try{
+    const {data}=await supabaseClient.auth.getSession();
+    if(data?.session?.user){
+      currentUser=data.session.user;
+      updateCloudUI();
+      return currentUser;
+    }
+  }catch(err){
+    console.warn("Could not restore Supabase session",err);
+  }
+  return null;
+}
+
 async function refreshPushStatus(){
   const badge=$("pushStatusBadge"),title=$("pushStatusTitle"),text=$("pushStatusText");
   if(!badge||!title||!text)return;
@@ -677,6 +693,8 @@ async function refreshPushStatus(){
   $("disablePushBtn").classList.add("hidden");
   $("enableNotificationsBtn").disabled=false;
   $("enableNotificationsBtn").textContent="Enable Mobile Push";
+
+  await resolveCurrentUser();
 
   if(!currentUser){
     badge.textContent="Sign in first";
@@ -770,6 +788,7 @@ async function refreshPushStatus(){
 }
 async function enableBrowserNotifications(){
   try{
+    await resolveCurrentUser();
     if(!currentUser)return toast("Sign in to Cloud Sync first");
 
     if(!pushSupported()){
@@ -838,6 +857,7 @@ async function disablePush(){
 }
 async function sendTestPush(){
   try{
+    await resolveCurrentUser();
     if(!currentUser||!supabaseClient)return toast("Sign in first");
     const session=(await supabaseClient.auth.getSession()).data.session;
     if(!session?.access_token)return toast("Your session expired — sign in again");
@@ -855,8 +875,9 @@ async function sendTestPush(){
 function openSettings(){
   $("supabaseUrlInput").value=settings.supabaseUrl||"";
   $("supabaseKeyInput").value=settings.supabaseKey||"";
-  renderPresets();updateCloudUI();refreshPushStatus().catch(()=>{});
-  $("settingsDialog").showModal()
+  renderPresets();updateCloudUI();
+  $("settingsDialog").showModal();
+  resolveCurrentUser().then(()=>refreshPushStatus()).catch(()=>refreshPushStatus().catch(()=>{}));
 }
 function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();persist();setupSupabase();$("settingsDialog").close();toast("Settings saved")}
 
@@ -873,8 +894,16 @@ async function setupSupabase(){
   if(!settings.supabaseUrl||!settings.supabaseKey||!window.supabase){supabaseClient=null;currentUser=null;stopRealtime();setSyncState("local","Local only");updateCloudUI();return}
   try{
     supabaseClient=window.supabase.createClient(settings.supabaseUrl,settings.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true}});
-    currentUser=(await supabaseClient.auth.getUser()).data.user||null;updateCloudUI();
-    supabaseClient.auth.onAuthStateChange((event,session)=>{currentUser=session?.user||null;updateCloudUI();if(currentUser){startRealtime();setTimeout(()=>pullCloud(false),50)}else stopRealtime()});
+    const {data:sessionData}=await supabaseClient.auth.getSession();
+    currentUser=sessionData?.session?.user||null;
+    updateCloudUI();
+    supabaseClient.auth.onAuthStateChange((event,session)=>{
+      currentUser=session?.user||null;
+      updateCloudUI();
+      if(currentUser){startRealtime();setTimeout(()=>pullCloud(false),50)}
+      else stopRealtime();
+      setTimeout(()=>refreshPushStatus().catch(()=>{}),0);
+    });
     if(currentUser){startRealtime();await pullCloud(false)}else setSyncState("local","Ready to sign in")
   }catch(e){console.error(e);currentUser=null;setSyncState("error","Supabase setup failed");updateCloudUI()}
 }
