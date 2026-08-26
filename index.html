@@ -14,230 +14,357 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">3D PRINT PRICING</p>
-        <h1>PrintBook</h1>
-      </div>
-      <div class="header-actions">
-        <button class="icon-btn" id="syncBtn" aria-label="Sync">↻</button>
-        <button class="icon-btn" id="settingsBtn" aria-label="Settings">⚙</button>
-      </div>
-    </header>
+<div class="app-shell">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">3D PRINT SHOP</p>
+      <h1>PrintBook</h1>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="helpPriceBtn" title="Help me price this">✦</button>
+      <button class="icon-btn" id="syncBtn" title="Sync">↻</button>
+      <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
+    </div>
+  </header>
 
-    <main>
-      <section class="hero">
+  <main>
+    <!-- DASHBOARD -->
+    <section class="view active" data-view="dashboard">
+      <section class="hero compact">
         <div>
-          <p class="hero-kicker">YOUR PRINT LIBRARY</p>
-          <h2>Know what to charge,<br><span>every time.</span></h2>
-          <p>Photos, print time, material cost, suggested price, and profit — all in one place.</p>
+          <p class="hero-kicker">YOUR SHOP AT A GLANCE</p>
+          <h2>Make it.<br><span>Price it. Sell it.</span></h2>
+          <p>Track stock, filament, sales, orders, and what each print actually earns.</p>
         </div>
-        <button class="primary big" id="addBtn">+ Add print</button>
+        <div class="hero-actions">
+          <button class="primary big" id="dashboardAddBtn">+ Add print</button>
+          <button class="secondary big" id="dashboardPriceBtn">✦ Help me price</button>
+        </div>
       </section>
 
-      <section class="stats-grid">
-        <div class="stat-card">
-          <span>Prints</span>
-          <strong id="statCount">0</strong>
+      <section class="stats-grid dashboard-stats">
+        <div class="stat-card"><span>Revenue</span><strong id="dashRevenue">$0</strong><small id="dashSalesCount">0 sales</small></div>
+        <div class="stat-card"><span>Est. profit</span><strong id="dashProfit">$0</strong><small>after material cost</small></div>
+        <div class="stat-card"><span>Items in stock</span><strong id="dashStock">0</strong><small id="dashPrintTypes">0 print types</small></div>
+        <div class="stat-card"><span>Open orders</span><strong id="dashOrders">0</strong><small id="dashOrderValue">$0 quoted</small></div>
+      </section>
+
+      <section class="dashboard-grid">
+        <div class="panel">
+          <div class="section-heading"><h3>Favorites</h3><button class="text-btn" data-go="prints">View all</button></div>
+          <div id="favoriteList" class="mini-list"></div>
         </div>
-        <div class="stat-card">
-          <span>Avg. price</span>
-          <strong id="statAvg">$0</strong>
+
+        <div class="panel">
+          <div class="section-heading"><h3>Recent sales</h3><button class="text-btn" id="openSalesBtn">Sales history</button></div>
+          <div id="recentSales" class="mini-list"></div>
         </div>
-        <div class="stat-card">
-          <span>Potential profit</span>
-          <strong id="statProfit">$0</strong>
+
+        <div class="panel">
+          <div class="section-heading"><h3>Low filament</h3><button class="text-btn" data-go="filaments">Filaments</button></div>
+          <div id="lowFilamentList" class="mini-list"></div>
+        </div>
+
+        <div class="panel">
+          <div class="section-heading"><h3>Active orders</h3><button class="text-btn" data-go="orders">Orders</button></div>
+          <div id="activeOrderList" class="mini-list"></div>
         </div>
       </section>
+    </section>
+
+    <!-- PRINTS -->
+    <section class="view" data-view="prints">
+      <div class="page-title">
+        <div><p class="eyebrow">CATALOG</p><h2>Your prints</h2></div>
+        <button class="primary" id="addBtn">+ Add print</button>
+      </div>
 
       <section class="controls">
-        <div class="search-wrap">
-          <span>⌕</span>
-          <input id="search" type="search" placeholder="Search prints, colors, notes..." />
-        </div>
-        <select id="categoryFilter" aria-label="Filter by category">
-          <option value="">All categories</option>
+        <div class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="Search prints, colors, model source..." /></div>
+        <select id="categoryFilter"><option value="">All categories</option></select>
+        <select id="stockFilter">
+          <option value="">All stock</option>
+          <option value="in">In stock</option>
+          <option value="out">Out of stock</option>
+          <option value="fav">Favorites</option>
         </select>
       </section>
 
-      <section>
-        <div class="section-heading">
-          <h3>Your prints</h3>
-          <span id="modeBadge" class="badge">Local</span>
-        </div>
-        <div id="printGrid" class="print-grid"></div>
-        <div id="emptyState" class="empty-state hidden">
-          <div class="empty-icon">◌</div>
-          <h3>No prints found</h3>
-          <p>Add your first print or change your search.</p>
-        </div>
-      </section>
-    </main>
+      <div class="section-heading">
+        <h3>Print library</h3>
+        <span id="modeBadge" class="badge">Local</span>
+      </div>
+      <div id="printGrid" class="print-grid"></div>
+      <div id="emptyState" class="empty-state hidden"><div class="empty-icon">◌</div><h3>No prints found</h3><p>Add your first print or change the filters.</p></div>
+    </section>
 
-    <nav class="bottom-nav">
-      <button class="nav-item active" data-action="home"><span>⌂</span><small>Home</small></button>
-      <button class="nav-item center-add" id="mobileAddBtn"><span>＋</span></button>
-      <button class="nav-item" data-action="settings"><span>⚙</span><small>Settings</small></button>
-    </nav>
-  </div>
-
-  <dialog id="editorDialog">
-    <form method="dialog" class="sheet" id="editorForm">
-      <div class="sheet-grabber"></div>
-      <div class="sheet-header">
-        <div>
-          <p class="eyebrow">PRINT DETAILS</p>
-          <h2 id="editorTitle">Add print</h2>
-        </div>
-        <button class="icon-btn" value="cancel" type="button" id="closeEditor">✕</button>
+    <!-- FILAMENTS -->
+    <section class="view" data-view="filaments">
+      <div class="page-title">
+        <div><p class="eyebrow">MATERIALS</p><h2>Filament inventory</h2></div>
+        <button class="primary" id="addFilamentBtn">+ Add spool</button>
       </div>
 
-      <div class="photo-picker">
-        <img id="photoPreview" class="hidden" alt="Print preview" />
-        <div id="photoPlaceholder">
-          <span>📷</span>
-          <strong>Add a photo</strong>
-          <small>Take one or choose from your library</small>
-        </div>
-        <input id="photoInput" type="file" accept="image/*" capture="environment" />
-      </div>
-
-      <div class="form-grid">
-        <label class="full">Print name
-          <input id="nameInput" required placeholder="Small multicolor figure" />
-        </label>
-        <label>Category
-          <input id="categoryInput" placeholder="Figures" />
-        </label>
-        <label>Selling price
-          <div class="money-input"><span>$</span><input id="priceInput" type="number" min="0" step="0.01" placeholder="10.00" /></div>
-        </label>
-
-        <label>Print time (hours)
-          <input id="hoursInput" type="number" min="0" step="0.1" placeholder="2" />
-        </label>
-        <label>Material cost
-          <div class="money-input"><span>$</span><input id="costInput" type="number" min="0" step="0.01" placeholder="0.80" /></div>
-        </label>
-
-        <label>Filament used (g)
-          <input id="gramsInput" type="number" min="0" step="1" placeholder="25" />
-        </label>
-        <label>Colors / material
-          <input id="colorsInput" placeholder="White + pink PLA" />
-        </label>
-
-        <label class="full">Notes
-          <textarea id="notesInput" placeholder="Multicolor, no painting. Good impulse-buy item."></textarea>
-        </label>
-      </div>
-
-      <div class="recommend-card">
-        <div>
-          <span>Suggested price</span>
-          <strong id="suggestedPrice">$0</strong>
-        </div>
-        <div>
-          <span>Est. profit</span>
-          <strong id="profitPreview">$0</strong>
-        </div>
-        <small>Uses your pricing settings below.</small>
-      </div>
-
-      <div class="sheet-actions">
-        <button type="button" class="secondary" id="deleteBtn">Delete</button>
-        <button type="button" class="primary" id="savePrintBtn">Save print</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="settingsDialog">
-    <div class="sheet settings-sheet">
-      <div class="sheet-grabber"></div>
-      <div class="sheet-header">
-        <div>
-          <p class="eyebrow">SETTINGS</p>
-          <h2>PrintBook setup</h2>
-        </div>
-        <button class="icon-btn" type="button" id="closeSettings">✕</button>
-      </div>
-
-      <section class="settings-section">
-        <h3>Pricing</h3>
-        <p class="muted">These values are used for automatic price suggestions.</p>
-        <div class="form-grid">
-          <label>Printer time / hr
-            <div class="money-input"><span>$</span><input id="rateInput" type="number" min="0" step="0.25" /></div>
-          </label>
-          <label>Profit multiplier
-            <input id="markupInput" type="number" min="1" step="0.1" />
-          </label>
-          <label>Minimum price
-            <div class="money-input"><span>$</span><input id="minimumInput" type="number" min="0" step="0.50" /></div>
-          </label>
-          <label>Round to
-            <select id="roundInput">
-              <option value="0.5">$0.50</option>
-              <option value="1">$1.00</option>
-              <option value="5">$5.00</option>
-            </select>
-          </label>
-        </div>
+      <section class="stats-grid">
+        <div class="stat-card"><span>Spools</span><strong id="filamentCount">0</strong></div>
+        <div class="stat-card"><span>Estimated remaining</span><strong id="filamentRemaining">0g</strong></div>
+        <div class="stat-card"><span>Inventory value</span><strong id="filamentValue">$0</strong></div>
       </section>
 
-      <section class="settings-section">
-        <div class="section-heading">
-          <h3>Cloud sync</h3>
-          <span id="cloudStatus" class="badge">Not connected</span>
-        </div>
-        <p class="muted">Optional. Connect Supabase to see the same price book on your phone and PC.</p>
-        <label>Supabase project URL
-          <input id="supabaseUrlInput" placeholder="https://xxxxx.supabase.co" />
-        </label>
-        <label>Supabase anon key
-          <input id="supabaseKeyInput" type="password" placeholder="eyJ..." />
-        </label>
+      <div id="filamentGrid" class="filament-grid"></div>
+      <div id="filamentEmpty" class="empty-state hidden"><h3>No filament yet</h3><p>Add a spool and PrintBook can calculate material cost automatically.</p></div>
+    </section>
 
-        <div id="authFields" class="auth-box">
-          <label>Email
-            <input id="emailInput" type="email" placeholder="you@example.com" />
-          </label>
-          <label>Password
-            <input id="passwordInput" type="password" placeholder="At least 6 characters" />
-          </label>
-          <div class="row">
-            <button class="secondary" type="button" id="signUpBtn">Create account</button>
-            <button class="primary" type="button" id="signInBtn">Sign in</button>
-          </div>
-        </div>
+    <!-- ORDERS -->
+    <section class="view" data-view="orders">
+      <div class="page-title">
+        <div><p class="eyebrow">CUSTOM WORK</p><h2>Custom orders</h2></div>
+        <button class="primary" id="addOrderBtn">+ New order</button>
+      </div>
 
-        <div id="signedInBox" class="auth-box hidden">
-          <p>Signed in as <strong id="signedInEmail"></strong></p>
-          <div class="row">
-            <button class="secondary" type="button" id="pushLocalBtn">Upload local prints</button>
-            <button class="secondary" type="button" id="signOutBtn">Sign out</button>
-          </div>
-        </div>
-      </section>
+      <div class="segmented" id="orderFilter">
+        <button class="active" data-status="">All</button>
+        <button data-status="Requested">Requested</button>
+        <button data-status="Printing">Printing</button>
+        <button data-status="Ready">Ready</button>
+        <button data-status="Paid">Paid</button>
+      </div>
+      <div id="orderList" class="order-list"></div>
+      <div id="orderEmpty" class="empty-state hidden"><h3>No orders here</h3><p>Custom requests will show up here.</p></div>
+    </section>
+  </main>
 
-      <section class="settings-section">
-        <h3>Backup</h3>
-        <div class="row">
-          <button class="secondary" type="button" id="exportBtn">Export JSON</button>
-          <label class="button-like">Import JSON
-            <input id="importInput" type="file" accept=".json,application/json" hidden />
-          </label>
-        </div>
-      </section>
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-nav="dashboard"><span>⌂</span><small>Home</small></button>
+    <button class="nav-item" data-nav="prints"><span>▦</span><small>Prints</small></button>
+    <button class="nav-item center-add" id="mobileAddBtn"><span>＋</span></button>
+    <button class="nav-item" data-nav="filaments"><span>◉</span><small>Filament</small></button>
+    <button class="nav-item" data-nav="orders"><span>☷</span><small>Orders</small></button>
+  </nav>
+</div>
 
-      <button class="primary full-width" id="saveSettingsBtn" type="button">Save settings</button>
+<!-- PRINT EDITOR -->
+<dialog id="editorDialog">
+  <form method="dialog" class="sheet" id="editorForm">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">PRINT DETAILS</p><h2 id="editorTitle">Add print</h2></div>
+      <button class="icon-btn" type="button" id="closeEditor">✕</button>
     </div>
-  </dialog>
 
-  <div id="toast" class="toast"></div>
+    <div class="photo-picker">
+      <img id="photoPreview" class="hidden" alt="Print preview" />
+      <div id="photoPlaceholder"><span>📷</span><strong>Add a photo</strong><small>Take one or choose from your library</small></div>
+      <input id="photoInput" type="file" accept="image/*" capture="environment" />
+    </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js"></script>
+    <div class="favorite-row">
+      <button type="button" class="favorite-toggle" id="favoriteToggle">☆ Favorite</button>
+      <a id="modelSourceOpen" class="model-link hidden" target="_blank" rel="noopener">Open model source ↗</a>
+    </div>
+
+    <div class="form-grid">
+      <label class="full">Print name<input id="nameInput" required placeholder="Small multicolor figure" /></label>
+      <label>Category<input id="categoryInput" placeholder="Figures" /></label>
+      <label>Model source<input id="modelSourceInput" type="url" placeholder="https://makerworld.com/..." /></label>
+
+      <label>Selling price<div class="money-input"><span>$</span><input id="priceInput" type="number" min="0" step="0.01" placeholder="10.00" /></div></label>
+      <label>Pricing preset<select id="presetInput"></select></label>
+
+      <label>Print time (hours)<input id="hoursInput" type="number" min="0" step="0.1" placeholder="2" /></label>
+      <label>Manual extra cost<div class="money-input"><span>$</span><input id="extraCostInput" type="number" min="0" step="0.01" placeholder="0.00" /></div></label>
+
+      <label>Made quantity<input id="madeInput" type="number" min="0" step="1" value="0" /></label>
+      <label>Sold quantity<input id="soldInput" type="number" min="0" step="1" value="0" /></label>
+
+      <label class="full">Notes<textarea id="notesInput" placeholder="Multicolor, no painting. Good impulse-buy item."></textarea></label>
+    </div>
+
+    <section class="subsection">
+      <div class="section-heading">
+        <div><h3>Filaments used</h3><p class="muted">Add as many colors/materials as the print uses.</p></div>
+        <button type="button" class="secondary small" id="addPrintFilamentBtn">+ Filament</button>
+      </div>
+      <div id="printFilamentRows" class="usage-list"></div>
+    </section>
+
+    <div class="recommend-card">
+      <div><span>Material cost</span><strong id="materialCostPreview">$0</strong></div>
+      <div><span>Suggested price</span><strong id="suggestedPrice">$0</strong></div>
+      <div><span>Est. profit each</span><strong id="profitPreview">$0</strong></div>
+      <div><span>In stock</span><strong id="stockPreview">0</strong></div>
+    </div>
+
+    <div class="sheet-actions">
+      <button type="button" class="danger secondary" id="deleteBtn">Delete</button>
+      <button type="button" class="secondary" id="recordSaleFromPrintBtn">Record sale</button>
+      <button type="button" class="primary" id="savePrintBtn">Save print</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- FILAMENT EDITOR -->
+<dialog id="filamentDialog">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">FILAMENT</p><h2 id="filamentTitle">Add spool</h2></div>
+      <button class="icon-btn" type="button" id="closeFilament">✕</button>
+    </div>
+    <div class="form-grid">
+      <label>Brand<input id="filBrand" placeholder="Bambu Lab" /></label>
+      <label>Material<input id="filMaterial" placeholder="PLA Basic" /></label>
+      <label>Color<input id="filColor" placeholder="Jade White" /></label>
+      <label>Spool size (g)<input id="filSpoolSize" type="number" min="1" value="1000" /></label>
+      <label>Purchase price<div class="money-input"><span>$</span><input id="filPrice" type="number" min="0" step="0.01" placeholder="19.99" /></div></label>
+      <label>Remaining (g)<input id="filRemainingInput" type="number" min="0" placeholder="1000" /></label>
+      <label class="full">Notes<input id="filNotes" placeholder="AMS slot 1, matte, etc." /></label>
+    </div>
+    <div class="recommend-card single-line">
+      <div><span>Cost per gram</span><strong id="costPerGramPreview">$0.000</strong></div>
+      <div><span>Remaining value</span><strong id="remainingValuePreview">$0</strong></div>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="danger secondary" id="deleteFilamentBtn">Delete</button>
+      <button type="button" class="primary" id="saveFilamentBtn">Save spool</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- SALE DIALOG -->
+<dialog id="saleDialog">
+  <div class="sheet narrow">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">SALE</p><h2>Record a sale</h2></div><button class="icon-btn" id="closeSale" type="button">✕</button></div>
+    <div class="form-grid">
+      <label class="full">Print<select id="salePrint"></select></label>
+      <label>Quantity<input id="saleQty" type="number" min="1" value="1" /></label>
+      <label>Price each<div class="money-input"><span>$</span><input id="salePrice" type="number" min="0" step="0.01" /></div></label>
+      <label>Date<input id="saleDate" type="date" /></label>
+      <label>Channel<input id="saleChannel" placeholder="Cash, Etsy, friend..." /></label>
+      <label class="full">Notes<input id="saleNotes" placeholder="Optional" /></label>
+    </div>
+    <div class="recommend-card">
+      <div><span>Total</span><strong id="saleTotalPreview">$0</strong></div>
+      <div><span>Est. profit</span><strong id="saleProfitPreview">$0</strong></div>
+    </div>
+    <button class="primary full-width" id="saveSaleBtn" type="button">Record sale</button>
+  </div>
+</dialog>
+
+<!-- SALES HISTORY -->
+<dialog id="salesHistoryDialog">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">SALES</p><h2>Sales history</h2></div><button class="icon-btn" id="closeSalesHistory" type="button">✕</button></div>
+    <div id="salesHistoryList" class="order-list"></div>
+  </div>
+</dialog>
+
+<!-- ORDER DIALOG -->
+<dialog id="orderDialog">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">CUSTOM ORDER</p><h2 id="orderTitle">New order</h2></div><button class="icon-btn" id="closeOrder" type="button">✕</button></div>
+    <div class="form-grid">
+      <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
+      <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Printing</option><option>Ready</option><option>Paid</option><option>Cancelled</option></select></label>
+      <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
+      <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
+      <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
+      <label>Due date<input id="orderDue" type="date" /></label>
+      <label>Linked print<select id="orderPrint"><option value="">None / custom</option></select></label>
+      <label class="full">Notes<textarea id="orderNotes" placeholder="Colors, size, delivery details..."></textarea></label>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="danger secondary" id="deleteOrderBtn">Delete</button>
+      <button type="button" class="primary" id="saveOrderBtn">Save order</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- HELP ME PRICE -->
+<dialog id="priceHelperDialog">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">PRICE ASSISTANT</p><h2>Help me price this</h2></div><button class="icon-btn" id="closePriceHelper" type="button">✕</button></div>
+    <p class="muted">Build a quick quote before you even create a catalog entry.</p>
+    <div class="form-grid">
+      <label>Print time (hours)<input id="hpHours" type="number" min="0" step="0.1" placeholder="2" /></label>
+      <label>Preset<select id="hpPreset"></select></label>
+      <label>Post-processing<div class="money-input"><span>$</span><input id="hpExtra" type="number" min="0" step="0.01" value="0" /></div></label>
+      <label>Complexity<select id="hpComplexity"><option value="1">Normal</option><option value="1.1">Detailed / risky</option><option value="1.2">High-risk / lots of swaps</option></select></label>
+    </div>
+    <section class="subsection">
+      <div class="section-heading"><div><h3>Filament usage</h3><p class="muted">Choose spools or enter a manual cost.</p></div><button class="secondary small" id="hpAddFilament" type="button">+ Filament</button></div>
+      <div id="hpFilamentRows" class="usage-list"></div>
+    </section>
+    <div class="recommend-card helper-results">
+      <div><span>Material</span><strong id="hpMaterial">$0</strong></div>
+      <div><span>Base cost</span><strong id="hpBase">$0</strong></div>
+      <div><span>Recommended</span><strong id="hpRecommended">$0</strong></div>
+      <div><span>High margin</span><strong id="hpHigh">$0</strong></div>
+      <div><span>Bulk 5+</span><strong id="hpBulk">$0</strong></div>
+      <div><span>Profit at recommended</span><strong id="hpProfit">$0</strong></div>
+    </div>
+    <button class="primary full-width" id="hpUsePriceBtn" type="button">Create print with recommended price</button>
+  </div>
+</dialog>
+
+<!-- SETTINGS -->
+<dialog id="settingsDialog">
+  <div class="sheet settings-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">SETTINGS</p><h2>PrintBook setup</h2></div><button class="icon-btn" type="button" id="closeSettings">✕</button></div>
+
+    <section class="settings-section">
+      <div class="section-heading"><div><h3>Pricing presets</h3><p class="muted">Normal, friend, event, wholesale — whatever you use.</p></div><button class="secondary small" id="addPresetBtn" type="button">+ Preset</button></div>
+      <div id="presetList" class="preset-list"></div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading"><h3>Cloud sync</h3><span id="cloudStatus" class="badge">Not connected</span></div>
+      <p class="muted">Optional. Connect Supabase to see the same data on phone and PC.</p>
+      <label>Supabase project URL<input id="supabaseUrlInput" placeholder="https://xxxxx.supabase.co" /></label>
+      <label>Supabase anon key<input id="supabaseKeyInput" type="password" placeholder="eyJ..." /></label>
+      <div id="authFields" class="auth-box">
+        <label>Email<input id="emailInput" type="email" /></label>
+        <label>Password<input id="passwordInput" type="password" /></label>
+        <div class="row"><button class="secondary" type="button" id="signUpBtn">Create account</button><button class="primary" type="button" id="signInBtn">Sign in</button></div>
+      </div>
+      <div id="signedInBox" class="auth-box hidden">
+        <p>Signed in as <strong id="signedInEmail"></strong></p>
+        <div class="row"><button class="secondary" type="button" id="pushLocalBtn">Upload local data</button><button class="secondary" type="button" id="signOutBtn">Sign out</button></div>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>Backup</h3>
+      <div class="row"><button class="secondary" type="button" id="exportBtn">Export JSON</button><label class="button-like">Import JSON<input id="importInput" type="file" accept=".json,application/json" hidden /></label></div>
+    </section>
+
+    <button class="primary full-width" id="saveSettingsBtn" type="button">Save settings</button>
+  </div>
+</dialog>
+
+<!-- PRESET EDITOR -->
+<dialog id="presetDialog">
+  <div class="sheet narrow">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">PRICING PRESET</p><h2 id="presetTitle">Add preset</h2></div><button class="icon-btn" type="button" id="closePreset">✕</button></div>
+    <div class="form-grid">
+      <label class="full">Name<input id="prName" placeholder="Normal" /></label>
+      <label>Printer time / hr<div class="money-input"><span>$</span><input id="prRate" type="number" min="0" step="0.25" /></div></label>
+      <label>Multiplier<input id="prMarkup" type="number" min="1" step="0.1" /></label>
+      <label>Minimum price<div class="money-input"><span>$</span><input id="prMinimum" type="number" min="0" step="0.5" /></div></label>
+      <label>Round to<select id="prRound"><option value=".5">$0.50</option><option value="1">$1</option><option value="5">$5</option></select></label>
+    </div>
+    <div class="sheet-actions"><button class="danger secondary" id="deletePresetBtn" type="button">Delete</button><button class="primary" id="savePresetBtn" type="button">Save preset</button></div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 </body>
 </html>

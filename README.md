@@ -1,77 +1,80 @@
-# PrintBook
+# PrintBook v3
 
-A phone-first 3D-print pricing book that can run on GitHub Pages.
+Mobile-first 3D print pricing, inventory, sales, and custom-order tracker.
 
-## What it does
+## Added in this version
 
-- Save a photo for each print
-- Track selling price, print time, material cost, filament weight, colors/material, category and notes
-- Automatically suggest a price
-- Estimate profit
-- Search and filter
-- Works offline in local mode
-- Optional Supabase account + cloud sync
-- Installable on iPhone/Android as a home-screen web app
-- JSON backup/export
+- Filament inventory
+  - brand, material, color, spool size, price, remaining grams
+  - automatic cost-per-gram
+  - low-filament dashboard section
+- Multiple filaments per print
+  - select multiple saved spools
+  - grams per color/material
+  - automatic material-cost calculation
+- Print inventory
+  - quantity made
+  - quantity sold
+  - current stock
+- Sales history
+  - quantity, sale price, date, channel, profit estimate
+  - recording a sale automatically increases sold quantity
+- Pricing presets
+  - Normal, Friend, Event/Market, Bulk defaults
+  - create/edit/delete your own presets
+- Dashboard
+  - revenue
+  - estimated profit
+  - stock
+  - open orders
+  - favorites
+  - recent sales
+  - low filament
+  - active orders
+- Favorites
+- Model source URL
+- Custom orders
+  - customer, request, quantity, quote, status, due date, linked print, notes
+- “Help Me Price This”
+  - print time
+  - multiple filament usage
+  - post-processing cost
+  - complexity
+  - preset
+  - recommended, high-margin, and bulk price
+  - one tap to turn the quote into a new print
 
-The first sample entry is the small multicolor figure priced at $10.
+## Updating the GitHub Pages site
 
-## Quick local test
+Replace the old repository files with the contents of this zip and commit them.
 
-Open `index.html` in a browser. Local mode works immediately.
+Important: `sw.js` now uses a new cache version so the updated site should replace the old app after refresh.
 
-For the installable/offline PWA features, use GitHub Pages or another web server rather than opening the file directly.
+## Local mode
 
-## Put it on GitHub Pages
+Everything except cross-device sync works without Supabase. Data is saved in the browser and can be exported as JSON.
 
-1. Create a new GitHub repository, for example `printbook`.
-2. Upload the contents of this folder to the repository root.
-3. Open **Settings → Pages**.
-4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Select `main` and `/ (root)`.
-6. Save. GitHub will give you the site address.
+## Supabase sync
 
-## Add it to iPhone Home Screen
+When you're ready:
 
-1. Open the GitHub Pages site in Safari.
-2. Tap **Share**.
-3. Tap **Add to Home Screen**.
-4. Name it `PrintBook`.
+1. Open Supabase SQL Editor.
+2. Run the included `supabase_schema.sql`.
+   - It is migration-friendly and can be run over the earlier PrintBook schema.
+3. Copy Project URL + anon/public key into PrintBook → Settings.
+4. Create account / sign in.
+5. Use “Upload local data” once to push your existing local prints, filaments, sales, and orders.
 
-It will launch much more like a normal app.
+Pricing presets are currently stored in local settings rather than Supabase because they're tiny configuration data. Your catalog, filaments, sales, orders, and print photos sync through Supabase.
 
-## Optional cloud sync with Supabase
+## Pricing logic
 
-Local mode works without this. Cloud sync is what makes the same price book appear on your phone and PC.
+For the selected preset:
 
-1. Create a free Supabase project.
-2. Open **SQL Editor**.
-3. Paste and run `supabase_schema.sql`.
-4. In Supabase, open **Project Settings → API**.
-5. Copy the **Project URL** and **anon/public key**.
-6. Open PrintBook → Settings.
-7. Paste the URL and anon key.
-8. Create an account with your email/password or sign in.
-9. Tap **Upload local prints** once if you already added prints before enabling sync.
+`base = material cost + (hours × printer hourly rate)`
 
-The anon key is intended for browser apps. The included Row Level Security rules prevent users from reading each other's print records.
+`recommended = base × markup × complexity`
 
-### Authentication note
+Then PrintBook applies the preset minimum and rounds upward.
 
-If Supabase email confirmation is enabled, you may need to confirm the email before signing in. For a private personal app, you can change this in Supabase Authentication settings if desired.
-
-## Pricing formula
-
-Suggested price is:
-
-`(material cost + print hours × printer hourly rate) × profit multiplier`
-
-Then it applies your minimum price and rounds up by your chosen amount.
-
-Defaults:
-- Printer time: $2/hour
-- Profit multiplier: 1.5×
-- Minimum price: $8
-- Round to: $1
-
-Change these inside Settings.
+Material cost comes from the selected saved filament spools and grams used, plus any manual extra cost.
