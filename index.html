@@ -16,9 +16,12 @@
 <body>
 <div class="app-shell">
   <header class="topbar">
-    <div>
-      <p class="eyebrow">3D PRINT SHOP</p>
-      <h1>PrintBook</h1>
+    <div class="brand-wrap">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">☰</button>
+      <div>
+        <p class="eyebrow">3D PRINT SHOP</p>
+        <h1>PrintBook</h1>
+      </div>
     </div>
     <div class="header-actions">
       <button class="icon-btn" id="helpPriceBtn" title="Help me price this">✦</button>
@@ -27,9 +30,64 @@
     </div>
   </header>
 
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="side-drawer" id="sideDrawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">PRINTBOOK</p>
+        <h2>Menu</h2>
+      </div>
+      <button class="icon-btn" id="closeMenuBtn" aria-label="Close menu">✕</button>
+    </div>
+
+    <nav class="drawer-nav">
+      <button class="drawer-link active" data-nav="shop"><span>⌂</span><div><strong>Home / Shop</strong><small>Browse what you sell</small></div></button>
+      <button class="drawer-link" data-nav="dashboard"><span>◫</span><div><strong>Dashboard</strong><small>Revenue, stock, orders</small></div></button>
+      <button class="drawer-link" data-nav="prints"><span>▦</span><div><strong>Print Library</strong><small>Edit products and inventory</small></div></button>
+      <button class="drawer-link" data-nav="filaments"><span>◉</span><div><strong>Filaments</strong><small>Spools, colors, remaining grams</small></div></button>
+      <button class="drawer-link" data-nav="orders"><span>☷</span><div><strong>Custom Orders</strong><small>Requests and due dates</small></div></button>
+    </nav>
+
+    <div class="drawer-actions">
+      <button class="secondary full-width" id="drawerPriceBtn">✦ Help me price this</button>
+      <button class="secondary full-width" id="drawerSalesBtn">Sales history</button>
+      <button class="secondary full-width" id="drawerSettingsBtn">Settings</button>
+    </div>
+  </aside>
+
   <main>
+
+    <!-- SHOP / HOME -->
+    <section class="view active" data-view="shop">
+      <section class="shop-hero">
+        <div>
+          <p class="eyebrow">YOUR SHOP</p>
+          <h2>What are we selling?</h2>
+          <p class="muted">This is the clean storefront-style home. Tap any item to open its details, edit stock, or record a sale.</p>
+        </div>
+        <button class="primary" id="shopAddBtn">+ Add product</button>
+      </section>
+
+      <section class="shop-controls">
+        <div class="search-wrap"><span>⌕</span><input id="shopSearch" type="search" placeholder="Search your products..." /></div>
+        <select id="shopCategoryFilter"><option value="">All categories</option></select>
+      </section>
+
+      <div class="shop-summary">
+        <span><strong id="shopProductCount">0</strong> products</span>
+        <span><strong id="shopStockCount">0</strong> items in stock</span>
+        <span><strong id="shopFavCount">0</strong> favorites</span>
+      </div>
+
+      <div id="shopGrid" class="shop-grid"></div>
+      <div id="shopEmpty" class="empty-state hidden">
+        <h3>No products yet</h3>
+        <p>Add your first print and it'll show up here.</p>
+      </div>
+    </section>
+
     <!-- DASHBOARD -->
-    <section class="view active" data-view="dashboard">
+    <section class="view" data-view="dashboard">
       <section class="hero compact">
         <div>
           <p class="hero-kicker">YOUR SHOP AT A GLANCE</p>
@@ -135,10 +193,10 @@
   </main>
 
   <nav class="bottom-nav">
-    <button class="nav-item active" data-nav="dashboard"><span>⌂</span><small>Home</small></button>
-    <button class="nav-item" data-nav="prints"><span>▦</span><small>Prints</small></button>
+    <button class="nav-item active" data-nav="shop"><span>⌂</span><small>Home</small></button>
+    <button class="nav-item" id="mobileMenuBtn"><span>☰</span><small>Menu</small></button>
     <button class="nav-item center-add" id="mobileAddBtn"><span>＋</span></button>
-    <button class="nav-item" data-nav="filaments"><span>◉</span><small>Filament</small></button>
+    <button class="nav-item" data-nav="prints"><span>▦</span><small>Prints</small></button>
     <button class="nav-item" data-nav="orders"><span>☷</span><small>Orders</small></button>
   </nav>
 </div>
@@ -214,7 +272,13 @@
     <div class="form-grid">
       <label>Brand<input id="filBrand" placeholder="Bambu Lab" /></label>
       <label>Material<input id="filMaterial" placeholder="PLA Basic" /></label>
-      <label>Color<input id="filColor" placeholder="Jade White" /></label>
+      <label>Color name<input id="filColor" placeholder="Jade White" /></label>
+      <label>Visual spool color
+        <div class="spool-color-control">
+          <input id="filVisualColor" type="color" value="#ffffff" aria-label="Visual spool color" />
+          <input id="filVisualHex" type="text" value="#ffffff" maxlength="7" placeholder="#ffffff" aria-label="Visual spool color hex" />
+        </div>
+      </label>
       <label>Spool size (g)<input id="filSpoolSize" type="number" min="1" value="1000" /></label>
       <label>Purchase price<div class="money-input"><span>$</span><input id="filPrice" type="number" min="0" step="0.01" placeholder="19.99" /></div></label>
       <label>Remaining (g)<input id="filRemainingInput" type="number" min="0" placeholder="1000" /></label>

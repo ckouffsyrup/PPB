@@ -31,7 +31,7 @@ let items=JSON.parse(localStorage.getItem(K.items)||"null")||[firstItem];
 
 let editingId=null, editingFilamentId=null, editingOrderId=null, editingPresetId=null;
 let pendingPhotoFile=null,pendingPhotoData="",editorFavorite=false;
-let currentView="dashboard",orderStatusFilter="";
+let currentView="shop",orderStatusFilter="";
 let supabaseClient=null,currentUser=null;
 
 function persist(){
@@ -62,14 +62,61 @@ function saleProfit(s){
  return (Number(s.unit_price)||0)*Number(s.quantity||0)-cost*Number(s.quantity||0)
 }
 function showView(name){
- currentView=name;document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.dataset.view===name));
+ currentView=name;
+ document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.dataset.view===name));
  document.querySelectorAll("[data-nav]").forEach(b=>b.classList.toggle("active",b.dataset.nav===name));
- window.scrollTo({top:0,behavior:"smooth"});renderAll()
+ closeMenu();
+ window.scrollTo({top:0,behavior:"smooth"});
+ renderAll()
 }
+function openMenu(){$("sideDrawer").classList.add("open");$("drawerBackdrop").classList.add("open");$("sideDrawer").setAttribute("aria-hidden","false")}
+function closeMenu(){$("sideDrawer").classList.remove("open");$("drawerBackdrop").classList.remove("open");$("sideDrawer").setAttribute("aria-hidden","true")}
 document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>showView(b.dataset.nav));
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>showView(b.dataset.go));
+$("menuBtn").onclick=openMenu;
+$("mobileMenuBtn").onclick=openMenu;
+$("closeMenuBtn").onclick=closeMenu;
+$("drawerBackdrop").onclick=closeMenu;
+$("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};
+$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};
+$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};
 
-function renderAll(){renderDashboard();renderPrints();renderFilaments();renderOrders();renderPresets();populatePrintSelects();populatePresetSelects()}
+function renderAll(){renderShop();renderDashboard();renderPrints();renderFilaments();renderOrders();renderPresets();populatePrintSelects();populatePresetSelects()}
+function renderShop(){
+ const q=$("shopSearch")?.value.trim().toLowerCase()||"";
+ const cat=$("shopCategoryFilter")?.value||"";
+ const list=items.filter(i=>{
+  const hay=[i.name,i.category,i.notes,i.model_source].join(" ").toLowerCase();
+  return hay.includes(q)&&(!cat||i.category===cat);
+ });
+ if($("shopGrid")){
+  $("shopGrid").innerHTML=list.map(i=>{
+   const stock=itemStock(i),mat=itemMaterialCost(i);
+   return `<article class="shop-card" onclick="openEditor('${i.id}')">
+    <div class="shop-card-photo">
+      ${i.photo_url?`<img src="${safe(i.photo_url)}" alt="${safe(i.name)}">`:`<div class="photo-fallback">◌</div>`}
+      ${i.favorite?`<div class="fav-chip">★</div>`:""}
+      <div class="price-chip">${money(i.price)}</div>
+    </div>
+    <div class="shop-card-body">
+      <h3>${safe(i.name)}</h3>
+      <p>${safe(i.category||"Uncategorized")}${i.hours?` · ${safe(i.hours)} hr print`:""}</p>
+      <div class="shop-card-footer">
+        <div><div class="shop-price">${money(i.price)}</div><small>${money(Math.max(0,Number(i.price||0)-mat))} est. profit</small></div>
+        <div class="shop-stock"><strong>${stock}</strong><br>in stock</div>
+      </div>
+    </div>
+   </article>`
+  }).join("");
+  $("shopEmpty").classList.toggle("hidden",!!list.length);
+  $("shopProductCount").textContent=items.length;
+  $("shopStockCount").textContent=items.reduce((a,i)=>a+itemStock(i),0);
+  $("shopFavCount").textContent=items.filter(i=>i.favorite).length;
+  const cats=[...new Set(items.map(i=>i.category).filter(Boolean))].sort();
+  const cur=$("shopCategoryFilter").value;
+  $("shopCategoryFilter").innerHTML=`<option value="">All categories</option>`+cats.map(c=>`<option ${c===cur?"selected":""}>${safe(c)}</option>`).join("");
+ }
+}
 function renderDashboard(){
  const revenue=sales.reduce((a,s)=>a+Number(s.unit_price||0)*Number(s.quantity||0),0);
  const profit=sales.reduce((a,s)=>a+saleProfit(s),0);
@@ -110,7 +157,7 @@ function renderFilaments(){
  const val=filaments.reduce((a,f)=>a+filamentCost(f.id,f.remaining),0);$("filamentValue").textContent=money(val);
  $("filamentGrid").innerHTML=filaments.map(f=>{
   const pct=Math.max(0,Math.min(100,Number(f.remaining||0)/Number(f.spool_size||1000)*100));
-  return `<article class="filament-card" onclick="openFilament('${f.id}')"><div class="filament-top"><div><strong>${safe(f.brand||"Filament")} · ${safe(f.color||"Unknown color")}</strong><small>${safe(f.material||"Material")}</small></div><div class="filament-color">◉</div></div><div class="progress"><span style="width:${pct}%"></span></div><div class="card-meta"><div><span>LEFT</span><strong>${Math.round(Number(f.remaining||0))}g</strong></div><div><span>COST/G</span><strong>${money(filamentCost(f.id,1))}</strong></div><div><span>VALUE</span><strong>${money(filamentCost(f.id,f.remaining))}</strong></div></div></article>`
+  return `<article class="filament-card" onclick="openFilament('${f.id}')"><div class="filament-top"><div><strong>${safe(f.brand||"Filament")} · ${safe(f.color||"Unknown color")}</strong><small>${safe(f.material||"Material")}</small></div><div class="filament-color" style="--spool-color:${safe(f.visual_color||'#ffffff')}" title="${safe(f.color||'Filament color')}">◉</div></div><div class="progress"><span style="width:${pct}%"></span></div><div class="card-meta"><div><span>LEFT</span><strong>${Math.round(Number(f.remaining||0))}g</strong></div><div><span>COST/G</span><strong>${money(filamentCost(f.id,1))}</strong></div><div><span>VALUE</span><strong>${money(filamentCost(f.id,f.remaining))}</strong></div></div></article>`
  }).join("");
  $("filamentEmpty").classList.toggle("hidden",!!filaments.length)
 }
@@ -169,10 +216,10 @@ async function savePrint(){
 }
 async function deletePrint(){if(!editingId||!confirm("Delete this print?"))return;if(currentUser)await syncDelete("prints",editingId);items=items.filter(i=>i.id!==editingId);persist();$("editorDialog").close();toast("Print deleted")}
 
-function resetFilament(){editingFilamentId=null;["filBrand","filMaterial","filColor","filPrice","filNotes"].forEach(id=>$(id).value="");$("filSpoolSize").value=1000;$("filRemainingInput").value=1000;$("deleteFilamentBtn").style.visibility="hidden";updateFilamentPreview()}
-window.openFilament=id=>{resetFilament();if(id){const f=filaments.find(x=>x.id===id);if(!f)return;editingFilamentId=id;$("filamentTitle").textContent="Edit spool";$("filBrand").value=f.brand||"";$("filMaterial").value=f.material||"";$("filColor").value=f.color||"";$("filSpoolSize").value=f.spool_size||1000;$("filPrice").value=f.purchase_price??"";$("filRemainingInput").value=f.remaining??"";$("filNotes").value=f.notes||"";$("deleteFilamentBtn").style.visibility="visible"}else $("filamentTitle").textContent="Add spool";updateFilamentPreview();$("filamentDialog").showModal()}
+function resetFilament(){editingFilamentId=null;["filBrand","filMaterial","filColor","filPrice","filNotes"].forEach(id=>$(id).value="");$("filVisualColor").value="#ffffff";$("filVisualHex").value="#ffffff";$("filSpoolSize").value=1000;$("filRemainingInput").value=1000;$("deleteFilamentBtn").style.visibility="hidden";updateFilamentPreview()}
+window.openFilament=id=>{resetFilament();if(id){const f=filaments.find(x=>x.id===id);if(!f)return;editingFilamentId=id;$("filamentTitle").textContent="Edit spool";$("filBrand").value=f.brand||"";$("filMaterial").value=f.material||"";$("filColor").value=f.color||"";$("filVisualColor").value=f.visual_color||"#ffffff";$("filVisualHex").value=f.visual_color||"#ffffff";$("filSpoolSize").value=f.spool_size||1000;$("filPrice").value=f.purchase_price??"";$("filRemainingInput").value=f.remaining??"";$("filNotes").value=f.notes||"";$("deleteFilamentBtn").style.visibility="visible"}else $("filamentTitle").textContent="Add spool";updateFilamentPreview();$("filamentDialog").showModal()}
 function updateFilamentPreview(){const size=Number($("filSpoolSize").value||1000),price=Number($("filPrice").value||0),rem=Number($("filRemainingInput").value||0),cpg=price/size;$("costPerGramPreview").textContent="$"+cpg.toFixed(3);$("remainingValuePreview").textContent=money(cpg*rem)}
-async function saveFilament(){const id=editingFilamentId||uid(),f={id,brand:$("filBrand").value.trim(),material:$("filMaterial").value.trim(),color:$("filColor").value.trim(),spool_size:Number($("filSpoolSize").value||1000),purchase_price:Number($("filPrice").value||0),remaining:Number($("filRemainingInput").value||0),notes:$("filNotes").value.trim(),created_at:filaments.find(x=>x.id===id)?.created_at||new Date().toISOString()};if(currentUser)await syncUpsert("filaments",{...f,user_id:currentUser.id});const idx=filaments.findIndex(x=>x.id===id);if(idx>=0)filaments[idx]=f;else filaments.unshift(f);persist();$("filamentDialog").close();toast("Spool saved")}
+async function saveFilament(){const id=editingFilamentId||uid(),f={id,brand:$("filBrand").value.trim(),material:$("filMaterial").value.trim(),color:$("filColor").value.trim(),visual_color:$("filVisualColor").value||"#ffffff",spool_size:Number($("filSpoolSize").value||1000),purchase_price:Number($("filPrice").value||0),remaining:Number($("filRemainingInput").value||0),notes:$("filNotes").value.trim(),created_at:filaments.find(x=>x.id===id)?.created_at||new Date().toISOString()};if(currentUser)await syncUpsert("filaments",{...f,user_id:currentUser.id});const idx=filaments.findIndex(x=>x.id===id);if(idx>=0)filaments[idx]=f;else filaments.unshift(f);persist();$("filamentDialog").close();toast("Spool saved")}
 async function deleteFilament(){if(!editingFilamentId||!confirm("Delete this spool?"))return;if(currentUser)await syncDelete("filaments",editingFilamentId);filaments=filaments.filter(f=>f.id!==editingFilamentId);persist();$("filamentDialog").close()}
 
 function openSale(printId=null){populatePrintSelects();$("salePrint").value=printId||items[0]?.id||"";syncSalePrice();$("saleQty").value=1;$("saleDate").value=TODAY();$("saleChannel").value="";$("saleNotes").value="";updateSalePreview();$("saleDialog").showModal()}
@@ -214,7 +261,7 @@ async function pullCloud(){if(!currentUser)return;const [pr,fi,sa,or]=await Prom
 function exportData(){const payload={version:3,exported_at:new Date().toISOString(),settings:{...settings,supabaseKey:""},presets,filaments,items,sales,orders};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="printbook-v3-backup.json";a.click();URL.revokeObjectURL(a.href)}
 async function importData(e){const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(d.items)items=d.items;if(d.filaments)filaments=d.filaments;if(d.sales)sales=d.sales;if(d.orders)orders=d.orders;if(d.presets)presets=d.presets;if(d.settings)settings={...settings,...d.settings,supabaseKey:settings.supabaseKey};persist();toast("Backup imported")}catch{toast("Invalid backup")}}
 
-$("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=()=>openEditor();
+$("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();
 $("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=async()=>{if(currentUser){await pullCloud();toast("Synced")}else toast("Cloud sync not connected")};
 $("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
@@ -222,10 +269,15 @@ $("closeEditor").onclick=()=>$("editorDialog").close();$("savePrintBtn").onclick
 ["hoursInput","extraCostInput","priceInput","madeInput","soldInput","presetInput"].forEach(id=>$(id).oninput=updatePricingPreviews);
 $("recordSaleFromPrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openSale(id)};
 $("addFilamentBtn").onclick=()=>openFilament();$("closeFilament").onclick=()=>$("filamentDialog").close();$("saveFilamentBtn").onclick=saveFilament;$("deleteFilamentBtn").onclick=deleteFilament;["filSpoolSize","filPrice","filRemainingInput"].forEach(id=>$(id).oninput=updateFilamentPreview);
+$("filVisualColor").oninput=()=>{$("filVisualHex").value=$("filVisualColor").value};
+$("filVisualHex").oninput=()=>{const v=$("filVisualHex").value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v))$("filVisualColor").value=v};
 $("openSalesBtn").onclick=openSalesHistory;$("closeSalesHistory").onclick=()=>$("salesHistoryDialog").close();$("closeSale").onclick=()=>$("saleDialog").close();$("salePrint").onchange=syncSalePrice;["saleQty","salePrice"].forEach(id=>$(id).oninput=updateSalePreview);$("saveSaleBtn").onclick=saveSale;
 $("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDialog").close();$("saveOrderBtn").onclick=saveOrder;$("deleteOrderBtn").onclick=deleteOrder;document.querySelectorAll("#orderFilter button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#orderFilter button").forEach(x=>x.classList.remove("active"));b.classList.add("active");orderStatusFilter=b.dataset.status;renderOrders()});
 $("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows",{},"hp");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;
 $("closeSettings").onclick=()=>$("settingsDialog").close();$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;
 $("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
-populatePresetSelects();renderAll();setupSupabase();showView("dashboard");
+populatePresetSelects();renderAll();setupSupabase();showView("shop");
+
+$("shopSearch").oninput=renderShop;
+$("shopCategoryFilter").onchange=renderShop;
