@@ -24,6 +24,8 @@
       </div>
     </div>
     <div class="header-actions">
+      <span class="sync-pill" id="syncStatusPill">Local</span>
+      <button class="icon-btn notification-btn" id="notificationBtn" title="Notifications">♢<span id="notificationBadge" class="notification-badge hidden">0</span></button>
       <button class="icon-btn" id="helpPriceBtn" title="Help me price this">✦</button>
       <button class="icon-btn" id="syncBtn" title="Sync">↻</button>
       <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
@@ -45,10 +47,17 @@
       <button class="drawer-link" data-nav="dashboard"><span>◫</span><div><strong>Dashboard</strong><small>Revenue, stock, orders</small></div></button>
       <button class="drawer-link" data-nav="prints"><span>▦</span><div><strong>Print Library</strong><small>Edit products and inventory</small></div></button>
       <button class="drawer-link" data-nav="filaments"><span>◉</span><div><strong>Filaments</strong><small>Spools, colors, remaining grams</small></div></button>
+      <button class="drawer-link" data-nav="colorways"><span>◈</span><div><strong>Colorways</strong><small>Reusable filament combinations</small></div></button>
       <button class="drawer-link" data-nav="orders"><span>☷</span><div><strong>Custom Orders</strong><small>Requests and due dates</small></div></button>
     </nav>
 
+    <div class="drawer-sync-card">
+      <div><span class="status-dot" id="drawerSyncDot"></span><strong id="drawerSyncStatus">Local only</strong></div>
+      <small id="drawerLastSync">Not synced yet</small>
+    </div>
     <div class="drawer-actions">
+      <button class="secondary full-width" id="drawerCustomerBtn">◫ Customer Store Mode</button>
+      <button class="secondary full-width" id="drawerNotificationsBtn">♢ Notifications</button>
       <button class="secondary full-width" id="drawerPriceBtn">✦ Help me price this</button>
       <button class="secondary full-width" id="drawerSalesBtn">Sales history</button>
       <button class="secondary full-width" id="drawerSettingsBtn">Settings</button>
@@ -65,7 +74,10 @@
           <h2>What are we selling?</h2>
           <p class="muted">This is the clean storefront-style home. Tap any item to open its details, edit stock, or record a sale.</p>
         </div>
-        <button class="primary" id="shopAddBtn">+ Add product</button>
+        <div class="shop-hero-actions">
+          <button class="secondary" id="customerModeBtn">◫ Customer Store Mode</button>
+          <button class="primary admin-only" id="shopAddBtn">+ Add product</button>
+        </div>
       </section>
 
       <section class="shop-controls">
@@ -119,7 +131,7 @@
         </div>
 
         <div class="panel">
-          <div class="section-heading"><h3>Low filament</h3><button class="text-btn" data-go="filaments">Filaments</button></div>
+          <div class="section-heading"><h3>Restock suggestions</h3><button class="text-btn" data-go="filaments">Filaments</button></div>
           <div id="lowFilamentList" class="mini-list"></div>
         </div>
 
@@ -171,6 +183,18 @@
 
       <div id="filamentGrid" class="filament-grid"></div>
       <div id="filamentEmpty" class="empty-state hidden"><h3>No filament yet</h3><p>Add a spool and PrintBook can calculate material cost automatically.</p></div>
+    </section>
+
+
+    <!-- COLORWAYS -->
+    <section class="view" data-view="colorways">
+      <div class="page-title">
+        <div><p class="eyebrow">COLOR PRESETS</p><h2>Colorways</h2></div>
+        <button class="primary" id="addColorwayBtn">+ New colorway</button>
+      </div>
+      <p class="muted page-intro">Save combinations you use a lot, then attach them to product variants.</p>
+      <div id="colorwayGrid" class="colorway-grid"></div>
+      <div id="colorwayEmpty" class="empty-state hidden"><h3>No colorways yet</h3><p>Create one from your saved filament spools.</p></div>
     </section>
 
     <!-- ORDERS -->
@@ -229,6 +253,16 @@
       <label>Selling price<div class="money-input"><span>$</span><input id="priceInput" type="number" min="0" step="0.01" placeholder="10.00" /></div></label>
       <label>Pricing preset<select id="presetInput"></select></label>
 
+      <label>Out-of-stock behavior
+        <select id="outOfStockInput">
+          <option value="show">Show “Out of stock”</option>
+          <option value="hide">Hide from Home / Store</option>
+        </select>
+      </label>
+      <label>Deal / discount
+        <div class="deal-fields"><input id="dealQtyInput" type="number" min="0" step="1" placeholder="Qty e.g. 2" /><div class="money-input"><span>$</span><input id="dealPriceInput" type="number" min="0" step="0.01" placeholder="Deal total" /></div></div>
+      </label>
+
       <label>Print time (hours)<input id="hoursInput" type="number" min="0" step="0.1" placeholder="2" /></label>
       <label>Manual extra cost<div class="money-input"><span>$</span><input id="extraCostInput" type="number" min="0" step="0.01" placeholder="0.00" /></div></label>
 
@@ -237,6 +271,15 @@
 
       <label class="full">Notes<textarea id="notesInput" placeholder="Multicolor, no painting. Good impulse-buy item."></textarea></label>
     </div>
+
+
+    <section class="subsection">
+      <div class="section-heading">
+        <div><h3>Product variants</h3><p class="muted">Optional sizes/color versions with their own price and stock.</p></div>
+        <button type="button" class="secondary small" id="addVariantBtn">+ Variant</button>
+      </div>
+      <div id="variantRows" class="variant-list"></div>
+    </section>
 
     <section class="subsection">
       <div class="section-heading">
@@ -255,6 +298,7 @@
 
     <div class="sheet-actions">
       <button type="button" class="danger secondary" id="deleteBtn">Delete</button>
+      <button type="button" class="secondary" id="makePrintBtn">Make / Restock</button>
       <button type="button" class="secondary" id="recordSaleFromPrintBtn">Record sale</button>
       <button type="button" class="primary" id="savePrintBtn">Save print</button>
     </div>
@@ -301,14 +345,26 @@
     <div class="sheet-grabber"></div>
     <div class="sheet-header"><div><p class="eyebrow">SALE</p><h2>Record a sale</h2></div><button class="icon-btn" id="closeSale" type="button">✕</button></div>
     <div class="form-grid">
-      <label class="full">Print<select id="salePrint"></select></label>
+      <label>Print<select id="salePrint"></select></label>
+      <label>Variant<select id="saleVariant"><option value="">Standard</option></select></label>
       <label>Quantity<input id="saleQty" type="number" min="1" value="1" /></label>
       <label>Price each<div class="money-input"><span>$</span><input id="salePrice" type="number" min="0" step="0.01" /></div></label>
+      <label>Discount
+        <select id="saleDiscountType">
+          <option value="none">No discount</option>
+          <option value="deal">Product deal</option>
+          <option value="percent">Percent off</option>
+          <option value="flat">Flat amount off</option>
+        </select>
+      </label>
+      <label>Discount value<input id="saleDiscountValue" type="number" min="0" step="0.01" value="0" /></label>
       <label>Date<input id="saleDate" type="date" /></label>
       <label>Channel<input id="saleChannel" placeholder="Cash, Etsy, friend..." /></label>
       <label class="full">Notes<input id="saleNotes" placeholder="Optional" /></label>
     </div>
     <div class="recommend-card">
+      <div><span>Subtotal</span><strong id="saleSubtotalPreview">$0</strong></div>
+      <div><span>Discount</span><strong id="saleDiscountPreview">$0</strong></div>
       <div><span>Total</span><strong id="saleTotalPreview">$0</strong></div>
       <div><span>Est. profit</span><strong id="saleProfitPreview">$0</strong></div>
     </div>
@@ -375,6 +431,64 @@
   </div>
 </dialog>
 
+
+<!-- MAKE / RESTOCK DIALOG -->
+<dialog id="makeDialog">
+  <div class="sheet narrow">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">PRODUCTION</p><h2>Make / Restock</h2></div><button class="icon-btn" id="closeMake" type="button">✕</button></div>
+    <p class="muted" id="makeProductName"></p>
+    <div class="form-grid">
+      <label>Variant<select id="makeVariant"><option value="">Standard</option></select></label>
+      <label>Quantity<input id="makeQty" type="number" min="1" step="1" value="1" /></label>
+    </div>
+    <section class="subsection">
+      <div class="section-heading"><div><h3>Filament check</h3><p class="muted">Required filament is checked before inventory is changed.</p></div></div>
+      <div id="makeCheckList" class="check-list"></div>
+    </section>
+    <div id="makeWarning" class="warning-box hidden"></div>
+    <button class="primary full-width" id="confirmMakeBtn" type="button">Make and deduct filament</button>
+  </div>
+</dialog>
+
+<!-- COLORWAY EDITOR -->
+<dialog id="colorwayDialog">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">COLORWAY</p><h2 id="colorwayTitle">New colorway</h2></div><button class="icon-btn" id="closeColorway" type="button">✕</button></div>
+    <label>Colorway name<input id="colorwayName" placeholder="White + Pink" /></label>
+    <section class="subsection">
+      <div class="section-heading"><div><h3>Filaments</h3><p class="muted">Save the grams normally used for one print.</p></div><button class="secondary small" id="addColorwayFilamentBtn" type="button">+ Filament</button></div>
+      <div id="colorwayFilamentRows" class="usage-list"></div>
+    </section>
+    <div class="sheet-actions"><button class="danger secondary" id="deleteColorwayBtn" type="button">Delete</button><button class="primary" id="saveColorwayBtn" type="button">Save colorway</button></div>
+  </div>
+</dialog>
+
+<!-- NOTIFICATION CENTER -->
+<dialog id="notificationsDialog">
+  <div class="sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">NOTIFICATIONS</p><h2>Needs your attention</h2></div><button class="icon-btn" id="closeNotifications" type="button">✕</button></div>
+    <div id="notificationList" class="notification-list"></div>
+  </div>
+</dialog>
+
+<!-- CUSTOMER PRODUCT VIEW -->
+<dialog id="customerProductDialog">
+  <div class="sheet customer-product-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">PRODUCT</p><h2 id="customerProductName"></h2></div><button class="icon-btn" id="closeCustomerProduct" type="button">✕</button></div>
+    <img id="customerProductPhoto" class="customer-product-photo hidden" alt="" />
+    <div id="customerProductPrice" class="customer-big-price"></div>
+    <div id="customerProductDeal" class="deal-banner hidden"></div>
+    <p id="customerProductNotes" class="muted"></p>
+    <div id="customerVariantList" class="customer-variant-list"></div>
+    <div id="customerAvailability" class="availability-banner"></div>
+  </div>
+</dialog>
+
+
 <!-- SETTINGS -->
 <dialog id="settingsDialog">
   <div class="sheet settings-sheet">
@@ -389,6 +503,7 @@
     <section class="settings-section">
       <div class="section-heading"><h3>Cloud sync</h3><span id="cloudStatus" class="badge">Not connected</span></div>
       <p class="muted">Optional. Connect Supabase to see the same data on phone and PC.</p>
+      <div class="sync-detail"><strong id="settingsSyncState">Local only</strong><small id="settingsLastSync">Not synced yet</small></div>
       <label>Supabase project URL<input id="supabaseUrlInput" placeholder="https://xxxxx.supabase.co" /></label>
       <label>Supabase anon key<input id="supabaseKeyInput" type="password" placeholder="eyJ..." /></label>
       <div id="authFields" class="auth-box">
@@ -400,6 +515,16 @@
         <p>Signed in as <strong id="signedInEmail"></strong></p>
         <div class="row"><button class="secondary" type="button" id="pushLocalBtn">Upload local data</button><button class="secondary" type="button" id="signOutBtn">Sign out</button></div>
       </div>
+    </section>
+
+
+    <section class="settings-section">
+      <div class="section-heading"><div><h3>Notifications</h3><p class="muted">Low filament, out-of-stock items, due orders, and sync issues.</p></div></div>
+      <div class="row">
+        <button class="secondary" type="button" id="enableNotificationsBtn">Enable browser notifications</button>
+        <button class="secondary" type="button" id="openNotificationsFromSettingsBtn">Open notification center</button>
+      </div>
+      <p class="muted tiny-note">Browser alerts work while PrintBook is open. The in-app notification center always works.</p>
     </section>
 
     <section class="settings-section">
