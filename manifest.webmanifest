@@ -1,0 +1,16 @@
+{
+  "name": "PrintBook - 3D Print Price Book",
+  "short_name": "PrintBook",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0910",
+  "theme_color": "#0d0b14",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

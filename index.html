@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d0b14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PrintBook" />
+  <title>PrintBook</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/icon-180.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">3D PRINT PRICING</p>
+        <h1>PrintBook</h1>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="syncBtn" aria-label="Sync">↻</button>
+        <button class="icon-btn" id="settingsBtn" aria-label="Settings">⚙</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="hero-kicker">YOUR PRINT LIBRARY</p>
+          <h2>Know what to charge,<br><span>every time.</span></h2>
+          <p>Photos, print time, material cost, suggested price, and profit — all in one place.</p>
+        </div>
+        <button class="primary big" id="addBtn">+ Add print</button>
+      </section>
+
+      <section class="stats-grid">
+        <div class="stat-card">
+          <span>Prints</span>
+          <strong id="statCount">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Avg. price</span>
+          <strong id="statAvg">$0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Potential profit</span>
+          <strong id="statProfit">$0</strong>
+        </div>
+      </section>
+
+      <section class="controls">
+        <div class="search-wrap">
+          <span>⌕</span>
+          <input id="search" type="search" placeholder="Search prints, colors, notes..." />
+        </div>
+        <select id="categoryFilter" aria-label="Filter by category">
+          <option value="">All categories</option>
+        </select>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <h3>Your prints</h3>
+          <span id="modeBadge" class="badge">Local</span>
+        </div>
+        <div id="printGrid" class="print-grid"></div>
+        <div id="emptyState" class="empty-state hidden">
+          <div class="empty-icon">◌</div>
+          <h3>No prints found</h3>
+          <p>Add your first print or change your search.</p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-action="home"><span>⌂</span><small>Home</small></button>
+      <button class="nav-item center-add" id="mobileAddBtn"><span>＋</span></button>
+      <button class="nav-item" data-action="settings"><span>⚙</span><small>Settings</small></button>
+    </nav>
+  </div>
+
+  <dialog id="editorDialog">
+    <form method="dialog" class="sheet" id="editorForm">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <div>
+          <p class="eyebrow">PRINT DETAILS</p>
+          <h2 id="editorTitle">Add print</h2>
+        </div>
+        <button class="icon-btn" value="cancel" type="button" id="closeEditor">✕</button>
+      </div>
+
+      <div class="photo-picker">
+        <img id="photoPreview" class="hidden" alt="Print preview" />
+        <div id="photoPlaceholder">
+          <span>📷</span>
+          <strong>Add a photo</strong>
+          <small>Take one or choose from your library</small>
+        </div>
+        <input id="photoInput" type="file" accept="image/*" capture="environment" />
+      </div>
+
+      <div class="form-grid">
+        <label class="full">Print name
+          <input id="nameInput" required placeholder="Small multicolor figure" />
+        </label>
+        <label>Category
+          <input id="categoryInput" placeholder="Figures" />
+        </label>
+        <label>Selling price
+          <div class="money-input"><span>$</span><input id="priceInput" type="number" min="0" step="0.01" placeholder="10.00" /></div>
+        </label>
+
+        <label>Print time (hours)
+          <input id="hoursInput" type="number" min="0" step="0.1" placeholder="2" />
+        </label>
+        <label>Material cost
+          <div class="money-input"><span>$</span><input id="costInput" type="number" min="0" step="0.01" placeholder="0.80" /></div>
+        </label>
+
+        <label>Filament used (g)
+          <input id="gramsInput" type="number" min="0" step="1" placeholder="25" />
+        </label>
+        <label>Colors / material
+          <input id="colorsInput" placeholder="White + pink PLA" />
+        </label>
+
+        <label class="full">Notes
+          <textarea id="notesInput" placeholder="Multicolor, no painting. Good impulse-buy item."></textarea>
+        </label>
+      </div>
+
+      <div class="recommend-card">
+        <div>
+          <span>Suggested price</span>
+          <strong id="suggestedPrice">$0</strong>
+        </div>
+        <div>
+          <span>Est. profit</span>
+          <strong id="profitPreview">$0</strong>
+        </div>
+        <small>Uses your pricing settings below.</small>
+      </div>
+
+      <div class="sheet-actions">
+        <button type="button" class="secondary" id="deleteBtn">Delete</button>
+        <button type="button" class="primary" id="savePrintBtn">Save print</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <div class="sheet settings-sheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <div>
+          <p class="eyebrow">SETTINGS</p>
+          <h2>PrintBook setup</h2>
+        </div>
+        <button class="icon-btn" type="button" id="closeSettings">✕</button>
+      </div>
+
+      <section class="settings-section">
+        <h3>Pricing</h3>
+        <p class="muted">These values are used for automatic price suggestions.</p>
+        <div class="form-grid">
+          <label>Printer time / hr
+            <div class="money-input"><span>$</span><input id="rateInput" type="number" min="0" step="0.25" /></div>
+          </label>
+          <label>Profit multiplier
+            <input id="markupInput" type="number" min="1" step="0.1" />
+          </label>
+          <label>Minimum price
+            <div class="money-input"><span>$</span><input id="minimumInput" type="number" min="0" step="0.50" /></div>
+          </label>
+          <label>Round to
+            <select id="roundInput">
+              <option value="0.5">$0.50</option>
+              <option value="1">$1.00</option>
+              <option value="5">$5.00</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <div class="section-heading">
+          <h3>Cloud sync</h3>
+          <span id="cloudStatus" class="badge">Not connected</span>
+        </div>
+        <p class="muted">Optional. Connect Supabase to see the same price book on your phone and PC.</p>
+        <label>Supabase project URL
+          <input id="supabaseUrlInput" placeholder="https://xxxxx.supabase.co" />
+        </label>
+        <label>Supabase anon key
+          <input id="supabaseKeyInput" type="password" placeholder="eyJ..." />
+        </label>
+
+        <div id="authFields" class="auth-box">
+          <label>Email
+            <input id="emailInput" type="email" placeholder="you@example.com" />
+          </label>
+          <label>Password
+            <input id="passwordInput" type="password" placeholder="At least 6 characters" />
+          </label>
+          <div class="row">
+            <button class="secondary" type="button" id="signUpBtn">Create account</button>
+            <button class="primary" type="button" id="signInBtn">Sign in</button>
+          </div>
+        </div>
+
+        <div id="signedInBox" class="auth-box hidden">
+          <p>Signed in as <strong id="signedInEmail"></strong></p>
+          <div class="row">
+            <button class="secondary" type="button" id="pushLocalBtn">Upload local prints</button>
+            <button class="secondary" type="button" id="signOutBtn">Sign out</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Backup</h3>
+        <div class="row">
+          <button class="secondary" type="button" id="exportBtn">Export JSON</button>
+          <label class="button-like">Import JSON
+            <input id="importInput" type="file" accept=".json,application/json" hidden />
+          </label>
+        </div>
+      </section>
+
+      <button class="primary full-width" id="saveSettingsBtn" type="button">Save settings</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
