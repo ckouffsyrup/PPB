@@ -74,6 +74,7 @@ orders=orders.map(o=>({updated_at:o.updated_at||o.created_at||nowISO(),...o}));
 
 let editingId=null,editingFilamentId=null,editingOrderId=null,editingPresetId=null,editingColorwayId=null;
 let pendingPhotoFile=null,pendingPhotoData="",editorFavorite=false,currentView="shop",orderStatusFilter="";
+let savePrintInFlight=false;
 let supabaseClient=null,currentUser=null,realtimeChannel=null,realtimeTimer=null;
 let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=false,currentMakePrintId=null;
 
@@ -289,20 +290,185 @@ window.openEditor=id=>{
 }
 function updateModelLink(){const url=$("modelSourceInput").value.trim(),a=$("modelSourceOpen");if(url){a.href=url;a.classList.remove("hidden")}else a.classList.add("hidden")}
 function updatePricingPreviews(){refreshUsageCosts();const usage=collectUsage("printFilamentRows"),mat=usageCost(usage)+Number($("extraCostInput").value||0),suggest=suggestedPrice($("hoursInput").value,mat,$("presetInput").value),price=$("priceInput").value===""?suggest:Number($("priceInput").value),variants=collectVariants();$("materialCostPreview").textContent=money(mat);$("suggestedPrice").textContent=money(suggest);$("profitPreview").textContent=money(price-mat);$("stockPreview").textContent=variants.length?variants.reduce((a,v)=>a+v.stock,0):Math.max(0,Number($("madeInput").value||0)-Number($("soldInput").value||0))}
-async function fileToDataUrl(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
-$("photoInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;pendingPhotoFile=f;pendingPhotoData=await fileToDataUrl(f);$("photoPreview").src=pendingPhotoData;$("photoPreview").classList.remove("hidden");$("photoPlaceholder").classList.add("hidden")}
+async function fileToDataUrl(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=rej;
+    r.readAsDataURL(file)
+  })
+}
+async function compressedPhotoDataUrl(file){
+  // Phone camera photos can be several MB. Saving the raw base64 image into
+  // localStorage can exceed Safari's quota and make the Save button appear broken.
+  // Keep the original File for Supabase upload, but store a lightweight local preview.
+  try{
+    const objectUrl=URL.createObjectURL(file);
+    const img=await new Promise((resolve,reject)=>{
+      const el=new Image();
+      el.onload=()=>resolve(el);
+      el.onerror=reject;
+      el.src=objectUrl;
+    });
+    const maxSide=1200;
+    const scale=Math.min(1,maxSide/Math.max(img.naturalWidth||1,img.naturalHeight||1));
+    const w=Math.max(1,Math.round(img.naturalWidth*scale));
+    const h=Math.max(1,Math.round(img.naturalHeight*scale));
+    const canvas=document.createElement("canvas");
+    canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext("2d",{alpha:false});
+    ctx.drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(objectUrl);
+    return canvas.toDataURL("image/jpeg",0.78);
+  }catch(err){
+    console.warn("Photo compression failed, using FileReader fallback",err);
+    return fileToDataUrl(file);
+  }
+}
+$("photoInput").onchange=async e=>{
+  const f=e.target.files[0];
+  if(!f)return;
+  pendingPhotoFile=f;
+  $("photoPlaceholder").classList.add("hidden");
+  $("photoPreview").classList.remove("hidden");
+  $("photoPreview").removeAttribute("src");
+  try{
+    pendingPhotoData=await compressedPhotoDataUrl(f);
+    $("photoPreview").src=pendingPhotoData;
+  }catch(err){
+    console.error(err);
+    pendingPhotoData="";
+    $("photoPreview").classList.add("hidden");
+    $("photoPlaceholder").classList.remove("hidden");
+    toast("Couldn't prepare that photo — try another one")
+  }
+}
 async function savePrint(){
-  const name=$("nameInput").value.trim();if(!name)return toast("Give the print a name");
-  const old=editingId?items.find(i=>i.id===editingId):null,id=editingId||uid(),usage=collectUsage("printFilamentRows"),variants=collectVariants(),mat=usageCost(usage)+Number($("extraCostInput").value||0),suggest=suggestedPrice($("hoursInput").value,mat,$("presetInput").value);
-  let item={id,name,category:$("categoryInput").value.trim(),model_source:$("modelSourceInput").value.trim(),price:Number($("priceInput").value||suggest),preset_id:$("presetInput").value,hours:$("hoursInput").value===""?"":Number($("hoursInput").value),extra_cost:Number($("extraCostInput").value||0),made_qty:Number($("madeInput").value||0),sold_qty:Number($("soldInput").value||0),notes:$("notesInput").value.trim(),favorite:editorFavorite,filament_usage:usage,variants,deal_qty:Number($("dealQtyInput").value||0),deal_price:Number($("dealPriceInput").value||0),out_of_stock_behavior:$("outOfStockInput").value,photo_url:old?.photo_url||"",created_at:old?.created_at||nowISO(),updated_at:nowISO()};
-  if(currentUser&&supabaseClient){
+  if(savePrintInFlight)return;
+  const name=$("nameInput").value.trim();
+  if(!name)return toast("Give the print a name");
+
+  savePrintInFlight=true;
+  const saveBtn=$("savePrintBtn");
+  const oldLabel=saveBtn.textContent;
+  saveBtn.disabled=true;
+  saveBtn.textContent="Saving…";
+
+  try{
+    const old=editingId?items.find(i=>i.id===editingId):null;
+    const id=editingId||uid();
+    const usage=collectUsage("printFilamentRows");
+    const variants=collectVariants();
+    const mat=usageCost(usage)+Number($("extraCostInput").value||0);
+    const suggest=suggestedPrice($("hoursInput").value,mat,$("presetInput").value);
+
+    // Capture globals now. The user can start another item while cloud work finishes.
+    const photoFile=pendingPhotoFile;
+    const localPhoto=pendingPhotoData;
+    const previousCloudPhoto=(old?.photo_url && !String(old.photo_url).startsWith("data:")) ? old.photo_url : "";
+
+    let item={
+      id,
+      name,
+      category:$("categoryInput").value.trim(),
+      model_source:$("modelSourceInput").value.trim(),
+      price:Number($("priceInput").value||suggest),
+      preset_id:$("presetInput").value,
+      hours:$("hoursInput").value===""?"":Number($("hoursInput").value),
+      extra_cost:Number($("extraCostInput").value||0),
+      made_qty:Number($("madeInput").value||0),
+      sold_qty:Number($("soldInput").value||0),
+      notes:$("notesInput").value.trim(),
+      favorite:editorFavorite,
+      filament_usage:usage,
+      variants,
+      deal_qty:Number($("dealQtyInput").value||0),
+      deal_price:Number($("dealPriceInput").value||0),
+      out_of_stock_behavior:$("outOfStockInput").value,
+      photo_url:localPhoto || old?.photo_url || "",
+      created_at:old?.created_at||nowISO(),
+      updated_at:nowISO()
+    };
+
+    // LOCAL FIRST: make Save feel instant on mobile. Do not wait for photo upload
+    // or Supabase before closing the editor.
+    const idx=items.findIndex(i=>i.id===id);
+    if(idx>=0)items[idx]=item;
+    else items.unshift(item);
+
     try{
-      setSyncState("syncing","Saving print…");
-      if(pendingPhotoFile){const ext=(pendingPhotoFile.name.split(".").pop()||"jpg").toLowerCase(),path=`${currentUser.id}/${id}.${ext}`;const {error}=await supabaseClient.storage.from("print-images").upload(path,pendingPhotoFile,{upsert:true});if(error)throw error;item.photo_url=supabaseClient.storage.from("print-images").getPublicUrl(path).data.publicUrl}
-      await syncUpsert("prints",dbPrint(item));
-    }catch(e){console.error(e);setSyncState("error","Cloud save failed");toast("Cloud save failed — kept locally");if(pendingPhotoData)item.photo_url=pendingPhotoData}
-  } else if(pendingPhotoData)item.photo_url=pendingPhotoData;
-  const idx=items.findIndex(i=>i.id===id);if(idx>=0)items[idx]=item;else items.unshift(item);persist();$("editorDialog").close();toast("Print saved")
+      persist();
+    }catch(err){
+      // Safari localStorage can throw QuotaExceededError when a camera image is too large.
+      // The print itself is more important than the local photo, so retry without data URL.
+      console.error("Local save failed; retrying without embedded photo",err);
+      if(String(item.photo_url||"").startsWith("data:")){
+        item.photo_url=previousCloudPhoto;
+        const retryIdx=items.findIndex(i=>i.id===id);
+        if(retryIdx>=0)items[retryIdx]=item;
+        persist();
+      }else{
+        throw err;
+      }
+    }
+
+    $("editorDialog").close();
+    toast(currentUser?"Print saved — syncing photo in background":"Print saved");
+
+    // Restore the button now, because the editor is already saved and closed.
+    savePrintInFlight=false;
+    saveBtn.disabled=false;
+    saveBtn.textContent=oldLabel;
+
+    // CLOUD SECOND: finish network/photo work without blocking the mobile UI.
+    if(currentUser&&supabaseClient){
+      (async()=>{
+        try{
+          setSyncState("syncing",photoFile?"Uploading photo…":"Saving print…");
+
+          let cloudPhoto=previousCloudPhoto;
+          if(photoFile){
+            const ext=(photoFile.name.split(".").pop()||"jpg").toLowerCase();
+            const path=`${currentUser.id}/${id}.${ext}`;
+            const {error}=await supabaseClient.storage
+              .from("print-images")
+              .upload(path,photoFile,{upsert:true,cacheControl:"3600"});
+            if(error)throw error;
+            cloudPhoto=supabaseClient.storage.from("print-images").getPublicUrl(path).data.publicUrl;
+          }
+
+          // Grab the newest local record in case it was edited while the upload ran.
+          const latest=items.find(i=>i.id===id);
+          if(!latest)return;
+
+          if(cloudPhoto){
+            latest.photo_url=cloudPhoto;
+            latest.updated_at=nowISO();
+            try{persist()}catch(err){console.warn("Could not cache cloud photo URL locally",err)}
+          }
+
+          // Never put a base64 camera image into the prints table.
+          const cloudRecord={
+            ...latest,
+            photo_url:String(latest.photo_url||"").startsWith("data:") ? (cloudPhoto||"") : latest.photo_url
+          };
+          const ok=await syncUpsert("prints",dbPrint(cloudRecord));
+          if(ok!==false)setSyncState("synced","Synced",nowISO());
+        }catch(err){
+          console.error("Background print sync failed",err);
+          setSyncState("error","Print saved locally — cloud/photo sync failed");
+          toast("Print saved locally; cloud photo sync failed")
+        }
+      })();
+    }
+
+  }catch(err){
+    console.error("Save print failed",err);
+    toast("Couldn't save this print");
+    savePrintInFlight=false;
+    saveBtn.disabled=false;
+    saveBtn.textContent=oldLabel;
+  }
 }
 async function deletePrint(){if(!editingId||!confirm("Delete this print?"))return;if(currentUser)await syncDelete("prints",editingId);items=items.filter(i=>i.id!==editingId);persist();$("editorDialog").close();toast("Print deleted")}
 
@@ -666,7 +832,7 @@ $("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=(
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
 $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
 $("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
-$("closeEditor").onclick=()=>$("editorDialog").close();$("savePrintBtn").onclick=savePrint;$("deleteBtn").onclick=deletePrint;$("favoriteToggle").onclick=()=>{editorFavorite=!editorFavorite;updateFavoriteButton()};$("modelSourceInput").oninput=updateModelLink;$("addPrintFilamentBtn").onclick=()=>addUsageRow("printFilamentRows");$("addVariantBtn").onclick=()=>addVariantRow();
+$("closeEditor").onclick=()=>{savePrintInFlight=false;$("savePrintBtn").disabled=false;$("savePrintBtn").textContent="Save print";$("editorDialog").close()};$("savePrintBtn").onclick=savePrint;$("deleteBtn").onclick=deletePrint;$("favoriteToggle").onclick=()=>{editorFavorite=!editorFavorite;updateFavoriteButton()};$("modelSourceInput").oninput=updateModelLink;$("addPrintFilamentBtn").onclick=()=>addUsageRow("printFilamentRows");$("addVariantBtn").onclick=()=>addVariantRow();
 ["hoursInput","extraCostInput","priceInput","madeInput","soldInput","presetInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).oninput=updatePricingPreviews);
 $("recordSaleFromPrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openSale(id)};$("makePrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openMake(id)};
 $("closeMake").onclick=()=>$("makeDialog").close();$("makeVariant").onchange=updateMakeCheck;$("makeQty").oninput=updateMakeCheck;$("confirmMakeBtn").onclick=confirmMake;
