@@ -125,27 +125,46 @@ function setSyncState(state,msg,last=null){
   if($("modeBadge"))$("modeBadge").textContent=currentUser?(state==="synced"?"Cloud synced":msg||"Connected"):"Local";
 }
 
-let menuScrollY=0;
+function clearLegacyMenuLock(){
+  // v4.1 used position:fixed on <body> to lock the background.
+  // iOS can retain that state after the drawer closes, which effectively
+  // shifts the whole app upward and can make the header impossible to reach.
+  document.body.classList.remove("menu-open");
+  document.documentElement.classList.remove("menu-open");
+  document.body.style.position="";
+  document.body.style.top="";
+  document.body.style.left="";
+  document.body.style.right="";
+  document.body.style.width="";
+  document.body.style.overflow="";
+  document.documentElement.style.overflow="";
+}
+
 function openMenu(){
-  if($("sideDrawer").classList.contains("open")) return;
-  menuScrollY=window.scrollY||0;
-  document.body.style.top=`-${menuScrollY}px`;
+  if($("sideDrawer").classList.contains("open"))return;
+  clearLegacyMenuLock();
+
+  // Lock scrolling without moving the document. No position:fixed / top hacks.
+  document.documentElement.classList.add("menu-open");
   document.body.classList.add("menu-open");
+
   $("sideDrawer").classList.add("open");
   $("drawerBackdrop").classList.add("open");
   $("sideDrawer").setAttribute("aria-hidden","false");
   $("sideDrawer").scrollTop=0;
 }
+
 function closeMenu(){
-  const wasOpen=$("sideDrawer").classList.contains("open");
   $("sideDrawer").classList.remove("open");
   $("drawerBackdrop").classList.remove("open");
   $("sideDrawer").setAttribute("aria-hidden","true");
-  if(wasOpen){
-    document.body.classList.remove("menu-open");
-    document.body.style.top="";
-    window.scrollTo(0,menuScrollY);
-  }
+
+  document.documentElement.classList.remove("menu-open");
+  document.body.classList.remove("menu-open");
+  document.documentElement.style.overflow="";
+  document.body.style.overflow="";
+  // Do NOT call scrollTo here. The page never moved, so its natural
+  // iOS scroll position stays exactly where the user left it.
 }
 function showView(name){
   currentView=name;
@@ -889,6 +908,8 @@ async function importData(e){const f=e.target.files[0];if(!f)return;try{const d=
 document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>showView(b.dataset.nav));
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>showView(b.dataset.go));
 $("menuBtn").onclick=openMenu;$("mobileMenuBtn").onclick=openMenu;$("closeMenuBtn").onclick=closeMenu;$("drawerBackdrop").onclick=closeMenu;
+$("drawerBackdrop").addEventListener("touchmove",e=>e.preventDefault(),{passive:false});
+$("sideDrawer").addEventListener("touchmove",e=>e.stopPropagation(),{passive:true});
 $("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=toggleCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};
 $("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=toggleCustomerMode;$("exitCustomerModeBtn").onclick=toggleCustomerMode;
 $("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;
@@ -907,6 +928,12 @@ $("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilamen
 $("closeSettings").onclick=()=>$("settingsDialog").close();$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
 window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshPushStatus().catch(()=>{})});
+// Defensive recovery from older installed builds that may have left the
+// body fixed/offset. This runs before normal interaction and on page restore.
+clearLegacyMenuLock();
+window.addEventListener("pageshow",()=>clearLegacyMenuLock());
+window.addEventListener("orientationchange",()=>setTimeout(clearLegacyMenuLock,80));
+
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&$("sideDrawer").classList.contains("open")) closeMenu();
 });

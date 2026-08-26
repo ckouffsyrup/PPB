@@ -304,3 +304,91 @@ body.menu-open{overflow:hidden!important;position:fixed;width:100%;left:0;right:
   .push-action-row{display:grid;grid-template-columns:1fr}
   .push-action-row button{width:100%;min-height:46px}
 }
+
+/* v4.2.3 — iOS navigation/scroll stability
+   Important: never move/fix the BODY to lock the hamburger drawer. */
+html.menu-open,body.menu-open{
+  overflow:hidden!important;
+  overscroll-behavior:none;
+}
+body.menu-open{
+  position:static!important;
+  top:auto!important;
+  left:auto!important;
+  right:auto!important;
+  width:auto!important;
+}
+
+@media(max-width:560px){
+  :root{--mobile-header-h:76px}
+
+  /* The header is viewport-fixed on phones, so it can never be scrolled away. */
+  .topbar{
+    position:fixed!important;
+    z-index:75!important;
+    top:0!important;
+    left:0!important;
+    right:0!important;
+    width:100%!important;
+    min-height:var(--mobile-header-h);
+    margin:0!important;
+    padding:
+      max(9px,env(safe-area-inset-top))
+      12px
+      9px!important;
+    background:rgba(11,9,16,.94)!important;
+    border-bottom:1px solid rgba(45,39,60,.75);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+  }
+
+  /* Reserve space for the fixed header. */
+  .app-shell{
+    padding-top:calc(var(--mobile-header-h) + env(safe-area-inset-top) + 8px)!important;
+  }
+
+  .menu-btn{
+    display:grid!important;
+    position:relative;
+    z-index:2;
+  }
+
+  /* Drawer owns its own scrolling. The page behind it does not. */
+  .side-drawer{
+    position:fixed!important;
+    inset:0 auto 0 0!important;
+    height:100dvh!important;
+    max-height:100dvh!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    overscroll-behavior-y:contain!important;
+    -webkit-overflow-scrolling:touch!important;
+    touch-action:pan-y!important;
+    padding-top:max(14px,env(safe-area-inset-top))!important;
+    padding-bottom:max(18px,env(safe-area-inset-bottom))!important;
+  }
+
+  .drawer-backdrop{
+    position:fixed!important;
+    inset:0!important;
+    overscroll-behavior:none!important;
+    touch-action:none!important;
+  }
+
+  .drawer-header{
+    position:sticky!important;
+    top:calc(-1 * max(14px,env(safe-area-inset-top)))!important;
+    z-index:4!important;
+    background:#100d16!important;
+    padding-top:max(14px,env(safe-area-inset-top))!important;
+  }
+
+  /* Keep modal sheets below the fixed header's z-index. */
+  dialog{z-index:100}
+  dialog::backdrop{z-index:99}
+
+  /* Customer-mode exit control remains reachable below the fixed header. */
+  .customer-mode-bar{
+    top:calc(var(--mobile-header-h) + env(safe-area-inset-top) + 4px)!important;
+  }
+}
