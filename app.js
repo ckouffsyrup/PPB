@@ -84,6 +84,7 @@ const PUBLIC_STOREFRONT_URL="https://ivxvnkwhufopzbcvjwqn.supabase.co/functions/
 let publicVisitorMode=false;
 let publicStoreLoaded=false;
 let publicStoreLoading=false;
+let publicStoreLastDiagnostic="";
 let waitingServiceWorker=null;
 let appUpdateReady=false;
 let updateReloadArmed=false;
@@ -211,10 +212,28 @@ function setCustomerStoreTab(tab){
   renderCustomerFilaments();
 }
 
-function setPublicStoreState(message="",isError=false){
-  const el=$("publicStoreState");if(!el)return;
-  el.textContent=message;el.classList.toggle("hidden",!message);el.classList.toggle("error",!!isError)
+function setPublicStoreState(message="",isError=false,showActions=false){
+  const el=$("publicStoreState"),text=$("publicStoreStateText"),actions=$("publicStoreActions");
+  if(!el||!text)return;
+  text.textContent=message;
+  el.classList.toggle("hidden",!message);
+  el.classList.toggle("error",!!isError);
+  if(actions)actions.classList.toggle("hidden",!showActions);
 }
+function clearPublicCatalogForFailure(){
+  // Never expose stale/local admin catalog to a public visitor when the live
+  // storefront cannot be reached.
+  items=[];
+  filaments=[];
+  publicStoreLoaded=false;
+  $("shopGrid").innerHTML=`<div class="public-store-unavailable"><h3>Store temporarily unavailable</h3><p>Live inventory could not be loaded. No stale products are being shown.</p></div>`;
+  $("customerFilamentGrid").innerHTML="";
+  $("shopEmpty").classList.add("hidden");
+  $("shopProductCount").textContent="0";
+  $("shopStockCount").textContent="0";
+  $("shopFavCount").textContent="0";
+}
+
 function normalizePublicPrint(p){
   return {id:p.id,name:p.name||"Print",category:p.category||"",price:Number(p.price||0),hours:p.hours??"",notes:p.notes||"",photo_url:p.photo_url||"",favorite:!!p.favorite,variants:Array.isArray(p.variants)?p.variants:[],deal_qty:Number(p.deal_qty||0),deal_price:Number(p.deal_price||0),out_of_stock_behavior:p.out_of_stock_behavior||"show",made_qty:Number(p.made_qty||0),sold_qty:Number(p.sold_qty||0),filament_usage:[],extra_cost:0,model_source:"",created_at:p.created_at||"",updated_at:p.updated_at||""}
 }
@@ -223,20 +242,66 @@ function normalizePublicFilament(f){
 }
 async function loadPublicStorefront(showError=true){
   if(publicStoreLoading)return false;
-  publicStoreLoading=true;setPublicStoreState("Loading the latest shop inventory…");
+  publicStoreLoading=true;
+  setPublicStoreState("Loading the latest shop inventory…",false,false);
+
+  const url=`${PUBLIC_STOREFRONT_URL}?t=${Date.now()}`;
   try{
-    const res=await fetch(`${PUBLIC_STOREFRONT_URL}?t=${Date.now()}`,{headers:{"Accept":"application/json"},cache:"no-store"});
-    let data={};try{data=await res.json()}catch{}
-    if(!res.ok)throw new Error(data.error||`Storefront returned ${res.status}`);
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),12000);
+    let res;
+    try{
+      res=await fetch(url,{
+        method:"GET",
+        headers:{"Accept":"application/json"},
+        cache:"no-store",
+        signal:controller.signal
+      });
+    }finally{
+      clearTimeout(timer);
+    }
+
+    const raw=await res.text();
+    let data={};
+    try{data=raw?JSON.parse(raw):{}}catch{}
+
+    publicStoreLastDiagnostic=[
+      `URL: ${url}`,
+      `HTTP: ${res.status} ${res.statusText}`,
+      `Response: ${raw.slice(0,500)||"(empty)"}`
+    ].join("\n");
+
+    if(!res.ok)throw new Error(data.error||`HTTP ${res.status} ${res.statusText}`);
+
     items=(data.products||[]).map(normalizePublicPrint);
     filaments=(data.filaments||[]).map(normalizePublicFilament);
-    publicStoreLoaded=true;setPublicStoreState("");renderAll();return true
+    publicStoreLoaded=true;
+    setPublicStoreState("",false,false);
+    renderAll();
+    return true
   }catch(err){
-    console.error("Public storefront load failed",err);publicStoreLoaded=false;
-    if(showError)setPublicStoreState("Couldn't load the live storefront right now. Reopen PrintBook and try again.",true);
+    const kind=err?.name==="AbortError"?"Request timed out":(err?.message||String(err));
+    if(!publicStoreLastDiagnostic){
+      publicStoreLastDiagnostic=[
+        `URL: ${url}`,
+        `Browser error: ${kind}`,
+        `Online: ${navigator.onLine}`,
+        `Origin: ${location.origin}`,
+        `User agent: ${navigator.userAgent}`
+      ].join("\n");
+    }else{
+      publicStoreLastDiagnostic += `\nBrowser error: ${kind}`;
+    }
+
+    console.error("Public storefront load failed",err,publicStoreLastDiagnostic);
+    clearPublicCatalogForFailure();
+    if(showError)setPublicStoreState(`Couldn't load the live storefront: ${kind}`,true,true);
     return false
-  }finally{publicStoreLoading=false}
+  }finally{
+    publicStoreLoading=false
+  }
 }
+
 async function activatePublicVisitorMode(){
   publicVisitorMode=true;customerMode=true;customerStoreTab="products";currentView="shop";
   document.body.classList.add("public-visitor");
@@ -260,6 +325,20 @@ async function submitPublicPrintRequest(payload){
 }
 
 function renderShop(){
+  if(publicVisitorMode&&!publicStoreLoaded){
+    document.body.classList.toggle("customer-mode",true);
+    document.body.classList.toggle("public-visitor",true);
+    $("customerModeBar").classList.remove("hidden");
+    $("customerStoreTabs").classList.remove("hidden");
+    $("customerModeBarTitle").textContent="Live Customer Store";
+    $("customerModeBarText").textContent="Products and filament availability are synced from PrintBook.";
+    $("customerModeBadge").textContent="LIVE";
+    if(!$("shopGrid").querySelector(".public-store-unavailable")){
+      $("shopGrid").innerHTML=`<div class="public-store-unavailable"><h3>Loading live store…</h3><p>Please wait while PrintBook loads current inventory.</p></div>`;
+    }
+    return;
+  }
+
   const q=$("shopSearch")?.value.trim().toLowerCase()||"",cat=$("shopCategoryFilter")?.value||"";
   let list=items.filter(i=>{
     const stock=itemStock(i);
@@ -1311,6 +1390,15 @@ $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
 $("applyAppUpdateBtn").onclick=applyAppUpdate;
 $("checkForUpdateBtn").onclick=()=>checkForAppUpdate(true);
 $("applyAppUpdateSettingsBtn").onclick=applyAppUpdate;
+$("retryPublicStoreBtn").onclick=()=>loadPublicStorefront(true);
+$("copyStoreDiagBtn").onclick=async()=>{
+  try{
+    await navigator.clipboard.writeText(publicStoreLastDiagnostic||"No diagnostics captured.");
+    toast("Store diagnostics copied");
+  }catch{
+    toast(publicStoreLastDiagnostic||"No diagnostics captured.")
+  }
+};
 $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
 $("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
 $("requestPrintBtn").onclick=openRequestPrint;

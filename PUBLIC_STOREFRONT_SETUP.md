@@ -37,3 +37,16 @@ They do NOT receive filament purchase cost, cost per gram, profit, sales, admin 
 A device that already has your Supabase admin session restored opens the normal admin interface. Signing out switches that device back to the public storefront.
 
 The public storefront never writes its synced catalog into the visitor's local admin data.
+
+
+## If the public page says the live storefront cannot load
+
+Open this exact URL directly in a normal browser tab:
+
+`https://ivxvnkwhufopzbcvjwqn.supabase.co/functions/v1/public-storefront`
+
+You should see JSON containing `products` and `filaments`.
+
+If that URL does not return JSON, the problem is in the Edge Function/deployment rather than GitHub Pages.
+
+v4.4.1 also adds **Copy diagnostics** on the public error message. It includes the request URL, HTTP status/response when available, or the browser/network error when the request never reached Supabase.

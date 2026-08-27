@@ -498,3 +498,19 @@ body.menu-open{
 .public-visitor .shop-hero-actions{display:none!important}
 .public-visitor .customer-mode-bar{display:flex!important}
 .public-visitor .customer-lock-badge{background:#102119;border-color:#275440;color:var(--green)}
+
+/* v4.4.1 public storefront failure safety + diagnostics */
+.public-store-state{display:block}
+.public-store-state.hidden{display:none!important}
+.public-store-state #publicStoreStateText{line-height:1.5}
+.public-store-actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.public-store-unavailable{
+  border:1px solid #5d2f3a;
+  background:#211218;
+  border-radius:18px;
+  padding:24px;
+  text-align:center;
+  grid-column:1/-1
+}
+.public-store-unavailable h3{margin:0 0 6px;color:#ffb3bd}
+.public-store-unavailable p{margin:0;color:var(--muted);font-size:12px}

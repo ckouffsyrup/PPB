@@ -112,7 +112,13 @@
         <button type="button" data-customer-tab="filaments">Available Filaments</button>
       </div>
 
-      <div id="publicStoreState" class="public-store-state hidden"></div>
+      <div id="publicStoreState" class="public-store-state hidden">
+        <div id="publicStoreStateText"></div>
+        <div class="public-store-actions hidden" id="publicStoreActions">
+          <button class="secondary small" id="retryPublicStoreBtn" type="button">Retry live store</button>
+          <button class="text-btn" id="copyStoreDiagBtn" type="button">Copy diagnostics</button>
+        </div>
+      </div>
       <div id="shopGrid" class="shop-grid"></div>
       <div id="customerFilamentGrid" class="customer-filament-grid hidden"></div>
       <div id="shopEmpty" class="empty-state hidden">
