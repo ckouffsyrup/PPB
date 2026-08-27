@@ -619,3 +619,26 @@ body.menu-open{
 .image-load-fallback{height:100%;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:#6e627d;background:linear-gradient(135deg,#17131f,#120f18)}
 .image-load-fallback span{font-size:34px;line-height:1}
 .image-load-fallback small{font-size:10px;color:var(--muted);font-weight:700}
+
+
+/* v5.2 reliable push diagnostics */
+.push-diagnostics{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin:10px 0;
+}
+.push-diag-cell{
+  border:1px solid var(--line);
+  background:#0e0c13;
+  border-radius:12px;
+  padding:10px 11px;
+  min-width:0;
+}
+.push-diag-cell span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.push-diag-cell strong{display:block;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.push-diag-cell strong.ok{color:var(--green)}
+.push-diag-cell strong.bad{color:var(--red)}
+.push-diag-cell strong.warn{color:var(--yellow)}
+.push-diag-actions{margin-top:8px}
+@media(max-width:620px){.push-diagnostics{grid-template-columns:repeat(2,minmax(0,1fr))}}

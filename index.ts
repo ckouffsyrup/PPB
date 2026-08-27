@@ -4,6 +4,8 @@ const SUPABASE_URL=Deno.env.get("SUPABASE_URL")??"";
 const SERVICE_ROLE=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"";
 const SHOP_OWNER_USER_ID=Deno.env.get("SHOP_OWNER_USER_ID")??"";
 const SUPABASE_ANON_KEY=Deno.env.get("SUPABASE_ANON_KEY")??"";
+const PUSH_INTERNAL_SECRET=Deno.env.get("PUSH_INTERNAL_SECRET")??"";
+
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"content-type","Access-Control-Allow-Methods":"GET,POST,OPTIONS","Cache-Control":"no-store"};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...cors,"Content-Type":"application/json"}});
 const clean=(s:unknown,max:number)=>String(s??"").trim().slice(0,max);
@@ -198,11 +200,41 @@ Deno.serve(async req=>{
     }
 
     console.log("Public request created",inserted.id);
+
+    // Push delivery is server-side and independent of whether PrintBook is open.
+    // A push failure must never destroy a successfully-created customer order.
+    let pushSent=0;
+    try{
+      if(!PUSH_INTERNAL_SECRET){
+        console.warn("Order saved, but PUSH_INTERNAL_SECRET is not configured; skipping push.");
+      }else{
+        const colorSummary=colorMode==="multi"?`${colorIds.length}-color multicolor`:filamentText!=="No preference"?filamentText:"";
+        const pushRes=await fetch(`${SUPABASE_URL}/functions/v1/push-notifications`,{
+          method:"POST",
+          headers:{"Content-Type":"application/json","x-printbook-push-secret":PUSH_INTERNAL_SECRET},
+          body:JSON.stringify({
+            action:"order_request",
+            user_id:SHOP_OWNER_USER_ID,
+            order_id:inserted.id,
+            customer,
+            item:product.name,
+            quantity,
+            detail:colorSummary
+          })
+        });
+        let pushData:any={};try{pushData=await pushRes.json()}catch{}
+        pushSent=Number(pushData.sent||0);
+        if(!pushRes.ok||pushSent<1)console.warn("Order push was not delivered",{status:pushRes.status,pushData});
+        else console.log("Order push delivered",{order_id:inserted.id,sent:pushSent});
+      }
+    }catch(pushErr){console.error("Order push call failed",pushErr)}
+
     return json({
       ok:true,
       request_id:inserted.id,
       estimated_price:estimate,
-      status:"Requested"
+      status:"Requested",
+      push_sent:pushSent>0
     })
   }
 

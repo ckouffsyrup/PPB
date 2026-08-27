@@ -90,6 +90,8 @@ const photoRepairAttempts=new Set();
 let brandOwnerTapCount=0,brandOwnerTapTimer=null;
 let publicRequestRefreshTimer=null;
 let waitingServiceWorker=null;
+let pendingPushLaunchView=new URL(location.href).searchParams.get("open")||"";
+
 let appUpdateReady=false;
 let updateReloadArmed=false;
 const pendingLocalProductIds=new Set();
@@ -1264,6 +1266,68 @@ async function resolveCurrentUser(){
   return null;
 }
 
+function bytesToBase64Url(bytes){
+  let s="";for(const b of bytes)s+=String.fromCharCode(b);
+  return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+}
+function subscriptionUsesPublicKey(subscription,publicKey){
+  try{
+    const raw=subscription?.options?.applicationServerKey;
+    if(!raw)return true; // Some WebKit versions do not expose it.
+    return bytesToBase64Url(new Uint8Array(raw))===String(publicKey||"").replace(/=+$/g,"");
+  }catch{return true}
+}
+async function getPushBackendHealth(){
+  if(!settings.supabaseUrl)return {ok:false,error:"No Supabase URL"};
+  const headers={};if(settings.supabaseKey)headers.apikey=settings.supabaseKey;
+  try{
+    const res=await fetch(`${pushFunctionUrl()}?health=1&t=${Date.now()}`,{headers,cache:"no-store"});
+    let data={};try{data=await res.json()}catch{}
+    return {ok:res.ok,...data,status:res.status};
+  }catch(err){return {ok:false,error:err?.message||String(err)}}
+}
+async function cloudPushRegistration(subscription){
+  if(!currentUser||!supabaseClient||!subscription)return null;
+  const {data,error}=await supabaseClient.from("push_subscriptions")
+    .select("endpoint,active,last_seen_at,updated_at,device_name")
+    .eq("user_id",currentUser.id).eq("endpoint",subscription.endpoint).maybeSingle();
+  if(error)throw error;return data||null;
+}
+function setPushDiag(id,text,state=""){
+  const el=$(id);if(!el)return;el.textContent=text;el.className=state;
+}
+async function refreshPushDiagnostics(){
+  const last=localStorage.getItem("printbook:lastPushTest");
+  if($("pushLastTestText"))$("pushLastTestText").textContent=last?`Last test: ${new Date(last).toLocaleString()}`:"No test push sent from this device yet.";
+  setPushDiag("pushDiagPermission",pushSupported()?Notification.permission:"Unsupported",pushSupported()?(Notification.permission==="granted"?"ok":Notification.permission==="denied"?"bad":"warn"):"bad");
+  setPushDiag("pushDiagStandalone",isIOS()?(isStandalonePWA()?"Installed":"Not installed"):(isStandalonePWA()?"Installed":"Browser"),isIOS()&&!isStandalonePWA()?"bad":"ok");
+  try{
+    const reg="serviceWorker" in navigator?await navigator.serviceWorker.ready:null;
+    setPushDiag("pushDiagWorker",reg?"Ready":"Missing",reg?"ok":"bad");
+  }catch{setPushDiag("pushDiagWorker","Error","bad")}
+  let sub=null;
+  try{sub=await getCurrentPushSubscription();setPushDiag("pushDiagBrowserSub",sub?"Present":"Missing",sub?"ok":"bad")}
+  catch{setPushDiag("pushDiagBrowserSub","Error","bad")}
+  try{
+    await resolveCurrentUser();
+    const row=await cloudPushRegistration(sub);
+    setPushDiag("pushDiagCloudSub",row?.active?"Registered":sub?"Missing":"—",row?.active?"ok":sub?"bad":"warn");
+  }catch(err){console.warn("Push cloud diagnostic failed",err);setPushDiag("pushDiagCloudSub","Error","bad")}
+  const health=await getPushBackendHealth();
+  const configured=health?.configured===true||health?.configured?.ready===true;
+  setPushDiag("pushDiagBackend",health.ok&&configured?"Ready":health.ok?"Needs keys":"Offline",health.ok&&configured?"ok":"bad");
+  return {sub,health};
+}
+function handlePushLaunchIntent(){
+  if(pendingPushLaunchView!=="orders"||!currentUser||publicVisitorMode)return;
+  pendingPushLaunchView="";
+  showView("orders");
+  try{
+    const url=new URL(location.href);url.searchParams.delete("open");
+    history.replaceState({},"",url.pathname+(url.search?url.search:"")+(url.hash||""));
+  }catch{}
+}
+
 async function refreshPushStatus(){
   const badge=$("pushStatusBadge"),title=$("pushStatusTitle"),text=$("pushStatusText");
   if(!badge||!title||!text)return;
@@ -1327,9 +1391,19 @@ async function refreshPushStatus(){
   }
 
   if(sub && permission==="granted"){
-    // A real PushManager subscription is the source of truth. Re-register it in
-    // Supabase if the browser has it but our database row was lost/stale.
+    // A changed VAPID key makes an old browser subscription unusable. Detect it
+    // and repair instead of falsely showing Enabled.
     try{
+      const publicKey=await getPushPublicKey();
+      if(!subscriptionUsesPublicKey(sub,publicKey)){
+        badge.textContent="Needs repair";badge.classList.add("problem");
+        title.textContent="This device was registered with an older push key";
+        text.textContent="Tap Repair Push Registration to rebuild the iPhone subscription.";
+        $("enableNotificationsBtn").textContent="Repair Push Registration";
+        settings.pushEnabled=false;localStorage.setItem(K.settings,JSON.stringify(settings));
+        await refreshPushDiagnostics();
+        return;
+      }
       await savePushSubscription(sub);
       badge.textContent="Enabled";
       badge.classList.add("enabled");
@@ -1341,6 +1415,7 @@ async function refreshPushStatus(){
       $("disablePushBtn").classList.remove("hidden");
       settings.pushEnabled=true;
       localStorage.setItem(K.settings,JSON.stringify(settings));
+      await refreshPushDiagnostics();
       return;
     }catch(err){
       console.error("Push subscription exists but cloud registration failed",err);
@@ -1366,6 +1441,7 @@ async function refreshPushStatus(){
   $("enableNotificationsBtn").disabled=permission==="denied";
   settings.pushEnabled=false;
   localStorage.setItem(K.settings,JSON.stringify(settings));
+  await refreshPushDiagnostics();
 }
 async function enableBrowserNotifications(){
   try{
@@ -1399,9 +1475,15 @@ async function enableBrowserNotifications(){
     // If permission is already granted (common after the iOS prompt), don't ask
     // again; just repair/create the actual Web Push subscription.
     let sub=await reg.pushManager.getSubscription();
+    const publicKey=await getPushPublicKey();
+    if(sub&&!subscriptionUsesPublicKey(sub,publicKey)){
+      try{
+        if(currentUser&&supabaseClient)await supabaseClient.from("push_subscriptions").delete().eq("user_id",currentUser.id).eq("endpoint",sub.endpoint);
+      }catch{}
+      await sub.unsubscribe();sub=null;
+    }
 
     if(!sub){
-      const publicKey=await getPushPublicKey();
       sub=await reg.pushManager.subscribe({
         userVisibleOnly:true,
         applicationServerKey:urlBase64ToUint8Array(publicKey)
@@ -1449,8 +1531,12 @@ async function sendTestPush(){
     });
     let data={};try{data=await res.json()}catch{}
     if(!res.ok)throw new Error(data.error||`Test failed (${res.status})`);
-    toast(data.sent?`Test push sent to ${data.sent} device${data.sent===1?"":"s"}`:"No registered push device found");
-  }catch(err){console.error(err);toast(err?.message||"Couldn't send test push")}
+    if(data.sent>0){
+      localStorage.setItem("printbook:lastPushTest",new Date().toISOString());
+      toast(`Test push: ${data.sent} sent · ${data.failed||0} failed · ${data.expired||0} expired`);
+    }else toast(`No push delivered · ${data.failed||0} failed · ${data.expired||0} expired`);
+    await refreshPushDiagnostics();
+  }catch(err){console.error(err);toast(err?.message||"Couldn't send test push");await refreshPushDiagnostics().catch(()=>{})}
 }
 
 function openSettings(){
@@ -1459,7 +1545,7 @@ function openSettings(){
   $("customerModePinInput").value=settings.customerModePin||"";
   renderPresets();updateCloudUI();
   $("settingsDialog").showModal();
-  resolveCurrentUser().then(()=>refreshPushStatus()).catch(()=>refreshPushStatus().catch(()=>{}));
+  resolveCurrentUser().then(async()=>{await refreshPushStatus();await refreshPushDiagnostics()}).catch(()=>refreshPushStatus().catch(()=>{}));
 }
 function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();settings.customerModePin=normalizeCustomerPin($("customerModePinInput").value);persist();setupSupabase();$("settingsDialog").close();toast("Settings saved")}
 
@@ -1489,7 +1575,7 @@ async function setupSupabase(){
       else{stopRealtime();setTimeout(()=>activatePublicVisitorMode(),0)}
       setTimeout(()=>refreshPushStatus().catch(()=>{}),0);
     });
-    if(currentUser){deactivatePublicVisitorMode();customerMode=false;startRealtime();await pullCloud(false)}
+    if(currentUser){deactivatePublicVisitorMode();customerMode=false;startRealtime();await pullCloud(false);handlePushLaunchIntent()}
     else{setSyncState("local","Public storefront");await activatePublicVisitorMode()}
   }catch(e){console.error(e);currentUser=null;setSyncState("error","Supabase setup failed");updateCloudUI()}
 }
@@ -1499,7 +1585,7 @@ function updateCloudUI(){
 }
 async function signIn(){
   settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();localStorage.setItem(K.settings,JSON.stringify(settings));await setupSupabase();if(!supabaseClient)return toast("Add Supabase URL and key first");
-  setSyncState("syncing","Signing in…");const {data,error}=await supabaseClient.auth.signInWithPassword({email:$("emailInput").value.trim(),password:$("passwordInput").value});if(error){setSyncState("error",error.message);return toast(error.message)}currentUser=data.user;updateCloudUI();startRealtime();await pullCloud(false);toast("Signed in")
+  setSyncState("syncing","Signing in…");const {data,error}=await supabaseClient.auth.signInWithPassword({email:$("emailInput").value.trim(),password:$("passwordInput").value});if(error){setSyncState("error",error.message);return toast(error.message)}currentUser=data.user;updateCloudUI();startRealtime();await pullCloud(false);handlePushLaunchIntent();toast("Signed in")
 }
 async function signUp(){
   settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();localStorage.setItem(K.settings,JSON.stringify(settings));await setupSupabase();if(!supabaseClient)return toast("Add Supabase URL and key first");
@@ -1753,7 +1839,7 @@ $("drawerBackdrop").addEventListener("touchmove",e=>e.preventDefault(),{passive:
 $("sideDrawer").addEventListener("touchmove",e=>e.stopPropagation(),{passive:true});
 $("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=enterCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};
 $("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=enterCustomerMode;
-$("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;
+$("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;$("refreshPushDiagnosticsBtn").onclick=refreshPushDiagnostics;
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
 $("applyAppUpdateBtn").onclick=applyAppUpdate;
 $("checkForUpdateBtn").onclick=()=>checkForAppUpdate(true);

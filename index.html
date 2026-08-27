@@ -698,7 +698,7 @@
       <div class="section-heading">
         <div>
           <h3>Mobile Push Notifications</h3>
-          <p class="muted">Get low-filament, out-of-stock, and order reminders even when PrintBook is closed.</p>
+          <p class="muted">Get new customer order requests even when PrintBook is closed. Test and device health are shown below.</p>
         </div>
         <span class="badge" id="pushStatusBadge">Not enabled</span>
       </div>
@@ -716,6 +716,19 @@
         <button class="secondary hidden" type="button" id="testPushBtn">Send test push</button>
         <button class="secondary hidden" type="button" id="disablePushBtn">Disable push</button>
       </div>
+
+      <div class="push-diagnostics" id="pushDiagnostics">
+        <div class="push-diag-cell"><span>Permission</span><strong id="pushDiagPermission">—</strong></div>
+        <div class="push-diag-cell"><span>Home Screen</span><strong id="pushDiagStandalone">—</strong></div>
+        <div class="push-diag-cell"><span>Service worker</span><strong id="pushDiagWorker">—</strong></div>
+        <div class="push-diag-cell"><span>Browser subscription</span><strong id="pushDiagBrowserSub">—</strong></div>
+        <div class="push-diag-cell"><span>Cloud registration</span><strong id="pushDiagCloudSub">—</strong></div>
+        <div class="push-diag-cell"><span>Push backend</span><strong id="pushDiagBackend">—</strong></div>
+      </div>
+      <div class="row push-action-row push-diag-actions">
+        <button class="secondary" type="button" id="refreshPushDiagnosticsBtn">Refresh diagnostics</button>
+      </div>
+      <p class="muted tiny-note" id="pushLastTestText">No test push sent from this device yet.</p>
 
       <div class="push-help hidden" id="iosPushHelp">
         <strong>iPhone setup</strong>
