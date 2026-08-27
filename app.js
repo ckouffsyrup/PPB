@@ -79,6 +79,7 @@ let savePrintInFlight=false;
 let supabaseClient=null,currentUser=null,realtimeChannel=null,realtimeTimer=null;
 let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=false,currentMakePrintId=null;
 let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=null;
+let currentRequestPrintId=null;
 const pendingLocalProductIds=new Set();
 
 function persist(){
@@ -582,12 +583,117 @@ function updateHelperPreview(){if(!$("hpHours"))return;refreshUsageCosts();const
 function helperToPrint(){const mat=usageCost(collectUsage("hpFilamentRows"))+Number($("hpExtra").value||0),rec=suggestedPrice($("hpHours").value,mat,$("hpPreset").value,Number($("hpComplexity").value||1)),usage=collectUsage("hpFilamentRows");$("priceHelperDialog").close();openEditor();$("hoursInput").value=$("hpHours").value;$("extraCostInput").value=$("hpExtra").value;$("presetInput").value=$("hpPreset").value;$("priceInput").value=rec;$("printFilamentRows").innerHTML="";usage.forEach(u=>addUsageRow("printFilamentRows",u));updatePricingPreviews()}
 
 function openCustomerProduct(id){
-  const i=items.find(x=>x.id===id);if(!i)return;$("customerProductName").textContent=i.name;$("customerProductPrice").textContent=money(i.price);$("customerProductNotes").textContent=i.notes||i.category||"";
+  const i=items.find(x=>x.id===id);if(!i)return;
+  currentRequestPrintId=id;$("customerProductName").textContent=i.name;$("customerProductPrice").textContent=money(i.price);$("customerProductNotes").textContent=i.notes||i.category||"";
   if(i.photo_url){$("customerProductPhoto").src=i.photo_url;$("customerProductPhoto").alt=i.name;$("customerProductPhoto").classList.remove("hidden")}else $("customerProductPhoto").classList.add("hidden");
   const deal=Number(i.deal_qty)>1&&Number(i.deal_price)>0;$("customerProductDeal").classList.toggle("hidden",!deal);$("customerProductDeal").textContent=deal?`Deal: ${i.deal_qty} for ${money(i.deal_price)}`:"";
   $("customerVariantList").innerHTML=(i.variants||[]).map(v=>`<div class="customer-variant"><span>${safe(v.name)}</span><strong>${money(variantPrice(i,v.id))} · ${v.stock||0} available</strong></div>`).join("");
   const stock=itemStock(i);$("customerAvailability").textContent=stock>0?`${stock} available right now`:"Currently out of stock";$("customerAvailability").classList.toggle("out",stock<=0);$("customerProductDialog").showModal()
 }
+
+function populateRequestFilaments(){
+  const select=$("requestFilament");
+  if(!select)return;
+  select.innerHTML=`<option value="">No preference</option>`+
+    filaments
+      .filter(f=>Number(f.remaining||0)>0)
+      .sort((a,b)=>String(a.color||"").localeCompare(String(b.color||"")))
+      .map(f=>`<option value="${f.id}">${safe(f.color||f.material||"Filament")}${f.material?` · ${safe(f.material)}`:""}</option>`)
+      .join("");
+}
+function requestUnitPrice(){
+  const item=items.find(i=>i.id===currentRequestPrintId);
+  if(!item)return 0;
+  const vid=$("requestVariant").value;
+  return variantPrice(item,vid);
+}
+function updateRequestEstimate(){
+  const qty=Math.max(1,Number($("requestQty").value||1));
+  $("requestEstimate").textContent=money(requestUnitPrice()*qty);
+}
+function openRequestPrint(){
+  const item=items.find(i=>i.id===currentRequestPrintId);
+  if(!item)return;
+
+  $("customerProductDialog").close();
+
+  $("requestPrintTitle").textContent=`Request ${item.name}`;
+  $("requestCustomerName").value="";
+  $("requestContact").value="";
+  $("requestNotes").value="";
+  $("requestQty").value=1;
+
+  $("requestVariant").innerHTML=`<option value="">Standard</option>`+
+    (item.variants||[]).map(v=>`<option value="${v.id}">${safe(v.name)}${Number(v.stock||0)>0?` · ${v.stock} available`:""}</option>`).join("");
+
+  if((item.variants||[]).length)$("requestVariant").value=item.variants[0].id;
+  populateRequestFilaments();
+
+  $("requestProductSummary").innerHTML=`
+    ${item.photo_url?`<img class="request-product-thumb" src="${safe(item.photo_url)}" alt="">`:`<div class="request-product-thumb"></div>`}
+    <div>
+      <strong>${safe(item.name)}</strong>
+      <small>Starting at ${money(item.price)}</small>
+    </div>`;
+
+  updateRequestEstimate();
+  $("requestPrintDialog").showModal();
+}
+async function submitPrintRequest(){
+  const item=items.find(i=>i.id===currentRequestPrintId);
+  if(!item)return toast("That product could not be found");
+
+  const customer=$("requestCustomerName").value.trim();
+  if(!customer)return toast("Enter your name");
+
+  const qty=Math.max(1,Number($("requestQty").value||1));
+  const variantId=$("requestVariant").value;
+  const variant=(item.variants||[]).find(v=>v.id===variantId);
+  const filamentId=$("requestFilament").value;
+  const filament=getFilament(filamentId);
+  const contact=$("requestContact").value.trim();
+  const userNotes=$("requestNotes").value.trim();
+  const estimate=requestUnitPrice()*qty;
+
+  const details=[
+    variant?`Variant: ${variant.name}`:"Version: Standard",
+    filament?`Preferred filament: ${filament.color||filament.material||"Selected filament"}`:"Filament: No preference",
+    contact?`Contact: ${contact}`:"",
+    userNotes?`Customer notes: ${userNotes}`:""
+  ].filter(Boolean).join("\n");
+
+  const order={
+    id:uid(),
+    customer,
+    status:"Requested",
+    item:item.name,
+    quantity:qty,
+    quoted_price:estimate,
+    due_date:"",
+    print_id:item.id,
+    notes:`Customer Store request\n${details}`,
+    created_at:nowISO(),
+    updated_at:nowISO()
+  };
+
+  // Local-first so the customer's request doesn't disappear if the connection is slow.
+  orders.unshift(order);
+  persist();
+  $("requestPrintDialog").close();
+  toast("Print request submitted");
+
+  if(currentUser&&supabaseClient){
+    (async()=>{
+      try{
+        await syncUpsert("orders",{...order,user_id:currentUser.id,print_id:order.print_id||null});
+      }catch(err){
+        console.error("Customer request sync failed",err);
+        setSyncState("error","Request saved locally — cloud sync failed");
+      }
+    })();
+  }
+}
+
 function normalizeCustomerPin(v){return String(v||"").replace(/\D/g,"").slice(0,8)}
 function enterCustomerMode(){
   if(customerMode)return;
@@ -1052,6 +1158,11 @@ $("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=(
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
 $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
 $("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
+$("requestPrintBtn").onclick=openRequestPrint;
+$("closeRequestPrint").onclick=()=>$("requestPrintDialog").close();
+$("requestVariant").onchange=updateRequestEstimate;
+$("requestQty").oninput=updateRequestEstimate;
+$("submitPrintRequestBtn").onclick=submitPrintRequest;
 document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));
 $("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();
 $("confirmCustomerUnlock").onclick=confirmCustomerUnlock;

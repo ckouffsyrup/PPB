@@ -410,3 +410,48 @@ body.menu-open{
 .customer-tab-hidden{display:none!important}
 @media(max-width:800px){.customer-filament-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.photo-actions{grid-template-columns:1fr}.photo-action-button{min-height:48px}.customer-filament-grid{grid-template-columns:1fr 1fr;gap:8px}.customer-filament-card{padding:10px;border-radius:14px}.customer-filament-card h3{font-size:13px}.customer-filament-card p{font-size:9px}.customer-mode-bar{align-items:center}.customer-store-tabs{width:100%;display:grid!important;grid-template-columns:1fr 1fr}.customer-store-tabs button{padding:9px 6px;font-size:11px}}
+
+/* v4.3.1 customer Request This Print */
+.customer-request-button{margin-top:12px;min-height:48px}
+.request-product-summary{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:11px;
+  margin-bottom:14px;
+  background:#0e0c13;
+  border:1px solid var(--line);
+  border-radius:14px
+}
+.request-product-thumb{
+  width:62px;height:62px;flex:0 0 62px;
+  border-radius:12px;
+  object-fit:cover;
+  background:#17131f;
+  border:1px solid var(--line)
+}
+.request-product-summary strong{display:block}
+.request-product-summary small{display:block;color:var(--muted);margin-top:3px}
+.request-estimate{
+  margin-top:14px;
+  padding:13px;
+  background:linear-gradient(135deg,#1f1830,#171222);
+  border:1px solid #41345a;
+  border-radius:15px
+}
+.request-estimate div{display:flex;align-items:end;justify-content:space-between;gap:10px}
+.request-estimate span{color:var(--muted);font-size:11px}
+.request-estimate strong{color:var(--purpleSoft);font-size:25px}
+.request-estimate small{display:block;color:var(--muted);font-size:10px;margin-top:5px;line-height:1.4}
+.request-success{
+  border:1px solid #275440;
+  background:#102119;
+  color:var(--green);
+  border-radius:14px;
+  padding:12px;
+  font-weight:850
+}
+@media(max-width:560px){
+  .request-print-sheet{max-height:calc(100dvh - max(10px,env(safe-area-inset-top)))}
+  .customer-request-button{position:sticky;bottom:0;z-index:2}
+}

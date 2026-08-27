@@ -502,9 +502,57 @@
     <p id="customerProductNotes" class="muted"></p>
     <div id="customerVariantList" class="customer-variant-list"></div>
     <div id="customerAvailability" class="availability-banner"></div>
+    <button class="primary full-width customer-request-button" id="requestPrintBtn" type="button">Request This Print</button>
   </div>
 </dialog>
 
+
+
+<!-- CUSTOMER REQUEST A PRINT -->
+<dialog id="requestPrintDialog">
+  <div class="sheet request-print-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">PRINT REQUEST</p><h2 id="requestPrintTitle">Request this print</h2></div>
+      <button class="icon-btn" id="closeRequestPrint" type="button">✕</button>
+    </div>
+
+    <div class="request-product-summary" id="requestProductSummary"></div>
+
+    <div class="form-grid">
+      <label>Your name
+        <input id="requestCustomerName" placeholder="Name / nickname" autocomplete="name" />
+      </label>
+
+      <label>Quantity
+        <input id="requestQty" type="number" min="1" step="1" value="1" />
+      </label>
+
+      <label>Version
+        <select id="requestVariant"><option value="">Standard</option></select>
+      </label>
+
+      <label>Preferred filament/color
+        <select id="requestFilament"><option value="">No preference</option></select>
+      </label>
+
+      <label class="full">How should I contact you?
+        <input id="requestContact" placeholder="Phone, Discord, email, etc." />
+      </label>
+
+      <label class="full">Notes / changes
+        <textarea id="requestNotes" placeholder="Different colors, size, quantity details, or anything else you want."></textarea>
+      </label>
+    </div>
+
+    <div class="request-estimate">
+      <div><span>Estimated price</span><strong id="requestEstimate">$0</strong></div>
+      <small>This is an estimate. Final price can be confirmed before printing.</small>
+    </div>
+
+    <button class="primary full-width" id="submitPrintRequestBtn" type="button">Submit Print Request</button>
+  </div>
+</dialog>
 
 <!-- CUSTOMER MODE OWNER UNLOCK -->
 <dialog id="customerUnlockDialog">
