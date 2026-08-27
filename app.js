@@ -18,7 +18,8 @@ const defaultPresets=[
 ];
 const defaultSettings={
   supabaseUrl:"",supabaseKey:"",defaultPresetId:"normal",
-  browserNotifications:false,pushEnabled:false,lowFilamentPct:15
+  browserNotifications:false,pushEnabled:false,lowFilamentPct:15,
+  customerModePin:""
 };
 
 function migrateArray(newKey,oldKeys,fallback=[]){
@@ -77,6 +78,7 @@ let pendingPhotoFile=null,pendingPhotoData="",editorFavorite=false,currentView="
 let savePrintInFlight=false;
 let supabaseClient=null,currentUser=null,realtimeChannel=null,realtimeTimer=null;
 let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=false,currentMakePrintId=null;
+let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=null;
 const pendingLocalProductIds=new Set();
 
 function persist(){
@@ -141,6 +143,7 @@ function clearLegacyMenuLock(){
 }
 
 function openMenu(){
+  if(customerMode)return;
   if($("sideDrawer").classList.contains("open"))return;
   clearLegacyMenuLock();
 
@@ -180,6 +183,25 @@ function renderAll(){
 function miniRow(title,sub,right){return `<div class="mini-row"><div class="left"><strong>${safe(title)}</strong><small>${safe(sub)}</small></div><div class="mini-price">${safe(right)}</div></div>`}
 function emptyMini(t){return `<div class="mini-row"><div class="left"><small>${safe(t)}</small></div></div>`}
 
+function renderCustomerFilaments(){
+  const grid=$("customerFilamentGrid");
+  if(!grid)return;
+  const available=filaments.filter(f=>Number(f.remaining||0)>0).sort((a,b)=>String(a.color||a.material||"").localeCompare(String(b.color||b.material||"")));
+  grid.innerHTML=available.map(f=>{
+    const remaining=Number(f.remaining||0),size=Number(f.spool_size||1000),pct=size?remaining/size*100:0,low=remaining<=100||pct<=15;
+    return `<article class="customer-filament-card"><div class="customer-filament-color" style="background:${safe(f.visual_color||'#777777')}"></div><h3>${safe(f.color||"Unnamed color")}</h3><p>${safe([f.brand,f.material].filter(Boolean).join(" · ")||"Filament")}</p><span class="customer-filament-availability ${low?"low":""}">${low?"LOW STOCK":"AVAILABLE"}</span></article>`
+  }).join("");
+  if(!available.length)grid.innerHTML=`<div class="empty-state"><h3>No filament available</h3><p>There are no in-stock filament colors to show right now.</p></div>`;
+}
+function setCustomerStoreTab(tab){
+  customerStoreTab=tab==="filaments"?"filaments":"products";
+  document.querySelectorAll("[data-customer-tab]").forEach(b=>b.classList.toggle("active",b.dataset.customerTab===customerStoreTab));
+  $("shopGrid").classList.toggle("hidden",customerMode&&customerStoreTab==="filaments");
+  $("shopEmpty").classList.toggle("customer-tab-hidden",customerMode&&customerStoreTab==="filaments");
+  $("customerFilamentGrid").classList.toggle("hidden",!customerMode||customerStoreTab!=="filaments");
+  renderCustomerFilaments();
+}
+
 function renderShop(){
   const q=$("shopSearch")?.value.trim().toLowerCase()||"",cat=$("shopCategoryFilter")?.value||"";
   let list=items.filter(i=>{
@@ -214,10 +236,12 @@ function renderShop(){
   $("shopProductCount").textContent=list.length;$("shopStockCount").textContent=list.reduce((a,i)=>a+itemStock(i),0);$("shopFavCount").textContent=items.filter(i=>i.favorite).length;
   const cats=[...new Set(items.map(i=>i.category).filter(Boolean))].sort(),cur=$("shopCategoryFilter").value;
   $("shopCategoryFilter").innerHTML=`<option value="">All categories</option>`+cats.map(c=>`<option ${c===cur?"selected":""}>${safe(c)}</option>`).join("");
-  $("customerModeBtn").textContent=customerMode?"← Exit Customer Mode":"◫ Customer Store Mode";
-  $("drawerCustomerBtn").textContent=customerMode?"← Exit Customer Store Mode":"◫ Customer Store Mode";
+  $("customerModeBtn").textContent="◫ Customer Store Mode";
+  $("drawerCustomerBtn").textContent="◫ Customer Store Mode";
   $("customerModeBar").classList.toggle("hidden",!customerMode);
+  $("customerStoreTabs").classList.toggle("hidden",!customerMode);
   document.body.classList.toggle("customer-mode",customerMode);
+  setCustomerStoreTab(customerStoreTab);
 }
 
 function restockSuggestions(){
@@ -294,7 +318,7 @@ function resetEditor(){
   editingId=null;pendingPhotoFile=null;pendingPhotoData="";editorFavorite=false;
   ["nameInput","categoryInput","modelSourceInput","priceInput","hoursInput","extraCostInput","notesInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).value="");
   $("madeInput").value=0;$("soldInput").value=0;$("outOfStockInput").value="show";$("presetInput").value=settings.defaultPresetId||presets[0]?.id;
-  $("photoPreview").classList.add("hidden");$("photoPlaceholder").classList.remove("hidden");$("printFilamentRows").innerHTML="";$("variantRows").innerHTML="";
+  $("photoPreview").classList.add("hidden");$("photoPlaceholder").classList.remove("hidden");if($("photoCameraInput"))$("photoCameraInput").value="";if($("photoLibraryInput"))$("photoLibraryInput").value="";$("printFilamentRows").innerHTML="";$("variantRows").innerHTML="";
   $("deleteBtn").style.visibility="hidden";$("recordSaleFromPrintBtn").style.visibility="hidden";$("makePrintBtn").style.visibility="hidden";updateFavoriteButton();updatePricingPreviews()
 }
 function updateFavoriteButton(){$("favoriteToggle").classList.toggle("active",editorFavorite);$("favoriteToggle").textContent=editorFavorite?"★ Favorite":"☆ Favorite"}
@@ -345,24 +369,14 @@ async function compressedPhotoDataUrl(file){
     return fileToDataUrl(file);
   }
 }
-$("photoInput").onchange=async e=>{
-  const f=e.target.files[0];
-  if(!f)return;
-  pendingPhotoFile=f;
-  $("photoPlaceholder").classList.add("hidden");
-  $("photoPreview").classList.remove("hidden");
-  $("photoPreview").removeAttribute("src");
-  try{
-    pendingPhotoData=await compressedPhotoDataUrl(f);
-    $("photoPreview").src=pendingPhotoData;
-  }catch(err){
-    console.error(err);
-    pendingPhotoData="";
-    $("photoPreview").classList.add("hidden");
-    $("photoPlaceholder").classList.remove("hidden");
-    toast("Couldn't prepare that photo — try another one")
-  }
+async function handleChosenPhoto(file){
+  if(!file)return;pendingPhotoFile=file;$("photoPlaceholder").classList.add("hidden");$("photoPreview").classList.remove("hidden");$("photoPreview").removeAttribute("src");
+  try{pendingPhotoData=await compressedPhotoDataUrl(file);$("photoPreview").src=pendingPhotoData}
+  catch(err){console.error(err);pendingPhotoData="";pendingPhotoFile=null;$("photoPreview").classList.add("hidden");$("photoPlaceholder").classList.remove("hidden");toast("Couldn't prepare that photo — try another one")}
 }
+$("photoCameraInput").onchange=e=>handleChosenPhoto(e.target.files?.[0]);
+$("photoLibraryInput").onchange=e=>handleChosenPhoto(e.target.files?.[0]);
+
 async function savePrint(){
   if(savePrintInFlight)return;
   const name=$("nameInput").value.trim();
@@ -574,14 +588,24 @@ function openCustomerProduct(id){
   $("customerVariantList").innerHTML=(i.variants||[]).map(v=>`<div class="customer-variant"><span>${safe(v.name)}</span><strong>${money(variantPrice(i,v.id))} · ${v.stock||0} available</strong></div>`).join("");
   const stock=itemStock(i);$("customerAvailability").textContent=stock>0?`${stock} available right now`:"Currently out of stock";$("customerAvailability").classList.toggle("out",stock<=0);$("customerProductDialog").showModal()
 }
-function toggleCustomerMode(){
-  customerMode=!customerMode;
-  closeMenu();
-  currentView="shop";
+function normalizeCustomerPin(v){return String(v||"").replace(/\D/g,"").slice(0,8)}
+function enterCustomerMode(){
+  if(customerMode)return;
+  const pin=normalizeCustomerPin(settings.customerModePin);
+  if(pin.length<4){toast("Set a 4–8 digit Customer Mode PIN in Settings first");openSettings();setTimeout(()=>$("customerModePinInput")?.focus(),120);return}
+  customerMode=true;customerStoreTab="products";closeMenu();currentView="shop";
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.dataset.view==="shop"));
-  renderAll();
-  window.scrollTo({top:0,behavior:"auto"});
-  toast(customerMode?"Customer Store Mode on — admin info hidden":"Back to admin mode");
+  renderAll();window.scrollTo({top:0,behavior:"auto"});toast("Customer Store Mode locked");
+}
+function openCustomerUnlock(){if(!customerMode)return;$("customerUnlockPin").value="";$("customerUnlockDialog").showModal();setTimeout(()=>$("customerUnlockPin").focus(),100)}
+function confirmCustomerUnlock(){
+  const entered=normalizeCustomerPin($("customerUnlockPin").value),pin=normalizeCustomerPin(settings.customerModePin);
+  if(!pin||entered!==pin){$("customerUnlockPin").value="";toast("Wrong owner PIN");return}
+  $("customerUnlockDialog").close();customerMode=false;customerStoreTab="products";customerTitleTapCount=0;renderAll();toast("Admin mode unlocked");
+}
+function customerOwnerTap(){
+  if(!customerMode)return;customerTitleTapCount++;clearTimeout(customerTitleTapTimer);customerTitleTapTimer=setTimeout(()=>customerTitleTapCount=0,1700);
+  if(customerTitleTapCount>=5){customerTitleTapCount=0;clearTimeout(customerTitleTapTimer);openCustomerUnlock()}
 }
 
 function generateNotifications(){
@@ -875,11 +899,12 @@ async function sendTestPush(){
 function openSettings(){
   $("supabaseUrlInput").value=settings.supabaseUrl||"";
   $("supabaseKeyInput").value=settings.supabaseKey||"";
+  $("customerModePinInput").value=settings.customerModePin||"";
   renderPresets();updateCloudUI();
   $("settingsDialog").showModal();
   resolveCurrentUser().then(()=>refreshPushStatus()).catch(()=>refreshPushStatus().catch(()=>{}));
 }
-function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();persist();setupSupabase();$("settingsDialog").close();toast("Settings saved")}
+function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();settings.customerModePin=normalizeCustomerPin($("customerModePinInput").value);persist();setupSupabase();$("settingsDialog").close();toast("Settings saved")}
 
 function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
 async function syncUpsert(table,row){
@@ -1021,12 +1046,17 @@ document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>showView(b.datas
 $("menuBtn").onclick=openMenu;$("mobileMenuBtn").onclick=openMenu;$("closeMenuBtn").onclick=closeMenu;$("drawerBackdrop").onclick=closeMenu;
 $("drawerBackdrop").addEventListener("touchmove",e=>e.preventDefault(),{passive:false});
 $("sideDrawer").addEventListener("touchmove",e=>e.stopPropagation(),{passive:true});
-$("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=toggleCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};
-$("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=toggleCustomerMode;$("exitCustomerModeBtn").onclick=toggleCustomerMode;
+$("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=enterCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};
+$("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=enterCustomerMode;
 $("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
 $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
 $("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
+document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));
+$("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();
+$("confirmCustomerUnlock").onclick=confirmCustomerUnlock;
+$("customerUnlockPin").addEventListener("keydown",e=>{if(e.key==="Enter")confirmCustomerUnlock()});
+document.querySelector(".topbar h1").addEventListener("click",customerOwnerTap);
 $("closeEditor").onclick=()=>{savePrintInFlight=false;$("savePrintBtn").disabled=false;$("savePrintBtn").textContent="Save print";$("editorDialog").close()};$("savePrintBtn").onclick=savePrint;$("deleteBtn").onclick=deletePrint;$("favoriteToggle").onclick=()=>{editorFavorite=!editorFavorite;updateFavoriteButton()};$("modelSourceInput").oninput=updateModelLink;$("addPrintFilamentBtn").onclick=()=>addUsageRow("printFilamentRows");$("addVariantBtn").onclick=()=>addVariantRow();
 ["hoursInput","extraCostInput","priceInput","madeInput","soldInput","presetInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).oninput=updatePricingPreviews);
 $("recordSaleFromPrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openSale(id)};$("makePrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openMake(id)};

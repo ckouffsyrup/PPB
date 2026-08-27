@@ -392,3 +392,21 @@ body.menu-open{
     top:calc(var(--mobile-header-h) + env(safe-area-inset-top) + 4px)!important;
   }
 }
+
+/* v4.3 customer-mode rework + photo library picker */
+.photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:0 0 16px}
+.photo-action-button{margin:0;min-height:44px;cursor:pointer}
+.customer-lock-badge{flex:0 0 auto;border:1px solid #5b476f;background:#171121;color:var(--purpleSoft);border-radius:999px;padding:6px 9px;font-size:9px;font-weight:950;letter-spacing:.12em}
+.customer-store-tabs{display:flex;gap:7px;margin:0 0 14px;padding:5px;width:max-content;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.customer-store-tabs button{border:0;background:transparent;color:var(--muted);border-radius:10px;padding:9px 13px;font-weight:850}
+.customer-store-tabs button.active{background:var(--panel3);color:var(--purpleSoft)}
+.customer-filament-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.customer-filament-card{border:1px solid var(--line);background:var(--panel);border-radius:18px;padding:15px}
+.customer-filament-color{width:100%;aspect-ratio:1.8/1;border-radius:14px;margin-bottom:12px;border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+.customer-filament-card h3{margin:0 0 4px;font-size:16px}.customer-filament-card p{margin:0;color:var(--muted);font-size:11px}
+.customer-filament-availability{margin-top:10px;display:inline-block;border-radius:999px;padding:5px 8px;font-size:9px;font-weight:900;background:#102119;color:var(--green);border:1px solid #275440}
+.customer-filament-availability.low{background:#261e10;color:var(--yellow);border-color:#5e4a28}
+.customer-mode .shop-summary{display:none}.customer-mode .shop-hero-actions{display:none!important}.customer-mode .shop-controls{margin-top:0}.customer-mode .customer-mode-bar{display:flex!important}.customer-mode .customer-store-tabs{display:flex!important}.customer-mode .shop-hero{min-height:auto}.customer-mode .shop-hero .muted{max-width:680px}
+.customer-tab-hidden{display:none!important}
+@media(max-width:800px){.customer-filament-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.photo-actions{grid-template-columns:1fr}.photo-action-button{min-height:48px}.customer-filament-grid{grid-template-columns:1fr 1fr;gap:8px}.customer-filament-card{padding:10px;border-radius:14px}.customer-filament-card h3{font-size:13px}.customer-filament-card p{font-size:9px}.customer-mode-bar{align-items:center}.customer-store-tabs{width:100%;display:grid!important;grid-template-columns:1fr 1fr}.customer-store-tabs button{padding:9px 6px;font-size:11px}}

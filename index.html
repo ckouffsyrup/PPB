@@ -71,9 +71,9 @@
       <div class="customer-mode-bar hidden" id="customerModeBar">
         <div>
           <strong>Customer Store Mode</strong>
-          <small>Costs, profit, admin controls, and management pages are hidden.</small>
+          <small>Browse products and available filament colors.</small>
         </div>
-        <button class="secondary" id="exitCustomerModeBtn" type="button">Exit Store Mode</button>
+        <span class="customer-lock-badge">LOCKED</span>
       </div>
 
       <section class="shop-hero">
@@ -99,7 +99,13 @@
         <span><strong id="shopFavCount">0</strong> favorites</span>
       </div>
 
+      <div class="customer-store-tabs hidden" id="customerStoreTabs">
+        <button class="active" type="button" data-customer-tab="products">Products</button>
+        <button type="button" data-customer-tab="filaments">Available Filaments</button>
+      </div>
+
       <div id="shopGrid" class="shop-grid"></div>
+      <div id="customerFilamentGrid" class="customer-filament-grid hidden"></div>
       <div id="shopEmpty" class="empty-state hidden">
         <h3>No products yet</h3>
         <p>Add your first print and it'll show up here.</p>
@@ -244,8 +250,11 @@
 
     <div class="photo-picker">
       <img id="photoPreview" class="hidden" alt="Print preview" />
-      <div id="photoPlaceholder"><span>📷</span><strong>Add a photo</strong><small>Take one or choose from your library</small></div>
-      <input id="photoInput" type="file" accept="image/*" capture="environment" />
+      <div id="photoPlaceholder"><span>📷</span><strong>Add a photo</strong><small>Take a new photo or choose one you already have</small></div>
+    </div>
+    <div class="photo-actions">
+      <label class="secondary photo-action-button">📷 Take photo<input id="photoCameraInput" type="file" accept="image/*" capture="environment" hidden /></label>
+      <label class="secondary photo-action-button">🖼 Choose from Photos<input id="photoLibraryInput" type="file" accept="image/*" hidden /></label>
     </div>
 
     <div class="favorite-row">
@@ -497,6 +506,20 @@
 </dialog>
 
 
+<!-- CUSTOMER MODE OWNER UNLOCK -->
+<dialog id="customerUnlockDialog">
+  <div class="sheet narrow">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">OWNER ONLY</p><h2>Unlock PrintBook</h2></div>
+      <button class="icon-btn" id="closeCustomerUnlock" type="button">✕</button>
+    </div>
+    <p class="muted">Enter your Customer Store Mode PIN to return to admin mode.</p>
+    <label>Owner PIN<input id="customerUnlockPin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" /></label>
+    <button class="primary full-width" id="confirmCustomerUnlock" type="button">Unlock Admin Mode</button>
+  </div>
+</dialog>
+
 <!-- SETTINGS -->
 <dialog id="settingsDialog">
   <div class="sheet settings-sheet">
@@ -506,6 +529,19 @@
     <section class="settings-section">
       <div class="section-heading"><div><h3>Pricing presets</h3><p class="muted">Normal, friend, event, wholesale — whatever you use.</p></div><button class="secondary small" id="addPresetBtn" type="button">+ Preset</button></div>
       <div id="presetList" class="preset-list"></div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <h3>Customer Store Mode</h3>
+          <p class="muted">Customers cannot exit Store Mode from the screen. Owner unlock is hidden behind 5 taps on the PrintBook title.</p>
+        </div>
+      </div>
+      <label>Owner PIN
+        <input id="customerModePinInput" type="password" inputmode="numeric" maxlength="8" placeholder="Set a 4–8 digit PIN" />
+      </label>
+      <p class="muted tiny-note">Set this before handing the phone to someone. Five taps on the PrintBook title opens the owner unlock screen.</p>
     </section>
 
     <section class="settings-section">
