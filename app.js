@@ -80,12 +80,17 @@ let supabaseClient=null,currentUser=null,realtimeChannel=null,realtimeTimer=null
 let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=false,currentMakePrintId=null;
 let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=null;
 let currentRequestPrintId=null;
+const PUBLIC_STOREFRONT_URL="https://ivxvnkwhufopzbcvjwqn.supabase.co/functions/v1/public-storefront";
+let publicVisitorMode=false;
+let publicStoreLoaded=false;
+let publicStoreLoading=false;
 let waitingServiceWorker=null;
 let appUpdateReady=false;
 let updateReloadArmed=false;
 const pendingLocalProductIds=new Set();
 
 function persist(){
+  if(publicVisitorMode){renderAll();return}
   localStorage.setItem(K.items,JSON.stringify(items));
   localStorage.setItem(K.filaments,JSON.stringify(filaments));
   localStorage.setItem(K.sales,JSON.stringify(sales));
@@ -147,7 +152,7 @@ function clearLegacyMenuLock(){
 }
 
 function openMenu(){
-  if(customerMode)return;
+  if(publicVisitorMode||customerMode)return;
   if($("sideDrawer").classList.contains("open"))return;
   clearLegacyMenuLock();
 
@@ -192,7 +197,7 @@ function renderCustomerFilaments(){
   if(!grid)return;
   const available=filaments.filter(f=>Number(f.remaining||0)>0).sort((a,b)=>String(a.color||a.material||"").localeCompare(String(b.color||b.material||"")));
   grid.innerHTML=available.map(f=>{
-    const remaining=Number(f.remaining||0),size=Number(f.spool_size||1000),pct=size?remaining/size*100:0,low=remaining<=100||pct<=15;
+    const remaining=Number(f.remaining||0),size=Number(f.spool_size||1000),pct=size?remaining/size*100:0,low=f.low_stock===true||remaining<=100||pct<=15;
     return `<article class="customer-filament-card"><div class="customer-filament-color" style="background:${safe(f.visual_color||'#777777')}"></div><h3>${safe(f.color||"Unnamed color")}</h3><p>${safe([f.brand,f.material].filter(Boolean).join(" · ")||"Filament")}</p><span class="customer-filament-availability ${low?"low":""}">${low?"LOW STOCK":"AVAILABLE"}</span></article>`
   }).join("");
   if(!available.length)grid.innerHTML=`<div class="empty-state"><h3>No filament available</h3><p>There are no in-stock filament colors to show right now.</p></div>`;
@@ -204,6 +209,54 @@ function setCustomerStoreTab(tab){
   $("shopEmpty").classList.toggle("customer-tab-hidden",customerMode&&customerStoreTab==="filaments");
   $("customerFilamentGrid").classList.toggle("hidden",!customerMode||customerStoreTab!=="filaments");
   renderCustomerFilaments();
+}
+
+function setPublicStoreState(message="",isError=false){
+  const el=$("publicStoreState");if(!el)return;
+  el.textContent=message;el.classList.toggle("hidden",!message);el.classList.toggle("error",!!isError)
+}
+function normalizePublicPrint(p){
+  return {id:p.id,name:p.name||"Print",category:p.category||"",price:Number(p.price||0),hours:p.hours??"",notes:p.notes||"",photo_url:p.photo_url||"",favorite:!!p.favorite,variants:Array.isArray(p.variants)?p.variants:[],deal_qty:Number(p.deal_qty||0),deal_price:Number(p.deal_price||0),out_of_stock_behavior:p.out_of_stock_behavior||"show",made_qty:Number(p.made_qty||0),sold_qty:Number(p.sold_qty||0),filament_usage:[],extra_cost:0,model_source:"",created_at:p.created_at||"",updated_at:p.updated_at||""}
+}
+function normalizePublicFilament(f){
+  return {id:f.id,brand:f.brand||"",material:f.material||"",color:f.color||"",visual_color:f.visual_color||"#777777",remaining:f.available?1:0,spool_size:1,low_stock:!!f.low_stock,public_only:true}
+}
+async function loadPublicStorefront(showError=true){
+  if(publicStoreLoading)return false;
+  publicStoreLoading=true;setPublicStoreState("Loading the latest shop inventory…");
+  try{
+    const res=await fetch(`${PUBLIC_STOREFRONT_URL}?t=${Date.now()}`,{headers:{"Accept":"application/json"},cache:"no-store"});
+    let data={};try{data=await res.json()}catch{}
+    if(!res.ok)throw new Error(data.error||`Storefront returned ${res.status}`);
+    items=(data.products||[]).map(normalizePublicPrint);
+    filaments=(data.filaments||[]).map(normalizePublicFilament);
+    publicStoreLoaded=true;setPublicStoreState("");renderAll();return true
+  }catch(err){
+    console.error("Public storefront load failed",err);publicStoreLoaded=false;
+    if(showError)setPublicStoreState("Couldn't load the live storefront right now. Reopen PrintBook and try again.",true);
+    return false
+  }finally{publicStoreLoading=false}
+}
+async function activatePublicVisitorMode(){
+  publicVisitorMode=true;customerMode=true;customerStoreTab="products";currentView="shop";
+  document.body.classList.add("public-visitor");
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.dataset.view==="shop"));
+  $("customerModeBarTitle").textContent="Live Customer Store";
+  $("customerModeBarText").textContent="Products and filament availability are synced from PrintBook.";
+  $("customerModeBadge").textContent="LIVE";
+  renderAll();await loadPublicStorefront(true)
+}
+function deactivatePublicVisitorMode(){
+  publicVisitorMode=false;document.body.classList.remove("public-visitor");
+  $("customerModeBarTitle").textContent="Customer Store Mode";
+  $("customerModeBarText").textContent="Browse products and available filament colors.";
+  $("customerModeBadge").textContent="LOCKED"
+}
+async function submitPublicPrintRequest(payload){
+  const res=await fetch(PUBLIC_STOREFRONT_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"request_print",...payload})});
+  let data={};try{data=await res.json()}catch{}
+  if(!res.ok)throw new Error(data.error||`Request failed (${res.status})`);
+  return data
 }
 
 function renderShop(){
@@ -245,6 +298,8 @@ function renderShop(){
   $("customerModeBar").classList.toggle("hidden",!customerMode);
   $("customerStoreTabs").classList.toggle("hidden",!customerMode);
   document.body.classList.toggle("customer-mode",customerMode);
+  document.body.classList.toggle("public-visitor",publicVisitorMode);
+  if(publicVisitorMode){$("customerModeBarTitle").textContent="Live Customer Store";$("customerModeBarText").textContent="Products and filament availability are synced from PrintBook.";$("customerModeBadge").textContent="LIVE"}
   setCustomerStoreTab(customerStoreTab);
 }
 
@@ -643,58 +698,23 @@ function openRequestPrint(){
   $("requestPrintDialog").showModal();
 }
 async function submitPrintRequest(){
-  const item=items.find(i=>i.id===currentRequestPrintId);
-  if(!item)return toast("That product could not be found");
+  const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
+  const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
+  const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim(),estimate=requestUnitPrice()*qty;
 
-  const customer=$("requestCustomerName").value.trim();
-  if(!customer)return toast("Enter your name");
-
-  const qty=Math.max(1,Number($("requestQty").value||1));
-  const variantId=$("requestVariant").value;
-  const variant=(item.variants||[]).find(v=>v.id===variantId);
-  const filamentId=$("requestFilament").value;
-  const filament=getFilament(filamentId);
-  const contact=$("requestContact").value.trim();
-  const userNotes=$("requestNotes").value.trim();
-  const estimate=requestUnitPrice()*qty;
-
-  const details=[
-    variant?`Variant: ${variant.name}`:"Version: Standard",
-    filament?`Preferred filament: ${filament.color||filament.material||"Selected filament"}`:"Filament: No preference",
-    contact?`Contact: ${contact}`:"",
-    userNotes?`Customer notes: ${userNotes}`:""
-  ].filter(Boolean).join("\n");
-
-  const order={
-    id:uid(),
-    customer,
-    status:"Requested",
-    item:item.name,
-    quantity:qty,
-    quoted_price:estimate,
-    due_date:"",
-    print_id:item.id,
-    notes:`Customer Store request\n${details}`,
-    created_at:nowISO(),
-    updated_at:nowISO()
-  };
-
-  // Local-first so the customer's request doesn't disappear if the connection is slow.
-  orders.unshift(order);
-  persist();
-  $("requestPrintDialog").close();
-  toast("Print request submitted");
-
-  if(currentUser&&supabaseClient){
-    (async()=>{
-      try{
-        await syncUpsert("orders",{...order,user_id:currentUser.id,print_id:order.print_id||null});
-      }catch(err){
-        console.error("Customer request sync failed",err);
-        setSyncState("error","Request saved locally — cloud sync failed");
-      }
-    })();
+  if(publicVisitorMode){
+    const btn=$("submitPrintRequestBtn"),oldLabel=btn.textContent;btn.disabled=true;btn.textContent="Submitting…";
+    try{
+      await submitPublicPrintRequest({print_id:item.id,variant_id:variantId||"",filament_id:filamentId||"",customer,contact,quantity:qty,notes:userNotes});
+      $("requestPrintDialog").close();toast("Print request sent");return
+    }catch(err){console.error("Public request failed",err);toast(err?.message||"Couldn't send the print request");return}
+    finally{btn.disabled=false;btn.textContent=oldLabel}
   }
+
+  const details=[variant?`Variant: ${variant.name}`:"Version: Standard",filament?`Preferred filament: ${filament.color||filament.material||"Selected filament"}`:"Filament: No preference",contact?`Contact: ${contact}`:"",userNotes?`Customer notes: ${userNotes}`:""].filter(Boolean).join("\n");
+  const order={id:uid(),customer,status:"Requested",item:item.name,quantity:qty,quoted_price:estimate,due_date:"",print_id:item.id,notes:`Customer Store request\n${details}`,created_at:nowISO(),updated_at:nowISO()};
+  orders.unshift(order);persist();$("requestPrintDialog").close();toast("Print request submitted");
+  if(currentUser&&supabaseClient){(async()=>{try{await syncUpsert("orders",{...order,user_id:currentUser.id,print_id:order.print_id||null})}catch(err){console.error("Customer request sync failed",err);setSyncState("error","Request saved locally — cloud sync failed")}})()}
 }
 
 function normalizeCustomerPin(v){return String(v||"").replace(/\D/g,"").slice(0,8)}
@@ -713,6 +733,7 @@ function confirmCustomerUnlock(){
   $("customerUnlockDialog").close();customerMode=false;customerStoreTab="products";customerTitleTapCount=0;renderAll();toast("Admin mode unlocked");
 }
 function customerOwnerTap(){
+  if(publicVisitorMode)return;
   if(!customerMode)return;customerTitleTapCount++;clearTimeout(customerTitleTapTimer);customerTitleTapTimer=setTimeout(()=>customerTitleTapCount=0,1700);
   if(customerTitleTapCount>=5){customerTitleTapCount=0;clearTimeout(customerTitleTapTimer);openCustomerUnlock()}
 }
@@ -1025,20 +1046,24 @@ async function syncDelete(table,id){
   setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).delete().eq("id",id).eq("user_id",currentUser.id);if(error){console.error(error);setSyncState("error",`Couldn't delete ${table}`);return false}setSyncState("synced","Synced",nowISO());return true
 }
 async function setupSupabase(){
-  if(!settings.supabaseUrl||!settings.supabaseKey||!window.supabase){supabaseClient=null;currentUser=null;stopRealtime();setSyncState("local","Local only");updateCloudUI();return}
+  if(!settings.supabaseUrl||!settings.supabaseKey||!window.supabase){
+    supabaseClient=null;currentUser=null;stopRealtime();setSyncState("local","Public storefront");updateCloudUI();
+    await activatePublicVisitorMode();return
+  }
   try{
     supabaseClient=window.supabase.createClient(settings.supabaseUrl,settings.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true}});
     const {data:sessionData}=await supabaseClient.auth.getSession();
     currentUser=sessionData?.session?.user||null;
+    if(currentUser)deactivatePublicVisitorMode();
     updateCloudUI();
     supabaseClient.auth.onAuthStateChange((event,session)=>{
-      currentUser=session?.user||null;
-      updateCloudUI();
-      if(currentUser){startRealtime();setTimeout(()=>pullCloud(false),50)}
-      else stopRealtime();
+      currentUser=session?.user||null;updateCloudUI();
+      if(currentUser){deactivatePublicVisitorMode();customerMode=false;startRealtime();setTimeout(()=>pullCloud(false),50)}
+      else{stopRealtime();setTimeout(()=>activatePublicVisitorMode(),0)}
       setTimeout(()=>refreshPushStatus().catch(()=>{}),0);
     });
-    if(currentUser){startRealtime();await pullCloud(false)}else setSyncState("local","Ready to sign in")
+    if(currentUser){deactivatePublicVisitorMode();customerMode=false;startRealtime();await pullCloud(false)}
+    else{setSyncState("local","Public storefront");await activatePublicVisitorMode()}
   }catch(e){console.error(e);currentUser=null;setSyncState("error","Supabase setup failed");updateCloudUI()}
 }
 function updateCloudUI(){
@@ -1053,7 +1078,7 @@ async function signUp(){
   settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();localStorage.setItem(K.settings,JSON.stringify(settings));await setupSupabase();if(!supabaseClient)return toast("Add Supabase URL and key first");
   const {error}=await supabaseClient.auth.signUp({email:$("emailInput").value.trim(),password:$("passwordInput").value});if(error)return toast(error.message);toast("Account created — check email if required")
 }
-async function signOut(){if(supabaseClient)await supabaseClient.auth.signOut();currentUser=null;stopRealtime();setSyncState("local","Signed out");updateCloudUI();toast("Signed out")}
+async function signOut(){if(supabaseClient)await supabaseClient.auth.signOut();currentUser=null;stopRealtime();setSyncState("local","Public storefront");updateCloudUI();await activatePublicVisitorMode();toast("Signed out")}
 async function pushLocal(){
   if(!currentUser)return;setSyncState("syncing","Uploading local data…");
   for(const i of items)await syncUpsert("prints",dbPrint(i));

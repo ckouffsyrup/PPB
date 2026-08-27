@@ -78,10 +78,10 @@
     <section class="view active" data-view="shop">
       <div class="customer-mode-bar hidden" id="customerModeBar">
         <div>
-          <strong>Customer Store Mode</strong>
-          <small>Browse products and available filament colors.</small>
+          <strong id="customerModeBarTitle">Customer Store Mode</strong>
+          <small id="customerModeBarText">Browse products and available filament colors.</small>
         </div>
-        <span class="customer-lock-badge">LOCKED</span>
+        <span class="customer-lock-badge" id="customerModeBadge">LOCKED</span>
       </div>
 
       <section class="shop-hero">
@@ -112,6 +112,7 @@
         <button type="button" data-customer-tab="filaments">Available Filaments</button>
       </div>
 
+      <div id="publicStoreState" class="public-store-state hidden"></div>
       <div id="shopGrid" class="shop-grid"></div>
       <div id="customerFilamentGrid" class="customer-filament-grid hidden"></div>
       <div id="shopEmpty" class="empty-state hidden">

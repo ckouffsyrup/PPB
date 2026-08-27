@@ -1,2 +1,3 @@
-[functions.push-notifications]
+
+[functions.public-storefront]
 verify_jwt = false

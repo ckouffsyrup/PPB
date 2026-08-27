@@ -488,3 +488,13 @@ body.menu-open{
   }
   .app-update-banner button{width:100%;min-height:44px}
 }
+
+/* v4.4 public synced storefront */
+.public-store-state{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:15px;padding:13px;margin-bottom:12px;font-size:12px}
+.public-store-state.error{border-color:#5d2f3a;background:#251219;color:#ffb3bd}
+.public-visitor .admin-only,.public-visitor .menu-btn,.public-visitor .notification-btn,.public-visitor .header-actions,.public-visitor .drawer-backdrop,.public-visitor .side-drawer{display:none!important}
+.public-visitor .topbar{justify-content:center}
+.public-visitor .brand-wrap{justify-content:center;text-align:center}
+.public-visitor .shop-hero-actions{display:none!important}
+.public-visitor .customer-mode-bar{display:flex!important}
+.public-visitor .customer-lock-badge{background:#102119;border-color:#275440;color:var(--green)}
