@@ -805,19 +805,6 @@ function requestVariantObject(){
   if(!item)return null;
   return (item.variants||[]).find(v=>v.id===$("requestVariant").value)||null;
 }
-function requestIsMulticolorCapable(){
-  const item=items.find(i=>i.id===currentRequestPrintId);
-  if(!item)return false;
-  const variant=requestVariantObject();
-
-  if(variant){
-    if(variant.multicolor_capable===true)return true;
-    if(!publicVisitorMode && variantUsage(variant).length>1)return true;
-  }
-  if(item.multicolor_capable===true)return true;
-  if(!publicVisitorMode && (item.filament_usage||[]).length>1)return true;
-  return false;
-}
 function selectedRequestColorIds(){
   return [...document.querySelectorAll('#requestColorGrid input[type="checkbox"]:checked')].map(x=>x.value);
 }
@@ -846,17 +833,9 @@ function updateRequestColorCount(){
   $("requestColorCount").textContent=`${n} selected`;
 }
 function updateRequestColorMode(){
-  const capable=requestIsMulticolorCapable();
-  $("requestColorModeField").classList.toggle("hidden",!capable);
-
-  if(!capable){
-    $("requestColorMode").value="single";
-  }
-
-  const multi=capable && $("requestColorMode").value==="multi";
+  const multi=$("requestColorMode").value==="multi";
   $("requestMulticolorSection").classList.toggle("hidden",!multi);
   $("requestSingleColorField").classList.toggle("hidden",multi);
-
   if(multi)renderRequestColorChoices();
 }
 function requestUnitPrice(){
@@ -903,7 +882,7 @@ async function submitPrintRequest(){
   const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
   const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
   const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim(),estimate=requestUnitPrice()*qty;
-  const wantsMulticolor=requestIsMulticolorCapable()&&$("requestColorMode").value==="multi";
+  const wantsMulticolor=$("requestColorMode").value==="multi";
   const colorIds=wantsMulticolor?selectedRequestColorIds():[];
   if(wantsMulticolor&&colorIds.length<2)return toast("Choose at least 2 colors");
 

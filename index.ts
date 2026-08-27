@@ -95,12 +95,8 @@ Deno.serve(async req=>{
         variantUsage=Array.isArray(cw?.usage)?cw.usage:[];
       }
     }
-    const baseUsage=Array.isArray(product.filament_usage)?product.filament_usage:[];
-    const multicolorCapable=(variant?variantUsage.length>1:false)||baseUsage.length>1;
-
-    if(colorMode==="multi"&&!multicolorCapable){
-      return json({error:"This product is not configured for multicolor requests."},400);
-    }
+    // Multicolor is a customer request preference, not an admin-configured
+    // product requirement. The owner can confirm model compatibility later.
     if(colorMode==="multi"&&colorIds.length<2){
       return json({error:"Choose at least 2 colors."},400);
     }
@@ -134,9 +130,9 @@ Deno.serve(async req=>{
       item:product.name,
       quantity,
       quoted_price:estimate,
-      // Match PrintBook's normal order shape. Some existing schemas use a
-      // non-null text/date field here, so an empty string is safer than null.
-      due_date:"",
+      // This column is a Postgres DATE. Empty string is invalid for DATE,
+      // so unscheduled customer requests must store NULL.
+      due_date:null,
       print_id:product.id,
       notes:detail,
       created_at:now,
