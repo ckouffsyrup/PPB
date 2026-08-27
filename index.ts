@@ -9,8 +9,24 @@ const clean=(s:unknown,max:number)=>String(s??"").trim().slice(0,max);
 
 Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
-  if(!SUPABASE_URL||!SERVICE_ROLE||!SHOP_OWNER_USER_ID)return json({error:"Public storefront is not configured."},503);
+  const missing:string[]=[];
+  if(!SUPABASE_URL)missing.push("SUPABASE_URL");
+  if(!SERVICE_ROLE)missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if(!SHOP_OWNER_USER_ID)missing.push("SHOP_OWNER_USER_ID");
+  if(missing.length){
+    console.error("Public storefront missing configuration:",missing);
+    return json({
+      error:"Public storefront is not configured.",
+      missing,
+      hint:"Add the missing secret/environment value, then redeploy or retry the function."
+    },503);
+  }
   const db=createClient(SUPABASE_URL,SERVICE_ROLE,{auth:{persistSession:false,autoRefreshToken:false}});
+
+  const url=new URL(req.url);
+  if(req.method==="GET"&&url.searchParams.get("health")==="1"){
+    return json({ok:true,configured:true,owner_user_id_present:!!SHOP_OWNER_USER_ID});
+  }
 
   if(req.method==="GET"){
     const [pr,fr]=await Promise.all([

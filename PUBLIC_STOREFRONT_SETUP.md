@@ -50,3 +50,24 @@ You should see JSON containing `products` and `filaments`.
 If that URL does not return JSON, the problem is in the Edge Function/deployment rather than GitHub Pages.
 
 v4.4.1 also adds **Copy diagnostics** on the public error message. It includes the request URL, HTTP status/response when available, or the browser/network error when the request never reached Supabase.
+
+
+## v4.4.3 503 diagnostic
+
+The frontend now uses the correct Edge Function URL:
+
+`https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-storefront`
+
+If the function returns HTTP 503, open:
+
+`https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-storefront?health=1`
+
+If configuration is missing, the normal function response now includes a `missing` array with the exact missing variable name.
+
+A 503 from this PrintBook function means one of these is unavailable to the running function:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SHOP_OWNER_USER_ID`
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are normally built-in Supabase Edge Function environment values. `SHOP_OWNER_USER_ID` is the custom secret you created.
