@@ -85,6 +85,8 @@ let publicVisitorMode=false;
 let publicStoreLoaded=false;
 let publicStoreLoading=false;
 let publicStoreLastDiagnostic="";
+let photoRepairInFlight=null;
+const photoRepairAttempts=new Set();
 let brandOwnerTapCount=0,brandOwnerTapTimer=null;
 let publicRequestRefreshTimer=null;
 let waitingServiceWorker=null;
@@ -396,6 +398,116 @@ async function submitPublicPrintRequest(payload){
   return data
 }
 
+function storageFileTime(file){
+  return Date.parse(file?.updated_at||file?.created_at||file?.last_accessed_at||"")||0;
+}
+function isImageStorageEntry(file){
+  return !!file?.name && /\.(jpe?g|png|webp|gif|heic|heif|avif)$/i.test(file.name);
+}
+function publicStorageUrl(path){
+  return supabaseClient?.storage.from("print-images").getPublicUrl(path).data.publicUrl||"";
+}
+async function findStoredProductPhoto(productId){
+  if(!supabaseClient||!currentUser)return "";
+  const bucket=supabaseClient.storage.from("print-images");
+  const candidates=[];
+  try{
+    const {data,error}=await bucket.list(`${currentUser.id}/${productId}`,{limit:100});
+    if(!error){
+      for(const file of data||[])if(isImageStorageEntry(file))candidates.push({file,path:`${currentUser.id}/${productId}/${file.name}`});
+    }
+  }catch(err){console.warn("Nested photo lookup failed",err)}
+  try{
+    const {data,error}=await bucket.list(currentUser.id,{limit:100,search:productId});
+    if(!error){
+      for(const file of data||[]){
+        if(isImageStorageEntry(file)&&file.name.startsWith(`${productId}.`))candidates.push({file,path:`${currentUser.id}/${file.name}`});
+      }
+    }
+  }catch(err){console.warn("Legacy photo lookup failed",err)}
+  candidates.sort((a,b)=>storageFileTime(b.file)-storageFileTime(a.file));
+  return candidates.length?publicStorageUrl(candidates[0].path):"";
+}
+function imageExtFromType(type=""){
+  if(type.includes("png"))return "png";
+  if(type.includes("webp"))return "webp";
+  if(type.includes("heic"))return "heic";
+  if(type.includes("heif"))return "heif";
+  if(type.includes("avif"))return "avif";
+  return "jpg";
+}
+async function uploadRecoveredDataPhoto(productId,dataUrl){
+  if(!supabaseClient||!currentUser||!String(dataUrl||"").startsWith("data:image/"))return "";
+  const blob=await fetch(dataUrl).then(r=>r.blob());
+  const ext=imageExtFromType(blob.type);
+  const path=`${currentUser.id}/${productId}/recovered-${Date.now()}-${crypto.randomUUID().slice(0,8)}.${ext}`;
+  const {error}=await supabaseClient.storage.from("print-images").upload(path,blob,{upsert:false,contentType:blob.type||`image/${ext}`,cacheControl:"31536000"});
+  if(error)throw error;
+  return publicStorageUrl(path);
+}
+async function repairProductPhoto(remoteProduct,{force=false}={}){
+  if(!supabaseClient||!currentUser||!remoteProduct?.id)return remoteProduct?.photo_url||"";
+  if(remoteProduct.photo_url&&!force)return remoteProduct.photo_url;
+
+  const local=items.find(i=>i.id===remoteProduct.id);
+  let recovered="";
+  try{recovered=await findStoredProductPhoto(remoteProduct.id)}catch(err){console.warn("Storage photo recovery failed",err)}
+
+  if(!recovered&&local?.photo_url){
+    const localUrl=String(local.photo_url);
+    if(localUrl.startsWith("data:image/")){
+      try{recovered=await uploadRecoveredDataPhoto(remoteProduct.id,localUrl)}catch(err){console.warn("Local photo migration failed",err)}
+    }else if(/^https?:\/\//i.test(localUrl)){
+      recovered=localUrl;
+    }
+  }
+
+  if(recovered && recovered!==remoteProduct.photo_url){
+    const {error}=await supabaseClient.from("prints").update({photo_url:recovered}).eq("id",remoteProduct.id).eq("user_id",currentUser.id);
+    if(error){console.warn("Could not repair print photo_url",error);return remoteProduct.photo_url||""}
+    remoteProduct.photo_url=recovered;
+  }
+  return remoteProduct.photo_url||"";
+}
+async function repairMissingProductPhotos(remoteRows=[]){
+  if(!supabaseClient||!currentUser||!navigator.onLine)return remoteRows;
+  if(photoRepairInFlight)return photoRepairInFlight;
+  photoRepairInFlight=(async()=>{
+    let repaired=0;
+    for(const product of remoteRows){
+      if(product.photo_url)continue;
+      const url=await repairProductPhoto(product);
+      if(url)repaired++;
+    }
+    if(repaired)toast(`Recovered ${repaired} product photo${repaired===1?"":"s"}`);
+    return remoteRows;
+  })().finally(()=>{photoRepairInFlight=null});
+  return photoRepairInFlight;
+}
+function wireProductImageFallbacks(root=document){
+  root.querySelectorAll('img[data-product-image]').forEach(img=>{
+    if(img.dataset.wired==="1")return;
+    img.dataset.wired="1";
+    const productId=img.dataset.productImage;
+    const fail=()=>{
+      if(img.dataset.failed==="1")return;
+      img.dataset.failed="1";
+      const fallback=document.createElement("div");
+      fallback.className="photo-fallback image-load-fallback";
+      fallback.innerHTML="<span>◌</span><small>Photo unavailable</small>";
+      img.replaceWith(fallback);
+      if(currentUser&&!publicVisitorMode&&productId&&!photoRepairAttempts.has(productId)){
+        photoRepairAttempts.add(productId);
+        const product=items.find(i=>i.id===productId);
+        if(product)repairProductPhoto(product,{force:true}).then(url=>{if(url&&url!==product.photo_url){product.photo_url=url;pullCloud(false)}}).catch(()=>{});
+      }
+    };
+    img.addEventListener("error",fail,{once:true});
+    if(img.complete&&img.naturalWidth===0)fail();
+    setTimeout(()=>{if(!img.complete)fail()},8000);
+  });
+}
+
 function renderShop(){
   if(publicVisitorMode&&!publicStoreLoaded){
     document.body.classList.toggle("customer-mode",true);
@@ -423,7 +535,7 @@ function renderShop(){
     const deal=Number(i.deal_qty)>1&&Number(i.deal_price)>0?`<div class="shop-deal">${i.deal_qty} for ${money(i.deal_price)}</div>`:"";
     return `<article class="shop-card" data-product-id="${i.id}">
       <div class="shop-card-photo">
-        ${i.photo_url?`<img src="${safe(i.photo_url)}" alt="${safe(i.name)}">`:`<div class="photo-fallback">◌</div>`}
+        ${i.photo_url?`<img data-product-image="${safe(i.id)}" src="${safe(i.photo_url)}" alt="${safe(i.name)}">`:`<div class="photo-fallback">◌</div>`}
         ${i.favorite&&!customerMode?`<div class="fav-chip">★</div>`:""}
         ${isOut?`<div class="out-badge">OUT OF STOCK</div>`:""}
         <div class="price-chip">${money(i.price)}</div>
@@ -440,6 +552,7 @@ function renderShop(){
     </article>`
   }).join("");
   document.querySelectorAll(".shop-card").forEach(card=>card.onclick=()=>customerMode?openCustomerProduct(card.dataset.productId):openEditor(card.dataset.productId));
+  wireProductImageFallbacks($("shopGrid"));
   $("shopEmpty").classList.toggle("hidden",!!list.length);
   $("shopProductCount").textContent=list.length;$("shopStockCount").textContent=list.reduce((a,i)=>a+itemStock(i),0);$("shopFavCount").textContent=items.filter(i=>i.favorite).length;
   const cats=[...new Set(items.map(i=>i.category).filter(Boolean))].sort(),cur=$("shopCategoryFilter").value;
@@ -478,7 +591,8 @@ function renderDashboard(){
 function renderPrints(){
   const q=$("search").value.trim().toLowerCase(),cat=$("categoryFilter").value,sf=$("stockFilter").value;
   const filtered=items.filter(i=>{const hay=[i.name,i.category,i.notes,i.model_source].join(" ").toLowerCase();if(!hay.includes(q)||(cat&&i.category!==cat))return false;if(sf==="in"&&itemStock(i)<=0)return false;if(sf==="out"&&itemStock(i)>0)return false;if(sf==="fav"&&!i.favorite)return false;return true});
-  $("printGrid").innerHTML=filtered.map(i=>{const mat=itemMaterialCost(i),stock=itemStock(i);return `<article class="print-card" onclick="openEditor('${i.id}')"><div class="card-photo">${i.photo_url?`<img src="${safe(i.photo_url)}">`:`<div class="photo-fallback">◌</div>`}${i.favorite?`<div class="fav-chip">★</div>`:""}${stock<=0?`<div class="out-badge">OUT</div>`:""}<div class="stock-chip">${stock} in stock</div><div class="price-chip">${money(i.price)}</div></div><div class="card-body"><h4>${safe(i.name)}</h4><div class="card-sub">${safe(i.category||"Uncategorized")} · ${(i.variants||[]).length?`${i.variants.length} variants`:`${(i.filament_usage||[]).length} filaments`}</div><div class="card-meta"><div><span>PRINT</span><strong>${i.hours?i.hours+" hr":"—"}</strong></div><div><span>MATERIAL</span><strong>${money(mat)}</strong></div><div><span>PROFIT</span><strong>${money(Number(i.price)-mat)}</strong></div></div></div></article>`}).join("");
+  $("printGrid").innerHTML=filtered.map(i=>{const mat=itemMaterialCost(i),stock=itemStock(i);return `<article class="print-card" onclick="openEditor('${i.id}')"><div class="card-photo">${i.photo_url?`<img data-product-image="${safe(i.id)}" src="${safe(i.photo_url)}" alt="${safe(i.name)}">`:`<div class="photo-fallback">◌</div>`}${i.favorite?`<div class="fav-chip">★</div>`:""}${stock<=0?`<div class="out-badge">OUT</div>`:""}<div class="stock-chip">${stock} in stock</div><div class="price-chip">${money(i.price)}</div></div><div class="card-body"><h4>${safe(i.name)}</h4><div class="card-sub">${safe(i.category||"Uncategorized")} · ${(i.variants||[]).length?`${i.variants.length} variants`:`${(i.filament_usage||[]).length} filaments`}</div><div class="card-meta"><div><span>PRINT</span><strong>${i.hours?i.hours+" hr":"—"}</strong></div><div><span>MATERIAL</span><strong>${money(mat)}</strong></div><div><span>PROFIT</span><strong>${money(Number(i.price)-mat)}</strong></div></div></div></article>`}).join("");
+  wireProductImageFallbacks($("printGrid"));
   $("emptyState").classList.toggle("hidden",!!filtered.length);
   const cats=[...new Set(items.map(i=>i.category).filter(Boolean))].sort(),cur=$("categoryFilter").value;$("categoryFilter").innerHTML=`<option value="">All categories</option>`+cats.map(c=>`<option ${c===cur?"selected":""}>${safe(c)}</option>`).join("")
 }
@@ -646,7 +760,13 @@ async function savePrint(){if(!requireOnlineAdminSave())return;
     // Capture globals now. The user can start another item while cloud work finishes.
     const photoFile=pendingPhotoFile;
     const localPhoto=pendingPhotoData;
-    const previousCloudPhoto=(old?.photo_url && !String(old.photo_url).startsWith("data:")) ? old.photo_url : "";
+    let previousCloudPhoto=(old?.photo_url && !String(old.photo_url).startsWith("data:")) ? old.photo_url : "";
+    if(!previousCloudPhoto&&editingId&&currentUser&&supabaseClient){
+      try{
+        const {data}=await supabaseClient.from("prints").select("photo_url").eq("id",id).eq("user_id",currentUser.id).maybeSingle();
+        if(data?.photo_url)previousCloudPhoto=data.photo_url;
+      }catch(err){console.warn("Could not read existing cloud photo",err)}
+    }
 
     let item={
       id,
@@ -670,7 +790,7 @@ async function savePrint(){if(!requireOnlineAdminSave())return;
       multicolor_max_colors:Math.max(2,Math.min(8,Number($("multicolorMaxColorsInput").value||2))),
       multicolor_price_mode:$("multicolorPriceModeInput").value==="per_extra"?"per_extra":"flat",
       multicolor_surcharge:Math.max(0,Number($("multicolorSurchargeInput").value||0)),
-      photo_url:localPhoto || old?.photo_url || "",
+      photo_url:localPhoto || previousCloudPhoto || old?.photo_url || "",
       created_at:old?.created_at||nowISO(),
       updated_at:nowISO()
     };
@@ -727,6 +847,10 @@ async function savePrint(){if(!requireOnlineAdminSave())return;
           // Grab the newest local record in case it was edited while the upload ran.
           const latest=items.find(i=>i.id===id);
           if(!latest)return;
+
+          if(!cloudPhoto&&String(latest.photo_url||"").startsWith("data:image/")){
+            cloudPhoto=await uploadRecoveredDataPhoto(id,latest.photo_url);
+          }
 
           if(cloudPhoto){
             latest.photo_url=cloudPhoto;
@@ -1450,6 +1574,7 @@ async function pullCloud(showToast=true){
     const remoteHasData=[pr,fi,sa,or,cw].some(x=>(x.data||[]).length);
     const localHasData=[items,filaments,sales,orders,colorways].some(a=>(a||[]).length);
     if(!remoteHasData&&localHasData){setSyncState("error","Cloud is empty — use Upload local data once");if(showToast)toast("Cloud is empty — upload this device's old data once");return false}
+    await repairMissingProductPhotos(pr.data||[]);
     const remoteItems=(pr.data||[]).map(({user_id,...x})=>({...x,multicolor_capable:!!x.multicolor_capable,multicolor_max_colors:Math.max(2,Number(x.multicolor_max_colors||2)),multicolor_price_mode:x.multicolor_price_mode==="per_extra"?"per_extra":"flat",multicolor_surcharge:Number(x.multicolor_surcharge||0),variants:x.variants||[],filament_usage:x.filament_usage||[]}));
     const pendingItems=items.filter(i=>pendingLocalProductIds.has(i.id)),pendingIds=new Set(pendingItems.map(i=>i.id));
     items=[...pendingItems,...remoteItems.filter(i=>!pendingIds.has(i.id))].sort((a,b)=>rowTime(b)-rowTime(a));

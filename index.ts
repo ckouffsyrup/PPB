@@ -8,6 +8,24 @@ const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"co
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...cors,"Content-Type":"application/json"}});
 const clean=(s:unknown,max:number)=>String(s??"").trim().slice(0,max);
 
+async function findStoredPhoto(db:any,productId:string){
+  const bucket=db.storage.from("print-images");
+  const candidates:any[]=[];
+  const isImage=(f:any)=>!!f?.name&&/\.(jpe?g|png|webp|gif|heic|heif|avif)$/i.test(f.name);
+  const stamp=(f:any)=>Date.parse(f?.updated_at||f?.created_at||f?.last_accessed_at||"")||0;
+  try{
+    const {data}=await bucket.list(`${SHOP_OWNER_USER_ID}/${productId}`,{limit:100});
+    for(const f of data??[])if(isImage(f))candidates.push({f,path:`${SHOP_OWNER_USER_ID}/${productId}/${f.name}`});
+  }catch(err){console.warn("Nested photo lookup failed",err)}
+  try{
+    const {data}=await bucket.list(SHOP_OWNER_USER_ID,{limit:100,search:productId});
+    for(const f of data??[])if(isImage(f)&&f.name.startsWith(`${productId}.`))candidates.push({f,path:`${SHOP_OWNER_USER_ID}/${f.name}`});
+  }catch(err){console.warn("Legacy photo lookup failed",err)}
+  candidates.sort((a,b)=>stamp(b.f)-stamp(a.f));
+  if(!candidates.length)return "";
+  return bucket.getPublicUrl(candidates[0].path).data.publicUrl||"";
+}
+
 Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
   const reqUrl=new URL(req.url);
@@ -44,7 +62,16 @@ Deno.serve(async req=>{
     ]);
     const err=pr.error||fr.error||cr.error;if(err){console.error(err);return json({error:"Could not load storefront."},500)}
     const colorwayMap=new Map((cr.data??[]).map((c:any)=>[String(c.id),Array.isArray(c.usage)?c.usage:[]]));
-    const products=(pr.data??[]).map((p:any)=>{
+    const repairedRows=await Promise.all((pr.data??[]).map(async(p:any)=>{
+      if(p.photo_url)return p;
+      const recovered=await findStoredPhoto(db,String(p.id));
+      if(!recovered)return p;
+      const {error}=await db.from("prints").update({photo_url:recovered}).eq("id",p.id).eq("user_id",SHOP_OWNER_USER_ID);
+      if(error)console.warn("Could not persist recovered storefront photo",error);
+      else p.photo_url=recovered;
+      return p;
+    }));
+    const products=repairedRows.map((p:any)=>{
       const baseUsage=Array.isArray(p.filament_usage)?p.filament_usage:[];
       const variants=Array.isArray(p.variants)?p.variants.map((v:any)=>{
         const variantUsage=Array.isArray(v.filament_usage)&&v.filament_usage.length

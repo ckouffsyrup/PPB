@@ -614,3 +614,8 @@ body.menu-open{
 .status.status-cancelled{color:#ff9ba9;border-color:#6a3440;background:#2a1419}
 @media(max-width:800px){.order-pipeline-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.order-pipeline-summary{grid-template-columns:1fr 1fr}.order-card-v2{display:block}.order-card-v2 .order-side{margin-top:10px}.order-card-actions{justify-content:flex-start}}
+
+/* v5.1.1 product photo recovery */
+.image-load-fallback{height:100%;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:#6e627d;background:linear-gradient(135deg,#17131f,#120f18)}
+.image-load-fallback span{font-size:34px;line-height:1}
+.image-load-fallback small{font-size:10px;color:var(--muted);font-weight:700}
