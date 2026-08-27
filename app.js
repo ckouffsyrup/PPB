@@ -307,7 +307,7 @@ async function ownerLogin(){
 }
 
 function normalizePublicPrint(p){
-  return {id:p.id,name:p.name||"Print",category:p.category||"",price:Number(p.price||0),hours:p.hours??"",notes:p.notes||"",photo_url:p.photo_url||"",favorite:!!p.favorite,variants:Array.isArray(p.variants)?p.variants:[],deal_qty:Number(p.deal_qty||0),deal_price:Number(p.deal_price||0),out_of_stock_behavior:p.out_of_stock_behavior||"show",made_qty:Number(p.made_qty||0),sold_qty:Number(p.sold_qty||0),multicolor_capable:!!p.multicolor_capable,filament_usage:[],extra_cost:0,model_source:"",created_at:p.created_at||"",updated_at:p.updated_at||""}
+  return {id:p.id,name:p.name||"Print",category:p.category||"",price:Number(p.price||0),hours:p.hours??"",notes:p.notes||"",photo_url:p.photo_url||"",favorite:!!p.favorite,variants:Array.isArray(p.variants)?p.variants:[],deal_qty:Number(p.deal_qty||0),deal_price:Number(p.deal_price||0),out_of_stock_behavior:p.out_of_stock_behavior||"show",made_qty:Number(p.made_qty||0),sold_qty:Number(p.sold_qty||0),multicolor_capable:!!p.multicolor_capable,multicolor_max_colors:Math.max(2,Number(p.multicolor_max_colors||2)),multicolor_price_mode:p.multicolor_price_mode==="per_extra"?"per_extra":"flat",multicolor_surcharge:Number(p.multicolor_surcharge||0),filament_usage:[],extra_cost:0,model_source:"",created_at:p.created_at||"",updated_at:p.updated_at||""}
 }
 function normalizePublicFilament(f){
   return {id:f.id,brand:f.brand||"",material:f.material||"",color:f.color||"",visual_color:f.visual_color||"#777777",remaining:f.available?1:0,spool_size:1,low_stock:!!f.low_stock,public_only:true}
@@ -468,7 +468,7 @@ function restockSuggestions(){
   }).filter(x=>x.low).sort((a,b)=>a.pct-b.pct);
 }
 function renderDashboard(){
-  const revenue=sales.reduce((a,s)=>a+Number(s.total ?? Number(s.unit_price||0)*Number(s.quantity||0)),0),profit=sales.reduce((a,s)=>a+saleProfit(s),0),stock=items.reduce((a,i)=>a+itemStock(i),0),open=orders.filter(o=>!["Paid","Cancelled"].includes(o.status));
+  const revenue=sales.reduce((a,s)=>a+Number(s.total ?? Number(s.unit_price||0)*Number(s.quantity||0)),0),profit=sales.reduce((a,s)=>a+saleProfit(s),0),stock=items.reduce((a,i)=>a+itemStock(i),0),open=orders.filter(o=>!["Completed","Cancelled","Paid"].includes(o.status));
   $("dashRevenue").textContent=money(revenue);$("dashSalesCount").textContent=`${sales.length} sale${sales.length===1?"":"s"}`;$("dashProfit").textContent=money(profit);$("dashStock").textContent=stock;$("dashPrintTypes").textContent=`${items.length} print types`;$("dashOrders").textContent=open.length;$("dashOrderValue").textContent=`${money(open.reduce((a,o)=>a+Number(o.quoted_price||0),0))} quoted`;
   const fav=items.filter(i=>i.favorite).slice(0,5);$("favoriteList").innerHTML=fav.length?fav.map(i=>miniRow(i.name,`${itemStock(i)} in stock`,money(i.price))).join(""):emptyMini("No favorites yet");
   const rs=[...sales].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5);$("recentSales").innerHTML=rs.length?rs.map(s=>{const i=items.find(x=>x.id===s.print_id);return miniRow(i?.name||"Deleted print",`${s.quantity} sold · ${s.date}`,money(s.total ?? Number(s.unit_price)*Number(s.quantity)))}).join(""):emptyMini("No sales recorded");
@@ -496,9 +496,32 @@ function renderColorways(){
   }).join("");
   $("colorwayEmpty").classList.toggle("hidden",!!colorways.length)
 }
+function orderStatusClass(status){return `status-${String(status||"requested").toLowerCase().replace(/[^a-z]+/g,"-")}`}
+function orderNextStep(status){
+  return ({Requested:["Quoted","Mark quoted"],Quoted:["Approved","Approve"],Approved:["Printing","Start printing"],Printing:["Ready","Mark ready"],Ready:["Completed","Complete"]})[status]||null;
+}
+async function advanceOrderStatus(id,event){
+  event?.stopPropagation();
+  const o=orders.find(x=>x.id===id);if(!o||!currentUser)return;
+  const next=orderNextStep(o.status);if(!next)return;
+  const updated={...o,status:next[0],updated_at:nowISO()};
+  const ok=await syncUpsert("orders",{...updated,user_id:currentUser.id,print_id:updated.print_id||null,due_date:updated.due_date||null});
+  if(ok===false)return toast("Couldn't update order");
+  Object.assign(o,updated);persist();toast(`Order moved to ${next[0]}`);
+}
+window.advanceOrderStatus=advanceOrderStatus;
 function renderOrders(){
-  const list=orders.filter(o=>!orderStatusFilter||o.status===orderStatusFilter).sort((a,b)=>String(a.due_date||"9999").localeCompare(String(b.due_date||"9999")));
-  $("orderList").innerHTML=list.map(o=>`<article class="order-card" onclick="openOrder('${o.id}')"><div class="order-main"><h4>${safe(o.item||"Custom order")}</h4><p>${safe(o.customer||"Customer")} · Qty ${o.quantity||1}${o.due_date?` · Due ${safe(o.due_date)}`:""}</p></div><div class="order-side"><span class="status">${safe(o.status)}</span><strong>${money(o.quoted_price)}</strong></div></article>`).join("");$("orderEmpty").classList.toggle("hidden",!!list.length)
+  const count=s=>orders.filter(o=>o.status===s).length;
+  if($("orderRequestedCount"))$("orderRequestedCount").textContent=count("Requested");
+  if($("orderQuotedCount"))$("orderQuotedCount").textContent=count("Quoted");
+  if($("orderProductionCount"))$("orderProductionCount").textContent=count("Approved")+count("Printing");
+  if($("orderReadyCount"))$("orderReadyCount").textContent=count("Ready");
+  const list=orders.filter(o=>!orderStatusFilter||o.status===orderStatusFilter).sort((a,b)=>String(a.due_date||"9999").localeCompare(String(b.due_date||"9999"))||String(b.created_at||"").localeCompare(String(a.created_at||"")));
+  $("orderList").innerHTML=list.map(o=>{
+    const next=orderNextStep(o.status),notes=String(o.notes||"").split("\n").filter(Boolean).slice(0,3).join(" · ");
+    return `<article class="order-card order-card-v2" onclick="openOrder('${o.id}')"><div class="order-main"><h4>${safe(o.item||"Custom order")}</h4><p>${safe(o.customer||"Customer")} · Qty ${o.quantity||1}${o.due_date?` · Due ${safe(o.due_date)}`:""}</p>${notes?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span><strong>${money(o.quoted_price)}</strong>${next?`<div class="order-card-actions"><button class="primary order-advance-btn" type="button" onclick="advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button></div>`:""}</div></article>`;
+  }).join("");
+  $("orderEmpty").classList.toggle("hidden",!!list.length)
 }
 function renderPresets(){$("presetList").innerHTML=presets.map(p=>`<div class="preset-row" onclick="openPreset('${p.id}')"><div><strong>${safe(p.name)}</strong><small>$${p.machineRate}/hr · ${p.markup}× · min ${money(p.minimum)}</small></div><span>›</span></div>`).join("")}
 function populatePrintSelects(){
@@ -524,10 +547,24 @@ function variantRowHTML(v={}){
 function addVariantRow(v={}){const d=document.createElement("div");d.innerHTML=variantRowHTML(v);const row=d.firstElementChild;$("variantRows").appendChild(row);row.querySelector(".remove-variant").onclick=()=>{row.remove();updatePricingPreviews()};row.querySelectorAll("input,select").forEach(x=>x.oninput=updatePricingPreviews)}
 function collectVariants(){return [...$("variantRows").querySelectorAll(".variant-row")].map(r=>({id:r.dataset.id||uid(),name:r.querySelector(".v-name").value.trim()||"Variant",price:r.querySelector(".v-price").value===""?"":Number(r.querySelector(".v-price").value),stock:Number(r.querySelector(".v-stock").value||0),colorway_id:r.querySelector(".v-colorway").value,filament_usage:[]}))}
 
+function updateMulticolorAdminOptions(){
+  const enabled=$("multicolorCapableInput").value==="true";
+  $("multicolorAdminOptions").classList.toggle("hidden",!enabled);
+  const mode=$("multicolorPriceModeInput").value;
+  $("multicolorPricingHint").textContent=mode==="per_extra"?"Charged for each color after the first, per item.":"Added once per item when multicolor is selected.";
+  if(Number($("multicolorMaxColorsInput").value||0)<2)$("multicolorMaxColorsInput").value=2;
+}
+function productMaxColors(item){return Math.max(2,Math.min(8,Number(item?.multicolor_max_colors||2)))}
+function multicolorSurcharge(item,colorCount){
+  if(!item?.multicolor_capable||colorCount<2)return 0;
+  const amount=Math.max(0,Number(item.multicolor_surcharge||0));
+  return item.multicolor_price_mode==="per_extra"?amount*Math.max(1,colorCount-1):amount;
+}
+
 function resetEditor(){
   editingId=null;pendingPhotoFile=null;pendingPhotoData="";editorFavorite=false;
   ["nameInput","categoryInput","modelSourceInput","priceInput","hoursInput","extraCostInput","notesInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).value="");
-  $("madeInput").value=0;$("soldInput").value=0;$("outOfStockInput").value="show";$("multicolorCapableInput").value="false";$("presetInput").value=settings.defaultPresetId||presets[0]?.id;
+  $("madeInput").value=0;$("soldInput").value=0;$("outOfStockInput").value="show";$("multicolorCapableInput").value="false";$("multicolorMaxColorsInput").value=2;$("multicolorPriceModeInput").value="flat";$("multicolorSurchargeInput").value=0;$("presetInput").value=settings.defaultPresetId||presets[0]?.id;updateMulticolorAdminOptions();
   $("photoPreview").classList.add("hidden");$("photoPlaceholder").classList.remove("hidden");if($("photoCameraInput"))$("photoCameraInput").value="";if($("photoLibraryInput"))$("photoLibraryInput").value="";$("printFilamentRows").innerHTML="";$("variantRows").innerHTML="";
   $("deleteBtn").style.visibility="hidden";$("recordSaleFromPrintBtn").style.visibility="hidden";$("makePrintBtn").style.visibility="hidden";updateFavoriteButton();updatePricingPreviews()
 }
@@ -535,7 +572,7 @@ function updateFavoriteButton(){$("favoriteToggle").classList.toggle("active",ed
 window.openEditor=id=>{
   resetEditor();
   if(id){
-    const i=items.find(x=>x.id===id);if(!i)return;editingId=id;$("editorTitle").textContent="Edit print";$("nameInput").value=i.name||"";$("categoryInput").value=i.category||"";$("modelSourceInput").value=i.model_source||"";$("priceInput").value=i.price??"";$("presetInput").value=i.preset_id||settings.defaultPresetId;$("hoursInput").value=i.hours??"";$("extraCostInput").value=i.extra_cost??0;$("notesInput").value=i.notes||"";$("madeInput").value=i.made_qty??0;$("soldInput").value=i.sold_qty??0;$("dealQtyInput").value=i.deal_qty||"";$("dealPriceInput").value=i.deal_price||"";$("outOfStockInput").value=i.out_of_stock_behavior||"show";$("multicolorCapableInput").value=i.multicolor_capable?"true":"false";editorFavorite=!!i.favorite;updateFavoriteButton();
+    const i=items.find(x=>x.id===id);if(!i)return;editingId=id;$("editorTitle").textContent="Edit print";$("nameInput").value=i.name||"";$("categoryInput").value=i.category||"";$("modelSourceInput").value=i.model_source||"";$("priceInput").value=i.price??"";$("presetInput").value=i.preset_id||settings.defaultPresetId;$("hoursInput").value=i.hours??"";$("extraCostInput").value=i.extra_cost??0;$("notesInput").value=i.notes||"";$("madeInput").value=i.made_qty??0;$("soldInput").value=i.sold_qty??0;$("dealQtyInput").value=i.deal_qty||"";$("dealPriceInput").value=i.deal_price||"";$("outOfStockInput").value=i.out_of_stock_behavior||"show";$("multicolorCapableInput").value=i.multicolor_capable?"true":"false";$("multicolorMaxColorsInput").value=productMaxColors(i);$("multicolorPriceModeInput").value=i.multicolor_price_mode==="per_extra"?"per_extra":"flat";$("multicolorSurchargeInput").value=Number(i.multicolor_surcharge||0);updateMulticolorAdminOptions();editorFavorite=!!i.favorite;updateFavoriteButton();
     if(i.photo_url){$("photoPreview").src=i.photo_url;$("photoPreview").classList.remove("hidden");$("photoPlaceholder").classList.add("hidden")}
     (i.filament_usage||[]).forEach(u=>addUsageRow("printFilamentRows",u));(i.variants||[]).forEach(v=>addVariantRow(v));
     $("deleteBtn").style.visibility="visible";$("recordSaleFromPrintBtn").style.visibility="visible";$("makePrintBtn").style.visibility="visible"
@@ -630,6 +667,9 @@ async function savePrint(){if(!requireOnlineAdminSave())return;
       deal_price:Number($("dealPriceInput").value||0),
       out_of_stock_behavior:$("outOfStockInput").value,
       multicolor_capable:$("multicolorCapableInput").value==="true",
+      multicolor_max_colors:Math.max(2,Math.min(8,Number($("multicolorMaxColorsInput").value||2))),
+      multicolor_price_mode:$("multicolorPriceModeInput").value==="per_extra"?"per_extra":"flat",
+      multicolor_surcharge:Math.max(0,Number($("multicolorSurchargeInput").value||0)),
       photo_url:localPhoto || old?.photo_url || "",
       created_at:old?.created_at||nowISO(),
       updated_at:nowISO()
@@ -858,12 +898,19 @@ function renderRequestColorChoices(){
       </span>
     </label>`).join("");
 
-  grid.querySelectorAll('input[type="checkbox"]').forEach(x=>x.onchange=updateRequestColorCount);
+  grid.querySelectorAll('input[type="checkbox"]').forEach(x=>x.onchange=()=>{
+    const item=items.find(i=>i.id===currentRequestPrintId),max=productMaxColors(item);
+    if(x.checked&&selectedRequestColorIds().length>max){x.checked=false;toast(`This print allows up to ${max} colors`)}
+    updateRequestColorCount();
+  });
   updateRequestColorCount();
 }
 function updateRequestColorCount(){
+  const item=items.find(i=>i.id===currentRequestPrintId),max=productMaxColors(item);
   const n=selectedRequestColorIds().length;
-  $("requestColorCount").textContent=`${n} selected`;
+  $("requestColorCount").textContent=`${n}/${max} selected`;
+  if($("requestColorHelp"))$("requestColorHelp").textContent=`Choose 2–${max} colors. ${item?.multicolor_surcharge?`Multicolor adds ${money(multicolorSurcharge(item,Math.max(2,n||2)))}${item.multicolor_price_mode==="per_extra"?" at 2 colors":" per item"}.`:""}`;
+  updateRequestEstimate();
 }
 function updateRequestColorMode(){
   const item=items.find(i=>i.id===currentRequestPrintId);
@@ -880,16 +927,22 @@ function updateRequestColorMode(){
   $("requestSingleColorField").classList.toggle("hidden",multi);
 
   if(multi)renderRequestColorChoices();
+  else updateRequestEstimate();
 }
 function requestUnitPrice(){
-  const item=items.find(i=>i.id===currentRequestPrintId);
-  if(!item)return 0;
-  const vid=$("requestVariant").value;
-  return variantPrice(item,vid);
+  const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return 0;
+  const base=variantPrice(item,$("requestVariant").value);
+  const colorCount=$("requestColorMode").value==="multi"?selectedRequestColorIds().length:0;
+  return base+multicolorSurcharge(item,colorCount);
 }
 function updateRequestEstimate(){
+  const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return;
   const qty=Math.max(1,Number($("requestQty").value||1));
-  $("requestEstimate").textContent=money(requestUnitPrice()*qty);
+  const base=variantPrice(item,$("requestVariant").value);
+  const colorCount=$("requestColorMode").value==="multi"?selectedRequestColorIds().length:0;
+  const extra=multicolorSurcharge(item,colorCount);
+  $("requestEstimate").textContent=money((base+extra)*qty);
+  if($("requestPricingBreakdown"))$("requestPricingBreakdown").textContent=extra>0?`${money(base)} base + ${money(extra)} multicolor surcharge per item · ${qty} item${qty===1?"":"s"}. Final price can be confirmed before printing.`:`${money(base)} per item · ${qty} item${qty===1?"":"s"}. Final price can be confirmed before printing.`;
 }
 function openRequestPrint(){
   const item=items.find(i=>i.id===currentRequestPrintId);
@@ -924,10 +977,12 @@ function openRequestPrint(){
 async function submitPrintRequest(){
   const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
   const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
-  const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim(),estimate=requestUnitPrice()*qty;
+  const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim();
   const wantsMulticolor=!!item.multicolor_capable && $("requestColorMode").value==="multi";
-  const colorIds=wantsMulticolor?selectedRequestColorIds():[];
+  const colorIds=wantsMulticolor?selectedRequestColorIds():[],maxColors=productMaxColors(item);
   if(wantsMulticolor&&colorIds.length<2)return toast("Choose at least 2 colors");
+  if(wantsMulticolor&&colorIds.length>maxColors)return toast(`Choose no more than ${maxColors} colors`);
+  const estimate=requestUnitPrice()*qty;
 
   if(publicVisitorMode){
     const btn=$("submitPrintRequestBtn"),oldLabel=btn.textContent;btn.disabled=true;btn.textContent="Submitting…";
@@ -942,10 +997,14 @@ async function submitPrintRequest(){
   const colorDetail=wantsMulticolor
     ?`Multicolor: ${chosenColors.map(f=>f.color||f.material||"Color").join(" + ")}`
     :(filament?`Preferred filament: ${filament.color||filament.material||"Selected filament"}`:"Filament: No preference");
-  const details=[variant?`Variant: ${variant.name}`:"Version: Standard",colorDetail,contact?`Contact: ${contact}`:"",userNotes?`Customer notes: ${userNotes}`:""].filter(Boolean).join("\n");
-  const order={id:uid(),customer,status:"Requested",item:item.name,quantity:qty,quoted_price:estimate,due_date:"",print_id:item.id,notes:`Customer Store request\n${details}`,created_at:nowISO(),updated_at:nowISO()};
+  const pricingDetail=wantsMulticolor&&multicolorSurcharge(item,colorIds.length)>0?`Multicolor surcharge: ${money(multicolorSurcharge(item,colorIds.length))} per item`:"";
+  const details=[variant?`Variant: ${variant.name}`:"Version: Standard",colorDetail,pricingDetail,contact?`Contact: ${contact}`:"",userNotes?`Customer notes: ${userNotes}`:""].filter(Boolean).join("\n");
+  const order={id:uid(),customer,status:"Requested",item:item.name,quantity:qty,quoted_price:estimate,due_date:null,print_id:item.id,notes:`Customer Store request\n${details}`,created_at:nowISO(),updated_at:nowISO()};
+  if(currentUser&&supabaseClient){
+    const ok=await syncUpsert("orders",{...order,user_id:currentUser.id,print_id:order.print_id||null});
+    if(ok===false)return toast("Couldn't submit request");
+  }
   orders.unshift(order);persist();$("requestPrintDialog").close();toast("Print request submitted");
-  if(currentUser&&supabaseClient){(async()=>{try{await syncUpsert("orders",{...order,user_id:currentUser.id,print_id:order.print_id||null})}catch(err){console.error("Customer request sync failed",err);setSyncState("error","Request saved locally — cloud sync failed")}})()}
 }
 
 function normalizeCustomerPin(v){return String(v||"").replace(/\D/g,"").slice(0,8)}
@@ -1280,7 +1339,7 @@ function openSettings(){
 }
 function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();settings.customerModePin=normalizeCustomerPin($("customerModePinInput").value);persist();setupSupabase();$("settingsDialog").close();toast("Settings saved")}
 
-function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",multicolor_capable:!!i.multicolor_capable,photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
+function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",multicolor_capable:!!i.multicolor_capable,multicolor_max_colors:productMaxColors(i),multicolor_price_mode:i.multicolor_price_mode==="per_extra"?"per_extra":"flat",multicolor_surcharge:Math.max(0,Number(i.multicolor_surcharge||0)),photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
 async function syncUpsert(table,row){
   if(!supabaseClient||!currentUser)return; if(!navigator.onLine){setSyncState("offline","Offline — changes saved locally");return}
   setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).upsert(row);if(error){console.error(error);setSyncState("error",`Couldn't sync ${table}`);return false}setSyncState("syncing","Cloud write complete — refreshing…");return true
@@ -1391,7 +1450,7 @@ async function pullCloud(showToast=true){
     const remoteHasData=[pr,fi,sa,or,cw].some(x=>(x.data||[]).length);
     const localHasData=[items,filaments,sales,orders,colorways].some(a=>(a||[]).length);
     if(!remoteHasData&&localHasData){setSyncState("error","Cloud is empty — use Upload local data once");if(showToast)toast("Cloud is empty — upload this device's old data once");return false}
-    const remoteItems=(pr.data||[]).map(({user_id,...x})=>({...x,multicolor_capable:!!x.multicolor_capable,variants:x.variants||[],filament_usage:x.filament_usage||[]}));
+    const remoteItems=(pr.data||[]).map(({user_id,...x})=>({...x,multicolor_capable:!!x.multicolor_capable,multicolor_max_colors:Math.max(2,Number(x.multicolor_max_colors||2)),multicolor_price_mode:x.multicolor_price_mode==="per_extra"?"per_extra":"flat",multicolor_surcharge:Number(x.multicolor_surcharge||0),variants:x.variants||[],filament_usage:x.filament_usage||[]}));
     const pendingItems=items.filter(i=>pendingLocalProductIds.has(i.id)),pendingIds=new Set(pendingItems.map(i=>i.id));
     items=[...pendingItems,...remoteItems.filter(i=>!pendingIds.has(i.id))].sort((a,b)=>rowTime(b)-rowTime(a));
     filaments=(fi.data||[]).map(({user_id,...x})=>x).sort((a,b)=>rowTime(b)-rowTime(a));
@@ -1587,6 +1646,9 @@ $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$
 $("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
 $("requestPrintBtn").onclick=openRequestPrint;
 $("closeRequestPrint").onclick=()=>$("requestPrintDialog").close();
+$("multicolorCapableInput").onchange=updateMulticolorAdminOptions;
+$("multicolorPriceModeInput").onchange=updateMulticolorAdminOptions;
+$("multicolorMaxColorsInput").oninput=updateMulticolorAdminOptions;
 $("requestVariant").onchange=()=>{updateRequestEstimate();updateRequestColorMode()};
 $("requestColorMode").onchange=updateRequestColorMode;
 $("requestQty").oninput=updateRequestEstimate;

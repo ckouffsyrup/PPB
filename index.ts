@@ -38,7 +38,7 @@ Deno.serve(async req=>{
 
   if(req.method==="GET"){
     const [pr,fr,cr]=await Promise.all([
-      db.from("prints").select("id,name,category,price,hours,notes,favorite,photo_url,variants,filament_usage,multicolor_capable,deal_qty,deal_price,out_of_stock_behavior,made_qty,sold_qty,created_at,updated_at").eq("user_id",SHOP_OWNER_USER_ID),
+      db.from("prints").select("id,name,category,price,hours,notes,favorite,photo_url,variants,filament_usage,multicolor_capable,multicolor_max_colors,multicolor_price_mode,multicolor_surcharge,deal_qty,deal_price,out_of_stock_behavior,made_qty,sold_qty,created_at,updated_at").eq("user_id",SHOP_OWNER_USER_ID),
       db.from("filaments").select("id,brand,material,color,visual_color,remaining,spool_size").eq("user_id",SHOP_OWNER_USER_ID),
       db.from("colorways").select("id,usage").eq("user_id",SHOP_OWNER_USER_ID)
     ]);
@@ -60,8 +60,11 @@ Deno.serve(async req=>{
         };
       }):[];
       const multicolor_capable=!!p.multicolor_capable;
+      const multicolor_max_colors=Math.max(2,Math.min(8,Number(p.multicolor_max_colors??2)));
+      const multicolor_price_mode=p.multicolor_price_mode==="per_extra"?"per_extra":"flat";
+      const multicolor_surcharge=Math.max(0,Number(p.multicolor_surcharge??0));
       const {filament_usage,...safeProduct}=p;
-      return {...safeProduct,price:Number(p.price??0),variants,multicolor_capable,deal_qty:Number(p.deal_qty??0),deal_price:Number(p.deal_price??0),made_qty:Number(p.made_qty??0),sold_qty:Number(p.sold_qty??0)}
+      return {...safeProduct,price:Number(p.price??0),variants,multicolor_capable,multicolor_max_colors,multicolor_price_mode,multicolor_surcharge,deal_qty:Number(p.deal_qty??0),deal_price:Number(p.deal_price??0),made_qty:Number(p.made_qty??0),sold_qty:Number(p.sold_qty??0)}
     }).filter((p:any)=>{
       const stock=p.variants.length?p.variants.reduce((n:number,v:any)=>n+Number(v.stock??0),0):Math.max(0,p.made_qty-p.sold_qty);
       return !(stock<=0&&p.out_of_stock_behavior==="hide")
@@ -81,7 +84,7 @@ Deno.serve(async req=>{
     const colorIds=Array.isArray(body.color_ids)?[...new Set(body.color_ids.map((x:any)=>clean(x,80)).filter(Boolean))].slice(0,8):[];
     if(!printId||!customer)return json({error:"Name and product are required."},400);
 
-    const {data:product,error:pe}=await db.from("prints").select("id,name,price,variants,filament_usage,multicolor_capable").eq("id",printId).eq("user_id",SHOP_OWNER_USER_ID).maybeSingle();
+    const {data:product,error:pe}=await db.from("prints").select("id,name,price,variants,filament_usage,multicolor_capable,multicolor_max_colors,multicolor_price_mode,multicolor_surcharge").eq("id",printId).eq("user_id",SHOP_OWNER_USER_ID).maybeSingle();
     if(pe||!product)return json({error:"That product is not available."},404);
     const variants=Array.isArray(product.variants)?product.variants:[],variant=variantId?variants.find((v:any)=>String(v.id)===variantId):null;
     if(variantId&&!variant)return json({error:"That product version is not available."},400);
@@ -101,6 +104,10 @@ Deno.serve(async req=>{
     if(colorMode==="multi"&&colorIds.length<2){
       return json({error:"Choose at least 2 colors."},400);
     }
+    const maxColors=Math.max(2,Math.min(8,Number(product.multicolor_max_colors??2)));
+    if(colorMode==="multi"&&colorIds.length>maxColors){
+      return json({error:`This print allows a maximum of ${maxColors} colors.`},400);
+    }
 
     let filamentText="No preference";
     if(colorMode==="multi"){
@@ -119,9 +126,13 @@ Deno.serve(async req=>{
       filamentText=[f.color,f.material,f.brand].filter(Boolean).join(" · ")
     }
 
-    const unitPrice=variant&&variant.price!==""&&variant.price!=null?Number(variant.price):Number(product.price??0),estimate=Math.max(0,unitPrice*quantity);
-    const colorDetail=colorMode==="multi"?`Multicolor: ${filamentText}`:`Preferred filament: ${filamentText}`;
-    const detail=["Public website request",`Version: ${variant?clean(variant.name,120):"Standard"}`,colorDetail,contact?`Contact: ${contact}`:"",notes?`Customer notes: ${notes}`:""].filter(Boolean).join("\n");
+    const baseUnitPrice=variant&&variant.price!==""&&variant.price!=null?Number(variant.price):Number(product.price??0);
+    const surchargeAmount=Math.max(0,Number(product.multicolor_surcharge??0));
+    const surcharge=colorMode==="multi"?(product.multicolor_price_mode==="per_extra"?surchargeAmount*Math.max(1,colorIds.length-1):surchargeAmount):0;
+    const unitPrice=baseUnitPrice+surcharge,estimate=Math.max(0,unitPrice*quantity);
+    const colorDetail=colorMode==="multi"?`Multicolor (${colorIds.length}/${maxColors} colors): ${filamentText}`:`Preferred filament: ${filamentText}`;
+    const pricingDetail=surcharge>0?`Multicolor surcharge: $${surcharge.toFixed(2)} per item`:"";
+    const detail=["Public website request",`Version: ${variant?clean(variant.name,120):"Standard"}`,colorDetail,pricingDetail,contact?`Contact: ${contact}`:"",notes?`Customer notes: ${notes}`:""].filter(Boolean).join("\n");
     const now=new Date().toISOString();
     const order={
       id:crypto.randomUUID(),

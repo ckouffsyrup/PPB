@@ -229,19 +229,29 @@
     <!-- ORDERS -->
     <section class="view" data-view="orders">
       <div class="page-title">
-        <div><p class="eyebrow">CUSTOM WORK</p><h2>Custom orders</h2></div>
+        <div><p class="eyebrow">CUSTOM WORK</p><h2>Orders & requests</h2><p class="muted">Move requests from quote to approval, production, and completion.</p></div>
         <button class="primary" id="addOrderBtn">+ New order</button>
       </div>
 
-      <div class="segmented" id="orderFilter">
+      <div class="order-pipeline-summary">
+        <div class="stat-card"><span>New requests</span><strong id="orderRequestedCount">0</strong><small>need review</small></div>
+        <div class="stat-card"><span>Waiting approval</span><strong id="orderQuotedCount">0</strong><small>quoted to customer</small></div>
+        <div class="stat-card"><span>In production</span><strong id="orderProductionCount">0</strong><small>approved + printing</small></div>
+        <div class="stat-card"><span>Ready</span><strong id="orderReadyCount">0</strong><small>waiting pickup/delivery</small></div>
+      </div>
+
+      <div class="segmented order-status-filter" id="orderFilter">
         <button class="active" data-status="">All</button>
         <button data-status="Requested">Requested</button>
+        <button data-status="Quoted">Quoted</button>
+        <button data-status="Approved">Approved</button>
         <button data-status="Printing">Printing</button>
         <button data-status="Ready">Ready</button>
-        <button data-status="Paid">Paid</button>
+        <button data-status="Completed">Completed</button>
+        <button data-status="Cancelled">Cancelled</button>
       </div>
       <div id="orderList" class="order-list"></div>
-      <div id="orderEmpty" class="empty-state hidden"><h3>No orders here</h3><p>Custom requests will show up here.</p></div>
+      <div id="orderEmpty" class="empty-state hidden"><h3>No orders here</h3><p>Customer requests and custom work will show up here.</p></div>
     </section>
   </main>
 
@@ -297,6 +307,24 @@
           <option value="true">Allow multicolor requests</option>
         </select>
       </label>
+      <div class="full multicolor-admin-options hidden" id="multicolorAdminOptions">
+        <div class="form-grid">
+          <label>Maximum colors
+            <input id="multicolorMaxColorsInput" type="number" min="2" max="8" step="1" value="2" />
+            <small>Defaults to 2. Raise this only for prints that support more.</small>
+          </label>
+          <label>Multicolor pricing
+            <select id="multicolorPriceModeInput">
+              <option value="flat">Flat surcharge</option>
+              <option value="per_extra">Per additional color</option>
+            </select>
+          </label>
+          <label>Multicolor surcharge
+            <div class="money-input"><span>$</span><input id="multicolorSurchargeInput" type="number" min="0" step="0.01" value="0" /></div>
+            <small id="multicolorPricingHint">Added once per item when multicolor is selected.</small>
+          </label>
+        </div>
+      </div>
       <label>Deal / discount
         <div class="deal-fields"><input id="dealQtyInput" type="number" min="0" step="1" placeholder="Qty e.g. 2" /><div class="money-input"><span>$</span><input id="dealPriceInput" type="number" min="0" step="0.01" placeholder="Deal total" /></div></div>
       </label>
@@ -426,7 +454,7 @@
     <div class="sheet-header"><div><p class="eyebrow">CUSTOM ORDER</p><h2 id="orderTitle">New order</h2></div><button class="icon-btn" id="closeOrder" type="button">✕</button></div>
     <div class="form-grid">
       <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
-      <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Printing</option><option>Ready</option><option>Paid</option><option>Cancelled</option></select></label>
+      <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
       <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
       <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
       <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
@@ -568,7 +596,7 @@
         <div class="request-multicolor-head">
           <div>
             <strong>Choose your colorway</strong>
-            <small>Select at least 2 available colors. Multicolor requests are subject to model compatibility.</small>
+            <small id="requestColorHelp">Select 2 colors.</small>
           </div>
           <span id="requestColorCount" class="badge">0 selected</span>
         </div>
@@ -586,7 +614,7 @@
 
     <div class="request-estimate">
       <div><span>Estimated price</span><strong id="requestEstimate">$0</strong></div>
-      <small>This is an estimate. Final price can be confirmed before printing.</small>
+      <small id="requestPricingBreakdown">This is an estimate. Final price can be confirmed before printing.</small>
     </div>
 
     <button class="primary full-width" id="submitPrintRequestBtn" type="button">Submit Print Request</button>

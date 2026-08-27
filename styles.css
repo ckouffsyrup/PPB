@@ -591,3 +591,26 @@ body.menu-open{
 
 /* v4.4.5 request delivery */
 .orders-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+/* v5.1 Orders V2 + multicolor rules */
+.multicolor-admin-options{border:1px solid var(--line);background:#100d16;border-radius:15px;padding:12px}
+.multicolor-admin-options small{display:block;color:var(--muted);font-size:10px;line-height:1.35;margin-top:4px}
+.order-pipeline-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.order-status-filter{overflow-x:auto;scrollbar-width:none;justify-content:flex-start}
+.order-status-filter::-webkit-scrollbar{display:none}
+.order-status-filter button{flex:0 0 auto}
+.order-card-v2{cursor:pointer;align-items:stretch}
+.order-card-v2 .order-main{min-width:0;flex:1}
+.order-card-v2 .order-main p{line-height:1.45}
+.order-card-v2 .order-notes-preview{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:620px}
+.order-card-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end;margin-top:8px}
+.order-advance-btn{font-size:10px;padding:7px 10px;min-height:32px}
+.status.status-requested{color:#ffc36b;border-color:#65491f;background:#241b0c}
+.status.status-quoted{color:#d5b4ff;border-color:#533a74;background:#1d142a}
+.status.status-approved{color:#8bd8ff;border-color:#285874;background:#10212b}
+.status.status-printing{color:#b9a6ff;border-color:#4c4182;background:#19152b}
+.status.status-ready{color:#77e7a7;border-color:#275d42;background:#10241a}
+.status.status-completed{color:#9fa8b8;border-color:#3d4655;background:#171b21}
+.status.status-cancelled{color:#ff9ba9;border-color:#6a3440;background:#2a1419}
+@media(max-width:800px){.order-pipeline-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.order-pipeline-summary{grid-template-columns:1fr 1fr}.order-card-v2{display:block}.order-card-v2 .order-side{margin-top:10px}.order-card-actions{justify-content:flex-start}}
