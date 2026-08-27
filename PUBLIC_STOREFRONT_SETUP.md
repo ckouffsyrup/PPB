@@ -43,7 +43,7 @@ The public storefront never writes its synced catalog into the visitor's local a
 
 Open this exact URL directly in a normal browser tab:
 
-`https://ivxvnkwhufopzbcvjwqn.supabase.co/functions/v1/public-storefront`
+`https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-storefront`
 
 You should see JSON containing `products` and `filaments`.
 

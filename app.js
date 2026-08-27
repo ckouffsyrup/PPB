@@ -80,7 +80,7 @@ let supabaseClient=null,currentUser=null,realtimeChannel=null,realtimeTimer=null
 let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=false,currentMakePrintId=null;
 let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=null;
 let currentRequestPrintId=null;
-const PUBLIC_STOREFRONT_URL="https://ivxvnkwhufopzbcvjwqn.supabase.co/functions/v1/public-storefront";
+const PUBLIC_STOREFRONT_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-storefront";
 let publicVisitorMode=false;
 let publicStoreLoaded=false;
 let publicStoreLoading=false;
