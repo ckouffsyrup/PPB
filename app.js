@@ -86,6 +86,7 @@ let publicStoreLoaded=false;
 let publicStoreLoading=false;
 let publicStoreLastDiagnostic="";
 let brandOwnerTapCount=0,brandOwnerTapTimer=null;
+let publicRequestRefreshTimer=null;
 let waitingServiceWorker=null;
 let appUpdateReady=false;
 let updateReloadArmed=false;
@@ -1383,15 +1384,69 @@ async function pullCloud(showToast=true){
 
   persist();setSyncState("synced","Synced",nowISO());if(showToast)toast("Synced")
 }
+async function refreshOrdersFromCloud({showToast=false}={}){
+  if(!supabaseClient||!currentUser||publicVisitorMode)return false;
+  try{
+    const {data,error}=await supabaseClient
+      .from("orders")
+      .select("*")
+      .eq("user_id",currentUser.id)
+      .order("created_at",{ascending:false});
+    if(error)throw error;
+
+    const beforeIds=new Set(orders.map(o=>o.id));
+    const remote=(data||[]).map(({user_id,...x})=>({...x,print_id:x.print_id||""}));
+    orders=mergeCloudCollection(orders,remote,{normalize:x=>({...x,print_id:x.print_id||""})});
+    persist();
+
+    const newRequested=orders.filter(o=>!beforeIds.has(o.id)&&String(o.status||"").toLowerCase()==="requested");
+    if(newRequested.length){
+      renderAll();
+      toast(newRequested.length===1
+        ?`New print request from ${newRequested[0].customer||"customer"}`
+        :`${newRequested.length} new print requests`);
+    }else if(showToast){
+      toast("Requests refreshed");
+    }
+    return true;
+  }catch(err){
+    console.warn("Could not refresh print requests",err);
+    if(showToast)toast("Couldn't refresh requests");
+    return false;
+  }
+}
+function startPublicRequestRefresh(){
+  stopPublicRequestRefresh();
+  if(!currentUser||publicVisitorMode)return;
+  publicRequestRefreshTimer=setInterval(()=>{
+    if(document.visibilityState==="visible")refreshOrdersFromCloud().catch(()=>{});
+  },15000);
+}
+function stopPublicRequestRefresh(){
+  if(publicRequestRefreshTimer)clearInterval(publicRequestRefreshTimer);
+  publicRequestRefreshTimer=null;
+}
+
 function startRealtime(){
   if(!supabaseClient||!currentUser)return;stopRealtime();
+  startPublicRequestRefresh();
   realtimeChannel=supabaseClient.channel(`printbook-${currentUser.id}`);
   for(const table of ["prints","filaments","sales","orders","colorways"]){
-    realtimeChannel.on("postgres_changes",{event:"*",schema:"public",table,filter:`user_id=eq.${currentUser.id}`},()=>{clearTimeout(realtimeTimer);realtimeTimer=setTimeout(()=>pullCloud(false),300)})
+    realtimeChannel.on("postgres_changes",{event:"*",schema:"public",table,filter:`user_id=eq.${currentUser.id}`},()=>{
+      clearTimeout(realtimeTimer);
+      realtimeTimer=setTimeout(()=>{
+        if(table==="orders")refreshOrdersFromCloud().catch(()=>{});
+        else pullCloud(false)
+      },250)
+    })
   }
   realtimeChannel.subscribe()
 }
-function stopRealtime(){if(realtimeChannel&&supabaseClient)supabaseClient.removeChannel(realtimeChannel);realtimeChannel=null}
+function stopRealtime(){
+  stopPublicRequestRefresh();
+  if(realtimeChannel&&supabaseClient)supabaseClient.removeChannel(realtimeChannel);
+  realtimeChannel=null
+}
 
 
 function setAppUpdateUI(ready,message=""){
@@ -1549,6 +1604,7 @@ $("requestVariant").onchange=()=>{updateRequestEstimate();updateRequestColorMode
 $("requestColorMode").onchange=updateRequestColorMode;
 $("requestQty").oninput=updateRequestEstimate;
 $("submitPrintRequestBtn").onclick=submitPrintRequest;
+if($("refreshRequestsBtn"))$("refreshRequestsBtn").onclick=()=>refreshOrdersFromCloud({showToast:true});
 document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));
 $("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();
 $("confirmCustomerUnlock").onclick=confirmCustomerUnlock;
@@ -1570,7 +1626,12 @@ $("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDia
 $("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;
 $("closeSettings").onclick=()=>$("settingsDialog").close();$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
 window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshPushStatus().catch(()=>{})});
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"){
+    refreshPushStatus().catch(()=>{});
+    refreshOrdersFromCloud().catch(()=>{});
+  }
+});
 window.addEventListener("load",()=>{if("serviceWorker" in navigator)navigator.serviceWorker.ready.then(()=>refreshPushStatus().catch(()=>{})).catch(()=>{})});
 // Defensive recovery from older installed builds that may have left the
 // body fixed/offset. This runs before normal interaction and on page restore.

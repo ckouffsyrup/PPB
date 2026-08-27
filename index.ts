@@ -125,9 +125,50 @@ Deno.serve(async req=>{
     const unitPrice=variant&&variant.price!==""&&variant.price!=null?Number(variant.price):Number(product.price??0),estimate=Math.max(0,unitPrice*quantity);
     const colorDetail=colorMode==="multi"?`Multicolor: ${filamentText}`:`Preferred filament: ${filamentText}`;
     const detail=["Public website request",`Version: ${variant?clean(variant.name,120):"Standard"}`,colorDetail,contact?`Contact: ${contact}`:"",notes?`Customer notes: ${notes}`:""].filter(Boolean).join("\n");
-    const {data:inserted,error:ie}=await db.from("orders").insert({user_id:SHOP_OWNER_USER_ID,customer,status:"Requested",item:product.name,quantity,quoted_price:estimate,due_date:null,print_id:product.id,notes:detail,created_at:new Date().toISOString(),updated_at:new Date().toISOString()}).select("id").single();
-    if(ie){console.error(ie);return json({error:"Could not submit the request."},500)}
-    return json({ok:true,request_id:inserted.id,estimated_price:estimate})
+    const now=new Date().toISOString();
+    const order={
+      id:crypto.randomUUID(),
+      user_id:SHOP_OWNER_USER_ID,
+      customer,
+      status:"Requested",
+      item:product.name,
+      quantity,
+      quoted_price:estimate,
+      // Match PrintBook's normal order shape. Some existing schemas use a
+      // non-null text/date field here, so an empty string is safer than null.
+      due_date:"",
+      print_id:product.id,
+      notes:detail,
+      created_at:now,
+      updated_at:now
+    };
+
+    const {data:inserted,error:ie}=await db.from("orders")
+      .insert(order)
+      .select("id,user_id,customer,status,item,quantity,quoted_price,due_date,print_id,notes,created_at,updated_at")
+      .single();
+
+    if(ie){
+      console.error("Public request insert failed",{
+        code:ie.code,
+        message:ie.message,
+        details:ie.details,
+        hint:ie.hint
+      });
+      return json({
+        error:"Could not submit the request.",
+        code:ie.code||"",
+        detail:ie.message||"Database insert failed."
+      },500);
+    }
+
+    console.log("Public request created",inserted.id);
+    return json({
+      ok:true,
+      request_id:inserted.id,
+      estimated_price:estimate,
+      status:"Requested"
+    })
   }
 
   return json({error:"Method not allowed."},405)

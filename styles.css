@@ -588,3 +588,6 @@ body.menu-open{
 @media(max-width:560px){
   .request-color-grid{grid-template-columns:1fr}
 }
+
+/* v4.4.5 request delivery */
+.orders-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
