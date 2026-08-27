@@ -32,6 +32,14 @@
     </div>
   </header>
 
+  <div class="app-update-banner hidden" id="appUpdateBanner">
+    <div>
+      <strong>PrintBook update available</strong>
+      <small>Your account and saved data stay signed in.</small>
+    </div>
+    <button class="primary" id="applyAppUpdateBtn" type="button">Update & Restart</button>
+  </div>
+
   <div class="drawer-backdrop" id="drawerBackdrop"></div>
   <aside class="side-drawer" id="sideDrawer" aria-hidden="true">
     <div class="drawer-header">
@@ -642,6 +650,21 @@
         <button class="secondary" type="button" id="openNotificationsFromSettingsBtn">Open in-app notification center</button>
       </div>
       <p class="muted tiny-note">The in-app notification center still works too. Mobile push requires the new Supabase push backend included with this update.</p>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <h3>App updates</h3>
+          <p class="muted">Check for a new GitHub Pages version without removing the Home Screen app.</p>
+        </div>
+        <span class="badge" id="appVersionBadge">Current</span>
+      </div>
+      <div class="row">
+        <button class="secondary" type="button" id="checkForUpdateBtn">Check for update</button>
+        <button class="primary hidden" type="button" id="applyAppUpdateSettingsBtn">Update & Restart</button>
+      </div>
+      <p class="muted tiny-note" id="appUpdateStatusText">PrintBook checks automatically when it opens.</p>
     </section>
 
     <section class="settings-section">

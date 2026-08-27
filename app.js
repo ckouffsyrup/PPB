@@ -80,6 +80,9 @@ let supabaseClient=null,currentUser=null,realtimeChannel=null,realtimeTimer=null
 let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=false,currentMakePrintId=null;
 let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=null;
 let currentRequestPrintId=null;
+let waitingServiceWorker=null;
+let appUpdateReady=false;
+let updateReloadArmed=false;
 const pendingLocalProductIds=new Set();
 
 function persist(){
@@ -1144,6 +1147,130 @@ function startRealtime(){
 }
 function stopRealtime(){if(realtimeChannel&&supabaseClient)supabaseClient.removeChannel(realtimeChannel);realtimeChannel=null}
 
+
+function setAppUpdateUI(ready,message=""){
+  appUpdateReady=!!ready;
+  const banner=$("appUpdateBanner");
+  if(banner)banner.classList.toggle("hidden",!ready);
+  if($("applyAppUpdateSettingsBtn"))$("applyAppUpdateSettingsBtn").classList.toggle("hidden",!ready);
+  if($("appVersionBadge")){
+    $("appVersionBadge").textContent=ready?"Update ready":"Current";
+    $("appVersionBadge").classList.toggle("enabled",ready);
+  }
+  if($("appUpdateStatusText")){
+    $("appUpdateStatusText").textContent=message||(ready
+      ?"A new version is ready. Updating will reload PrintBook without clearing your login or local data."
+      :"PrintBook is up to date.");
+  }
+}
+function rememberWaitingWorker(reg){
+  const worker=reg?.waiting;
+  if(!worker)return false;
+  waitingServiceWorker=worker;
+  setAppUpdateUI(true,"A new PrintBook version is ready to install.");
+  return true;
+}
+function watchServiceWorkerRegistration(reg){
+  if(!reg)return;
+  if(rememberWaitingWorker(reg))return;
+
+  reg.addEventListener("updatefound",()=>{
+    const worker=reg.installing;
+    if(!worker)return;
+    worker.addEventListener("statechange",()=>{
+      if(worker.state==="installed"&&navigator.serviceWorker.controller){
+        waitingServiceWorker=reg.waiting||worker;
+        setAppUpdateUI(true,"A new PrintBook version finished downloading.");
+      }
+    });
+  });
+}
+async function checkForAppUpdate(showToast=true){
+  if(!("serviceWorker" in navigator)){
+    if(showToast)toast("App updates aren't supported in this browser");
+    return false;
+  }
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(!reg){
+      if(showToast)toast("PrintBook service worker isn't installed yet");
+      return false;
+    }
+    setAppUpdateUI(false,"Checking GitHub Pages for a new version…");
+    await reg.update();
+    watchServiceWorkerRegistration(reg);
+    if(reg.waiting||waitingServiceWorker){
+      rememberWaitingWorker(reg);
+      if(showToast)toast("Update ready");
+      return true;
+    }
+    // Give a newly-found worker a short moment to install.
+    await new Promise(r=>setTimeout(r,700));
+    if(reg.waiting||waitingServiceWorker){
+      rememberWaitingWorker(reg);
+      if(showToast)toast("Update ready");
+      return true;
+    }
+    setAppUpdateUI(false,"PrintBook is up to date.");
+    if(showToast)toast("You're on the latest version");
+    return false;
+  }catch(err){
+    console.error("Update check failed",err);
+    if($("appUpdateStatusText"))$("appUpdateStatusText").textContent="Couldn't check for updates right now.";
+    if(showToast)toast("Couldn't check for updates");
+    return false;
+  }
+}
+async function applyAppUpdate(){
+  if(updateReloadArmed)return;
+  updateReloadArmed=true;
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    waitingServiceWorker=waitingServiceWorker||reg?.waiting||null;
+    if(!waitingServiceWorker){
+      updateReloadArmed=false;
+      const found=await checkForAppUpdate(false);
+      if(!found){
+        toast("No update is waiting");
+        return;
+      }
+    }
+    if($("applyAppUpdateBtn")){
+      $("applyAppUpdateBtn").disabled=true;
+      $("applyAppUpdateBtn").textContent="Restarting…";
+    }
+    if($("applyAppUpdateSettingsBtn")){
+      $("applyAppUpdateSettingsBtn").disabled=true;
+      $("applyAppUpdateSettingsBtn").textContent="Restarting…";
+    }
+
+    // localStorage / IndexedDB / Supabase auth are intentionally untouched.
+    // Only activate the already-downloaded worker, then reload once.
+    waitingServiceWorker.postMessage({type:"SKIP_WAITING"});
+  }catch(err){
+    console.error("Apply update failed",err);
+    updateReloadArmed=false;
+    toast("Couldn't apply the update");
+  }
+}
+async function initAppUpdateFlow(){
+  if(!("serviceWorker" in navigator))return;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    watchServiceWorkerRegistration(reg);
+    rememberWaitingWorker(reg);
+    // Always ask the browser to check once at launch. This does not clear auth/data.
+    reg.update().catch(()=>{});
+  }catch(err){
+    console.warn("Update flow init failed",err);
+  }
+}
+navigator.serviceWorker?.addEventListener("controllerchange",()=>{
+  if(!updateReloadArmed)return;
+  // New worker owns the page. Reload exactly once into the new version.
+  window.location.reload();
+});
+
 function exportData(){const payload={version:4,exported_at:nowISO(),settings:{...settings,supabaseKey:""},presets,filaments,colorways,items,sales,orders};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="printbook-v4-backup.json";a.click();URL.revokeObjectURL(a.href)}
 async function importData(e){const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(d.items)items=d.items;if(d.filaments)filaments=d.filaments;if(d.colorways)colorways=d.colorways;if(d.sales)sales=d.sales;if(d.orders)orders=d.orders;if(d.presets)presets=d.presets;if(d.settings)settings={...settings,...d.settings,supabaseKey:settings.supabaseKey};persist();toast("Backup imported")}catch{toast("Invalid backup")}}
 
@@ -1156,6 +1283,9 @@ $("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBt
 $("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=enterCustomerMode;
 $("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
+$("applyAppUpdateBtn").onclick=applyAppUpdate;
+$("checkForUpdateBtn").onclick=()=>checkForAppUpdate(true);
+$("applyAppUpdateSettingsBtn").onclick=applyAppUpdate;
 $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
 $("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
 $("requestPrintBtn").onclick=openRequestPrint;
@@ -1190,5 +1320,12 @@ window.addEventListener("orientationchange",()=>setTimeout(clearLegacyMenuLock,8
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&$("sideDrawer").classList.contains("open")) closeMenu();
 });
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",async()=>{
+  try{
+    const reg=await navigator.serviceWorker.register("sw.js");
+    watchServiceWorkerRegistration(reg);
+    rememberWaitingWorker(reg);
+    initAppUpdateFlow();
+  }catch(err){console.warn("Service worker registration failed",err)}
+});
 populatePresetSelects();renderAll();setupSupabase();showView("shop");
