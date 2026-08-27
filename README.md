@@ -77,4 +77,4 @@ The service-worker cache is bumped to `printbook-v4`.
 ## Notification limitation
 
 The in-app notification center always works when you open PrintBook.
-Standard browser notifications in this version are local alerts while PrintBook is open. True background push notifications would require a push service / backend job later.
+Standard browser notifications in this version are local alerts while PrintBook is open. True background push notifications would require a push service / backend job later
