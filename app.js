@@ -85,6 +85,7 @@ let publicVisitorMode=false;
 let publicStoreLoaded=false;
 let publicStoreLoading=false;
 let publicStoreLastDiagnostic="";
+let brandOwnerTapCount=0,brandOwnerTapTimer=null;
 let waitingServiceWorker=null;
 let appUpdateReady=false;
 let updateReloadArmed=false;
@@ -234,8 +235,68 @@ function clearPublicCatalogForFailure(){
   $("shopFavCount").textContent="0";
 }
 
+async function getPublicSupabaseConfig(){
+  const res=await fetch(`${PUBLIC_STOREFRONT_URL}?config=1&t=${Date.now()}`,{
+    headers:{"Accept":"application/json"},cache:"no-store"
+  });
+  let data={};try{data=await res.json()}catch{}
+  if(!res.ok)throw new Error(data.error||`Couldn't load login config (${res.status})`);
+  if(!data.supabase_url||!data.anon_key)throw new Error("Admin login config is unavailable.");
+  return data;
+}
+function openOwnerLogin(){
+  $("ownerLoginEmail").value="";
+  $("ownerLoginPassword").value="";
+  $("ownerLoginStatus").textContent="Use your normal PrintBook admin account.";
+  $("ownerLoginDialog").showModal();
+  setTimeout(()=>$("ownerLoginEmail").focus(),100);
+}
+async function ownerLogin(){
+  const email=$("ownerLoginEmail").value.trim();
+  const password=$("ownerLoginPassword").value;
+  if(!email||!password)return toast("Enter your email and password");
+
+  const btn=$("ownerLoginBtn"),old=btn.textContent;
+  btn.disabled=true;btn.textContent="Signing in…";
+  $("ownerLoginStatus").textContent="Connecting to PrintBook…";
+
+  try{
+    const cfg=await getPublicSupabaseConfig();
+
+    // The anon/publishable key is intended for browser clients.
+    settings.supabaseUrl=cfg.supabase_url;
+    settings.supabaseKey=cfg.anon_key;
+    localStorage.setItem(K.settings,JSON.stringify(settings));
+
+    supabaseClient=window.supabase.createClient(settings.supabaseUrl,settings.supabaseKey,{
+      auth:{persistSession:true,autoRefreshToken:true}
+    });
+
+    const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+    if(error)throw error;
+    if(!data?.user)throw new Error("Sign-in did not return a user.");
+
+    currentUser=data.user;
+    deactivatePublicVisitorMode();
+    customerMode=false;
+    $("ownerLoginDialog").close();
+
+    // Re-run our normal setup so realtime/sync/auth listeners are attached.
+    await setupSupabase();
+    currentView="shop";
+    renderAll();
+    toast("Admin signed in");
+  }catch(err){
+    console.error("Owner login failed",err);
+    $("ownerLoginStatus").textContent=err?.message||"Sign-in failed.";
+    toast(err?.message||"Couldn't sign in");
+  }finally{
+    btn.disabled=false;btn.textContent=old
+  }
+}
+
 function normalizePublicPrint(p){
-  return {id:p.id,name:p.name||"Print",category:p.category||"",price:Number(p.price||0),hours:p.hours??"",notes:p.notes||"",photo_url:p.photo_url||"",favorite:!!p.favorite,variants:Array.isArray(p.variants)?p.variants:[],deal_qty:Number(p.deal_qty||0),deal_price:Number(p.deal_price||0),out_of_stock_behavior:p.out_of_stock_behavior||"show",made_qty:Number(p.made_qty||0),sold_qty:Number(p.sold_qty||0),filament_usage:[],extra_cost:0,model_source:"",created_at:p.created_at||"",updated_at:p.updated_at||""}
+  return {id:p.id,name:p.name||"Print",category:p.category||"",price:Number(p.price||0),hours:p.hours??"",notes:p.notes||"",photo_url:p.photo_url||"",favorite:!!p.favorite,variants:Array.isArray(p.variants)?p.variants:[],deal_qty:Number(p.deal_qty||0),deal_price:Number(p.deal_price||0),out_of_stock_behavior:p.out_of_stock_behavior||"show",made_qty:Number(p.made_qty||0),sold_qty:Number(p.sold_qty||0),multicolor_capable:!!p.multicolor_capable,filament_usage:[],extra_cost:0,model_source:"",created_at:p.created_at||"",updated_at:p.updated_at||""}
 }
 function normalizePublicFilament(f){
   return {id:f.id,brand:f.brand||"",material:f.material||"",color:f.color||"",visual_color:f.visual_color||"#777777",remaining:f.available?1:0,spool_size:1,low_stock:!!f.low_stock,public_only:true}
@@ -738,6 +799,65 @@ function populateRequestFilaments(){
       .map(f=>`<option value="${f.id}">${safe(f.color||f.material||"Filament")}${f.material?` · ${safe(f.material)}`:""}</option>`)
       .join("");
 }
+function requestVariantObject(){
+  const item=items.find(i=>i.id===currentRequestPrintId);
+  if(!item)return null;
+  return (item.variants||[]).find(v=>v.id===$("requestVariant").value)||null;
+}
+function requestIsMulticolorCapable(){
+  const item=items.find(i=>i.id===currentRequestPrintId);
+  if(!item)return false;
+  const variant=requestVariantObject();
+
+  if(variant){
+    if(variant.multicolor_capable===true)return true;
+    if(!publicVisitorMode && variantUsage(variant).length>1)return true;
+  }
+  if(item.multicolor_capable===true)return true;
+  if(!publicVisitorMode && (item.filament_usage||[]).length>1)return true;
+  return false;
+}
+function selectedRequestColorIds(){
+  return [...document.querySelectorAll('#requestColorGrid input[type="checkbox"]:checked')].map(x=>x.value);
+}
+function renderRequestColorChoices(){
+  const grid=$("requestColorGrid");
+  if(!grid)return;
+  const available=filaments
+    .filter(f=>Number(f.remaining||0)>0)
+    .sort((a,b)=>String(a.color||a.material||"").localeCompare(String(b.color||b.material||"")));
+
+  grid.innerHTML=available.map(f=>`
+    <label class="request-color-choice">
+      <input type="checkbox" value="${safe(f.id)}">
+      <span class="request-color-swatch" style="background:${safe(f.visual_color||'#777777')}"></span>
+      <span>
+        <strong>${safe(f.color||f.material||"Filament")}</strong>
+        <small>${safe([f.material,f.brand].filter(Boolean).join(" · "))}</small>
+      </span>
+    </label>`).join("");
+
+  grid.querySelectorAll('input[type="checkbox"]').forEach(x=>x.onchange=updateRequestColorCount);
+  updateRequestColorCount();
+}
+function updateRequestColorCount(){
+  const n=selectedRequestColorIds().length;
+  $("requestColorCount").textContent=`${n} selected`;
+}
+function updateRequestColorMode(){
+  const capable=requestIsMulticolorCapable();
+  $("requestColorModeField").classList.toggle("hidden",!capable);
+
+  if(!capable){
+    $("requestColorMode").value="single";
+  }
+
+  const multi=capable && $("requestColorMode").value==="multi";
+  $("requestMulticolorSection").classList.toggle("hidden",!multi);
+  $("requestSingleColorField").classList.toggle("hidden",multi);
+
+  if(multi)renderRequestColorChoices();
+}
 function requestUnitPrice(){
   const item=items.find(i=>i.id===currentRequestPrintId);
   if(!item)return 0;
@@ -765,6 +885,8 @@ function openRequestPrint(){
 
   if((item.variants||[]).length)$("requestVariant").value=item.variants[0].id;
   populateRequestFilaments();
+  $("requestColorMode").value="single";
+  updateRequestColorMode();
 
   $("requestProductSummary").innerHTML=`
     ${item.photo_url?`<img class="request-product-thumb" src="${safe(item.photo_url)}" alt="">`:`<div class="request-product-thumb"></div>`}
@@ -780,17 +902,24 @@ async function submitPrintRequest(){
   const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
   const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
   const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim(),estimate=requestUnitPrice()*qty;
+  const wantsMulticolor=requestIsMulticolorCapable()&&$("requestColorMode").value==="multi";
+  const colorIds=wantsMulticolor?selectedRequestColorIds():[];
+  if(wantsMulticolor&&colorIds.length<2)return toast("Choose at least 2 colors");
 
   if(publicVisitorMode){
     const btn=$("submitPrintRequestBtn"),oldLabel=btn.textContent;btn.disabled=true;btn.textContent="Submitting…";
     try{
-      await submitPublicPrintRequest({print_id:item.id,variant_id:variantId||"",filament_id:filamentId||"",customer,contact,quantity:qty,notes:userNotes});
+      await submitPublicPrintRequest({print_id:item.id,variant_id:variantId||"",filament_id:wantsMulticolor?"":(filamentId||""),color_mode:wantsMulticolor?"multi":"single",color_ids:colorIds,customer,contact,quantity:qty,notes:userNotes});
       $("requestPrintDialog").close();toast("Print request sent");return
     }catch(err){console.error("Public request failed",err);toast(err?.message||"Couldn't send the print request");return}
     finally{btn.disabled=false;btn.textContent=oldLabel}
   }
 
-  const details=[variant?`Variant: ${variant.name}`:"Version: Standard",filament?`Preferred filament: ${filament.color||filament.material||"Selected filament"}`:"Filament: No preference",contact?`Contact: ${contact}`:"",userNotes?`Customer notes: ${userNotes}`:""].filter(Boolean).join("\n");
+  const chosenColors=colorIds.map(id=>getFilament(id)).filter(Boolean);
+  const colorDetail=wantsMulticolor
+    ?`Multicolor: ${chosenColors.map(f=>f.color||f.material||"Color").join(" + ")}`
+    :(filament?`Preferred filament: ${filament.color||filament.material||"Selected filament"}`:"Filament: No preference");
+  const details=[variant?`Variant: ${variant.name}`:"Version: Standard",colorDetail,contact?`Contact: ${contact}`:"",userNotes?`Customer notes: ${userNotes}`:""].filter(Boolean).join("\n");
   const order={id:uid(),customer,status:"Requested",item:item.name,quantity:qty,quoted_price:estimate,due_date:"",print_id:item.id,notes:`Customer Store request\n${details}`,created_at:nowISO(),updated_at:nowISO()};
   orders.unshift(order);persist();$("requestPrintDialog").close();toast("Print request submitted");
   if(currentUser&&supabaseClient){(async()=>{try{await syncUpsert("orders",{...order,user_id:currentUser.id,print_id:order.print_id||null})}catch(err){console.error("Customer request sync failed",err);setSyncState("error","Request saved locally — cloud sync failed")}})()}
@@ -811,11 +940,24 @@ function confirmCustomerUnlock(){
   if(!pin||entered!==pin){$("customerUnlockPin").value="";toast("Wrong owner PIN");return}
   $("customerUnlockDialog").close();customerMode=false;customerStoreTab="products";customerTitleTapCount=0;renderAll();toast("Admin mode unlocked");
 }
-function customerOwnerTap(){
-  if(publicVisitorMode)return;
-  if(!customerMode)return;customerTitleTapCount++;clearTimeout(customerTitleTapTimer);customerTitleTapTimer=setTimeout(()=>customerTitleTapCount=0,1700);
-  if(customerTitleTapCount>=5){customerTitleTapCount=0;clearTimeout(customerTitleTapTimer);openCustomerUnlock()}
+function brandOwnerTap(){
+  brandOwnerTapCount++;
+  clearTimeout(brandOwnerTapTimer);
+  brandOwnerTapTimer=setTimeout(()=>brandOwnerTapCount=0,1700);
+  if(brandOwnerTapCount<5)return;
+
+  brandOwnerTapCount=0;
+  clearTimeout(brandOwnerTapTimer);
+
+  if(publicVisitorMode){
+    openOwnerLogin();
+    return;
+  }
+  if(customerMode){
+    openCustomerUnlock();
+  }
 }
+function customerOwnerTap(){brandOwnerTap()}
 
 function generateNotifications(){
   const notices=[];
@@ -1403,14 +1545,20 @@ $("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$
 $("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
 $("requestPrintBtn").onclick=openRequestPrint;
 $("closeRequestPrint").onclick=()=>$("requestPrintDialog").close();
-$("requestVariant").onchange=updateRequestEstimate;
+$("requestVariant").onchange=()=>{updateRequestEstimate();updateRequestColorMode()};
+$("requestColorMode").onchange=updateRequestColorMode;
 $("requestQty").oninput=updateRequestEstimate;
 $("submitPrintRequestBtn").onclick=submitPrintRequest;
 document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));
 $("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();
 $("confirmCustomerUnlock").onclick=confirmCustomerUnlock;
 $("customerUnlockPin").addEventListener("keydown",e=>{if(e.key==="Enter")confirmCustomerUnlock()});
-document.querySelector(".topbar h1").addEventListener("click",customerOwnerTap);
+$("brandOwnerTrigger").addEventListener("click",brandOwnerTap);
+$("brandOwnerTrigger").addEventListener("dblclick",e=>e.preventDefault());
+$("brandOwnerTrigger").addEventListener("selectstart",e=>e.preventDefault());
+$("closeOwnerLogin").onclick=()=>$("ownerLoginDialog").close();
+$("ownerLoginBtn").onclick=ownerLogin;
+$("ownerLoginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")ownerLogin()});
 $("closeEditor").onclick=()=>{savePrintInFlight=false;$("savePrintBtn").disabled=false;$("savePrintBtn").textContent="Save print";$("editorDialog").close()};$("savePrintBtn").onclick=savePrint;$("deleteBtn").onclick=deletePrint;$("favoriteToggle").onclick=()=>{editorFavorite=!editorFavorite;updateFavoriteButton()};$("modelSourceInput").oninput=updateModelLink;$("addPrintFilamentBtn").onclick=()=>addUsageRow("printFilamentRows");$("addVariantBtn").onclick=()=>addVariantRow();
 ["hoursInput","extraCostInput","priceInput","madeInput","soldInput","presetInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).oninput=updatePricingPreviews);
 $("recordSaleFromPrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openSale(id)};$("makePrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openMake(id)};

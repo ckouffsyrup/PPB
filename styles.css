@@ -514,3 +514,77 @@ body.menu-open{
 }
 .public-store-unavailable h3{margin:0 0 6px;color:#ffb3bd}
 .public-store-unavailable p{margin:0;color:var(--muted);font-size:12px}
+
+/* v4.4.4 owner login + multicolor requests */
+.brand-owner-trigger{
+  appearance:none;
+  border:0;
+  background:transparent;
+  color:inherit;
+  padding:0;
+  margin:0;
+  text-align:left;
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-touch-callout:none;
+  touch-action:manipulation
+}
+.brand-owner-trigger *{
+  user-select:none;
+  -webkit-user-select:none;
+  pointer-events:none
+}
+.brand-owner-trigger:focus-visible{
+  outline:2px solid var(--purpleSoft);
+  outline-offset:5px;
+  border-radius:8px
+}
+.public-visitor .brand-owner-trigger{cursor:pointer}
+.request-multicolor{
+  border:1px solid var(--line);
+  background:#0e0c13;
+  border-radius:15px;
+  padding:12px
+}
+.request-multicolor-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px
+}
+.request-multicolor-head strong{display:block}
+.request-multicolor-head small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.request-color-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px
+}
+.request-color-choice{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  border-radius:12px;
+  padding:9px;
+  cursor:pointer;
+  user-select:none
+}
+.request-color-choice input{width:auto;flex:0 0 auto}
+.request-color-swatch{
+  width:28px;height:28px;flex:0 0 28px;
+  border-radius:9px;
+  border:1px solid rgba(255,255,255,.16)
+}
+.request-color-choice span{min-width:0}
+.request-color-choice strong{display:block;font-size:11px}
+.request-color-choice small{display:block;color:var(--muted);font-size:9px;margin-top:2px}
+.request-color-choice:has(input:checked){
+  border-color:#7556a3;
+  background:#1c1528
+}
+@media(max-width:560px){
+  .request-color-grid{grid-template-columns:1fr}
+}

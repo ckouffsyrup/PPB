@@ -18,10 +18,10 @@
   <header class="topbar">
     <div class="brand-wrap">
       <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Open menu">☰</button>
-      <div>
+      <button class="brand-owner-trigger" id="brandOwnerTrigger" type="button" aria-label="PrintBook">
         <p class="eyebrow">3D PRINT SHOP</p>
         <h1>PrintBook</h1>
-      </div>
+      </button>
     </div>
     <div class="header-actions">
       <span class="sync-pill" id="syncStatusPill">Local</span>
@@ -547,9 +547,27 @@
         <select id="requestVariant"><option value="">Standard</option></select>
       </label>
 
-      <label>Preferred filament/color
+      <label id="requestSingleColorField">Preferred filament/color
         <select id="requestFilament"><option value="">No preference</option></select>
       </label>
+
+      <label id="requestColorModeField" class="hidden">Color setup
+        <select id="requestColorMode">
+          <option value="single">Single color</option>
+          <option value="multi">Multicolor</option>
+        </select>
+      </label>
+
+      <div class="full request-multicolor hidden" id="requestMulticolorSection">
+        <div class="request-multicolor-head">
+          <div>
+            <strong>Choose your colors</strong>
+            <small>Select at least 2 available filaments.</small>
+          </div>
+          <span id="requestColorCount" class="badge">0 selected</span>
+        </div>
+        <div class="request-color-grid" id="requestColorGrid"></div>
+      </div>
 
       <label class="full">How should I contact you?
         <input id="requestContact" placeholder="Phone, Discord, email, etc." />
@@ -566,6 +584,23 @@
     </div>
 
     <button class="primary full-width" id="submitPrintRequestBtn" type="button">Submit Print Request</button>
+  </div>
+</dialog>
+
+
+<!-- OWNER LOGIN FOR NEW DEVICES -->
+<dialog id="ownerLoginDialog">
+  <div class="sheet narrow">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">OWNER ONLY</p><h2>Admin Sign In</h2></div>
+      <button class="icon-btn" id="closeOwnerLogin" type="button">✕</button>
+    </div>
+    <p class="muted">Sign into your PrintBook admin account on this device.</p>
+    <label>Email<input id="ownerLoginEmail" type="email" autocomplete="username" /></label>
+    <label>Password<input id="ownerLoginPassword" type="password" autocomplete="current-password" /></label>
+    <p class="muted tiny-note" id="ownerLoginStatus">Tap the PrintBook logo five times from the public store to open this screen.</p>
+    <button class="primary full-width" id="ownerLoginBtn" type="button">Sign In as Admin</button>
   </div>
 </dialog>
 
