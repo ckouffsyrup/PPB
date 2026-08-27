@@ -94,6 +94,11 @@ const pendingLocalProductIds=new Set();
 const pendingLocalOrderIds=new Set();
 let ordersLastCloudSyncAt=null;
 
+function requireOnlineAdminSave(){
+  if(!currentUser||!supabaseClient){toast("Sign in to save changes");return false}
+  if(!navigator.onLine){setSyncState("offline","Offline — viewing cached data");toast("Offline — reconnect before editing");return false}
+  return true
+}
 function persist(){
   if(publicVisitorMode){renderAll();return}
   localStorage.setItem(K.items,JSON.stringify(items));
@@ -582,7 +587,7 @@ async function handleChosenPhoto(file){
 $("photoCameraInput").onchange=e=>handleChosenPhoto(e.target.files?.[0]);
 $("photoLibraryInput").onchange=e=>handleChosenPhoto(e.target.files?.[0]);
 
-async function savePrint(){
+async function savePrint(){if(!requireOnlineAdminSave())return;
   if(savePrintInFlight)return;
   const name=$("nameInput").value.trim();
   if(!name)return toast("Give the print a name");
@@ -671,10 +676,10 @@ async function savePrint(){
           let cloudPhoto=previousCloudPhoto;
           if(photoFile){
             const ext=(photoFile.name.split(".").pop()||"jpg").toLowerCase();
-            const path=`${currentUser.id}/${id}.${ext}`;
+            const path=`${currentUser.id}/${id}/${Date.now()}-${crypto.randomUUID().slice(0,8)}.${ext}`;
             const {error}=await supabaseClient.storage
               .from("print-images")
-              .upload(path,photoFile,{upsert:true,cacheControl:"3600"});
+              .upload(path,photoFile,{upsert:false,cacheControl:"31536000"});
             if(error)throw error;
             cloudPhoto=supabaseClient.storage.from("print-images").getPublicUrl(path).data.publicUrl;
           }
@@ -716,18 +721,18 @@ async function savePrint(){
     saveBtn.textContent=oldLabel;
   }
 }
-async function deletePrint(){if(!editingId||!confirm("Delete this print?"))return;if(currentUser)await syncDelete("prints",editingId);items=items.filter(i=>i.id!==editingId);persist();$("editorDialog").close();toast("Print deleted")}
+async function deletePrint(){if(!requireOnlineAdminSave())return;if(!editingId||!confirm("Delete this print?"))return;if(currentUser)await syncDelete("prints",editingId);items=items.filter(i=>i.id!==editingId);persist();$("editorDialog").close();toast("Print deleted")}
 
 function resetFilament(){editingFilamentId=null;["filBrand","filMaterial","filColor","filPrice","filNotes"].forEach(id=>$(id).value="");$("filVisualColor").value="#ffffff";$("filVisualHex").value="#ffffff";$("filSpoolSize").value=1000;$("filRemainingInput").value=1000;$("deleteFilamentBtn").style.visibility="hidden";updateFilamentPreview()}
 window.openFilament=id=>{resetFilament();if(id){const f=filaments.find(x=>x.id===id);if(!f)return;editingFilamentId=id;$("filamentTitle").textContent="Edit spool";$("filBrand").value=f.brand||"";$("filMaterial").value=f.material||"";$("filColor").value=f.color||"";$("filVisualColor").value=f.visual_color||"#ffffff";$("filVisualHex").value=f.visual_color||"#ffffff";$("filSpoolSize").value=f.spool_size||1000;$("filPrice").value=f.purchase_price??"";$("filRemainingInput").value=f.remaining??"";$("filNotes").value=f.notes||"";$("deleteFilamentBtn").style.visibility="visible"}else $("filamentTitle").textContent="Add spool";updateFilamentPreview();$("filamentDialog").showModal()}
 function updateFilamentPreview(){const size=Number($("filSpoolSize").value||1000),price=Number($("filPrice").value||0),rem=Number($("filRemainingInput").value||0),cpg=price/size;$("costPerGramPreview").textContent="$"+cpg.toFixed(3);$("remainingValuePreview").textContent=money(cpg*rem)}
-async function saveFilament(){const id=editingFilamentId||uid(),f={id,brand:$("filBrand").value.trim(),material:$("filMaterial").value.trim(),color:$("filColor").value.trim(),visual_color:$("filVisualColor").value||"#ffffff",spool_size:Number($("filSpoolSize").value||1000),purchase_price:Number($("filPrice").value||0),remaining:Number($("filRemainingInput").value||0),notes:$("filNotes").value.trim(),created_at:filaments.find(x=>x.id===id)?.created_at||nowISO(),updated_at:nowISO()};if(currentUser)await syncUpsert("filaments",{...f,user_id:currentUser.id});const idx=filaments.findIndex(x=>x.id===id);if(idx>=0)filaments[idx]=f;else filaments.unshift(f);persist();$("filamentDialog").close();toast("Spool saved")}
-async function deleteFilament(){if(!editingFilamentId||!confirm("Delete this spool?"))return;if(currentUser)await syncDelete("filaments",editingFilamentId);filaments=filaments.filter(f=>f.id!==editingFilamentId);persist();$("filamentDialog").close()}
+async function saveFilament(){if(!requireOnlineAdminSave())return;const id=editingFilamentId||uid(),f={id,brand:$("filBrand").value.trim(),material:$("filMaterial").value.trim(),color:$("filColor").value.trim(),visual_color:$("filVisualColor").value||"#ffffff",spool_size:Number($("filSpoolSize").value||1000),purchase_price:Number($("filPrice").value||0),remaining:Number($("filRemainingInput").value||0),notes:$("filNotes").value.trim(),created_at:filaments.find(x=>x.id===id)?.created_at||nowISO(),updated_at:nowISO()};if(currentUser)await syncUpsert("filaments",{...f,user_id:currentUser.id});const idx=filaments.findIndex(x=>x.id===id);if(idx>=0)filaments[idx]=f;else filaments.unshift(f);persist();$("filamentDialog").close();toast("Spool saved")}
+async function deleteFilament(){if(!requireOnlineAdminSave())return;if(!editingFilamentId||!confirm("Delete this spool?"))return;if(currentUser)await syncDelete("filaments",editingFilamentId);filaments=filaments.filter(f=>f.id!==editingFilamentId);persist();$("filamentDialog").close()}
 
 function resetColorway(){editingColorwayId=null;$("colorwayName").value="";$("colorwayFilamentRows").innerHTML="";$("deleteColorwayBtn").style.visibility="hidden"}
 window.openColorway=id=>{resetColorway();if(id){const c=colorways.find(x=>x.id===id);if(!c)return;editingColorwayId=id;$("colorwayTitle").textContent="Edit colorway";$("colorwayName").value=c.name||"";(c.usage||[]).forEach(u=>addUsageRow("colorwayFilamentRows",u));$("deleteColorwayBtn").style.visibility="visible"}else{$("colorwayTitle").textContent="New colorway";addUsageRow("colorwayFilamentRows")}$("colorwayDialog").showModal()}
-async function saveColorway(){const name=$("colorwayName").value.trim();if(!name)return toast("Name the colorway");const id=editingColorwayId||uid(),c={id,name,usage:collectUsage("colorwayFilamentRows"),created_at:colorways.find(x=>x.id===id)?.created_at||nowISO(),updated_at:nowISO()};if(currentUser)await syncUpsert("colorways",{...c,user_id:currentUser.id});const idx=colorways.findIndex(x=>x.id===id);if(idx>=0)colorways[idx]=c;else colorways.unshift(c);persist();$("colorwayDialog").close();toast("Colorway saved")}
-async function deleteColorway(){if(!editingColorwayId||!confirm("Delete this colorway?"))return;if(currentUser)await syncDelete("colorways",editingColorwayId);colorways=colorways.filter(c=>c.id!==editingColorwayId);for(const i of items)for(const v of i.variants||[])if(v.colorway_id===editingColorwayId)v.colorway_id="";persist();$("colorwayDialog").close()}
+async function saveColorway(){if(!requireOnlineAdminSave())return;const name=$("colorwayName").value.trim();if(!name)return toast("Name the colorway");const id=editingColorwayId||uid(),c={id,name,usage:collectUsage("colorwayFilamentRows"),created_at:colorways.find(x=>x.id===id)?.created_at||nowISO(),updated_at:nowISO()};if(currentUser)await syncUpsert("colorways",{...c,user_id:currentUser.id});const idx=colorways.findIndex(x=>x.id===id);if(idx>=0)colorways[idx]=c;else colorways.unshift(c);persist();$("colorwayDialog").close();toast("Colorway saved")}
+async function deleteColorway(){if(!requireOnlineAdminSave())return;if(!editingColorwayId||!confirm("Delete this colorway?"))return;if(currentUser)await syncDelete("colorways",editingColorwayId);colorways=colorways.filter(c=>c.id!==editingColorwayId);for(const i of items)for(const v of i.variants||[])if(v.colorway_id===editingColorwayId)v.colorway_id="";persist();$("colorwayDialog").close()}
 
 function openMake(printId){
   const item=items.find(i=>i.id===printId);if(!item)return;currentMakePrintId=printId;$("makeProductName").textContent=item.name;$("makeQty").value=1;
@@ -740,7 +745,7 @@ function updateMakeCheck(){
   $("makeCheckList").innerHTML=checks.length?checks.map(c=>`<div class="check-row"><div><strong>${safe(c.f?`${c.f.brand||""} ${c.f.color||c.f.material}`.trim():"Missing spool")}</strong><small>Need ${Math.round(c.need)}g · Have ${Math.round(c.have)}g</small></div><span class="${c.ok?"ok":"bad"}">${c.ok?"Enough":"Short"}</span></div>`).join(""):`<div class="check-row"><div><strong>No filament recipe</strong><small>This print has no saved filament usage, so nothing will be deducted.</small></div><span class="ok">OK</span></div>`;
   const shortages=checks.filter(c=>!c.ok);$("makeWarning").classList.toggle("hidden",!shortages.length);$("makeWarning").textContent=shortages.length?`Not enough filament for this batch. Add/restock the listed spool${shortages.length===1?"":"s"} before printing.`:"";$("confirmMakeBtn").disabled=!!shortages.length;$("confirmMakeBtn").style.opacity=shortages.length?".45":"1"
 }
-async function confirmMake(){
+async function confirmMake(){if(!requireOnlineAdminSave())return;
   const item=items.find(i=>i.id===currentMakePrintId);if(!item)return;const qty=Math.max(1,Number($("makeQty").value||1)),vid=$("makeVariant").value,usage=makeUsage();
   for(const u of usage){const f=getFilament(u.filament_id),need=Number(u.grams||0)*qty;if(!f||Number(f.remaining||0)<need)return toast("Not enough filament")}
   for(const u of usage){const f=getFilament(u.filament_id);f.remaining=Math.max(0,Number(f.remaining||0)-Number(u.grams||0)*qty);f.updated_at=nowISO()}
@@ -764,7 +769,7 @@ function calcSale(){
   const total=Math.max(0,subtotal-discount),cost=i?itemMaterialCost(i,$("saleVariant").value):0;return {i,q,unit,subtotal,discount,total,cost}
 }
 function updateSalePreview(){const c=calcSale();$("saleSubtotalPreview").textContent=money(c.subtotal);$("saleDiscountPreview").textContent="-"+money(c.discount);$("saleTotalPreview").textContent=money(c.total);$("saleProfitPreview").textContent=money(c.total-c.cost*c.q)}
-async function saveSale(){
+async function saveSale(){if(!requireOnlineAdminSave())return;
   const c=calcSale(),print_id=$("salePrint").value,variant_id=$("saleVariant").value;if(!print_id)return toast("Choose a print");const available=variant_id?variantStock(c.i,variant_id):itemStock(c.i);if(c.q>available&&!confirm(`Only ${available} in stock. Record the sale anyway?`))return;
   const s={id:uid(),print_id,variant_id,quantity:c.q,unit_price:c.unit,discount_type:$("saleDiscountType").value,discount_value:Number($("saleDiscountValue").value||0),discount_amount:c.discount,total:c.total,unit_cost:c.cost,date:$("saleDate").value||TODAY(),channel:$("saleChannel").value.trim(),notes:$("saleNotes").value.trim(),created_at:nowISO(),updated_at:nowISO()};sales.unshift(s);
   if(variant_id){const v=(c.i.variants||[]).find(x=>x.id===variant_id);if(v)v.stock=Math.max(0,Number(v.stock||0)-c.q)}else c.i.sold_qty=Number(c.i.sold_qty||0)+c.q;c.i.updated_at=nowISO();
@@ -775,7 +780,7 @@ function openSalesHistory(){const sorted=[...sales].sort((a,b)=>String(b.date).l
 
 function resetOrder(){editingOrderId=null;["orderCustomer","orderItem","orderPrice","orderDue","orderNotes"].forEach(id=>$(id).value="");$("orderQty").value=1;$("orderStatus").value="Requested";$("orderPrint").value="";$("deleteOrderBtn").style.visibility="hidden"}
 window.openOrder=id=>{resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";$("orderNotes").value=o.notes||"";$("deleteOrderBtn").style.visibility="visible"}else $("orderTitle").textContent="New order";$("orderDialog").showModal()}
-async function saveOrder(){
+async function saveOrder(){if(!requireOnlineAdminSave())return;
   const item=$("orderItem").value.trim();if(!item)return toast("Describe the order");
   const id=editingOrderId||uid(),o={id,customer:$("orderCustomer").value.trim(),status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",notes:$("orderNotes").value.trim(),created_at:orders.find(x=>x.id===id)?.created_at||nowISO(),updated_at:nowISO()};
 
@@ -790,7 +795,7 @@ async function saveOrder(){
   persist();$("orderDialog").close();
   toast(synced||!currentUser?"Order saved":"Order saved locally — waiting for cloud");
 }
-async function deleteOrder(){
+async function deleteOrder(){if(!requireOnlineAdminSave())return;
   if(!editingOrderId||!confirm("Delete this order?"))return;
   if(currentUser&&navigator.onLine){
     const ok=await syncDelete("orders",editingOrderId);
@@ -1278,11 +1283,11 @@ function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();
 function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",multicolor_capable:!!i.multicolor_capable,photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
 async function syncUpsert(table,row){
   if(!supabaseClient||!currentUser)return; if(!navigator.onLine){setSyncState("offline","Offline — changes saved locally");return}
-  setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).upsert(row);if(error){console.error(error);setSyncState("error",`Couldn't sync ${table}`);return false}setSyncState("synced","Synced",nowISO());return true
+  setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).upsert(row);if(error){console.error(error);setSyncState("error",`Couldn't sync ${table}`);return false}setSyncState("syncing","Cloud write complete — refreshing…");return true
 }
 async function syncDelete(table,id){
   if(!supabaseClient||!currentUser)return;if(!navigator.onLine){setSyncState("offline","Offline — deletion not uploaded");return false}
-  setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).delete().eq("id",id).eq("user_id",currentUser.id);if(error){console.error(error);setSyncState("error",`Couldn't delete ${table}`);return false}setSyncState("synced","Synced",nowISO());return true
+  setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).delete().eq("id",id).eq("user_id",currentUser.id);if(error){console.error(error);setSyncState("error",`Couldn't delete ${table}`);return false}setSyncState("syncing","Cloud write complete — refreshing…");return true
 }
 async function setupSupabase(){
   if(!settings.supabaseUrl||!settings.supabaseKey||!window.supabase){
@@ -1371,96 +1376,48 @@ function mergeCloudCollection(localRows,remoteRows,{normalize=x=>x,preferLocalId
 }
 
 async function pullCloud(showToast=true){
-  if(!currentUser||!supabaseClient)return;if(!navigator.onLine){setSyncState("offline","Offline — using local data");return}
-  setSyncState("syncing","Syncing…");
-  const [pr,fi,sa,or,cw]=await Promise.all([
-    supabaseClient.from("prints").select("*").eq("user_id",currentUser.id),
-    supabaseClient.from("filaments").select("*").eq("user_id",currentUser.id),
-    supabaseClient.from("sales").select("*").eq("user_id",currentUser.id),
-    supabaseClient.from("orders").select("*").eq("user_id",currentUser.id),
-    supabaseClient.from("colorways").select("*").eq("user_id",currentUser.id)
-  ]);
-  const errs=[pr,fi,sa,or,cw].map(x=>x.error).filter(Boolean);if(errs.length){console.error(errs);setSyncState("error","Cloud sync failed — run the v4 SQL migration");return toast("Sync failed — database may need the v4 SQL update")}
-  const remoteHasData=[pr.data,fi.data,sa.data,or.data,cw.data].some(a=>a&&a.length);
-  const localHasData=[items,filaments,sales,orders,colorways].some(a=>a&&a.length);
-  if(!remoteHasData&&localHasData){setSyncState("synced","Cloud empty — upload local data",nowISO());if(showToast)toast("Cloud is empty — use Upload local data");return}
-  const remoteItems=(pr.data||[]).map(({user_id,...x})=>({...x,multicolor_capable:!!x.multicolor_capable,variants:x.variants||[],filament_usage:x.filament_usage||[]}));
-  const remoteFilaments=(fi.data||[]).map(({user_id,...x})=>x);
-  const remoteSales=(sa.data||[]).map(({user_id,...x})=>x);
-  const remoteOrders=(or.data||[]).map(({user_id,...x})=>({...x,print_id:x.print_id||""}));
-  const remoteColorways=(cw.data||[]).map(({user_id,...x})=>x);
-
-  items=mergeCloudCollection(items,remoteItems,{
-    normalize:x=>({...x,multicolor_capable:!!x.multicolor_capable,variants:x.variants||[],filament_usage:x.filament_usage||[]}),
-    preferLocalIds:pendingLocalProductIds
-  });
-  filaments=mergeCloudCollection(filaments,remoteFilaments);
-  sales=mergeCloudCollection(sales,remoteSales);
-  {
-    const remoteOrderIds=new Set(remoteOrders.map(o=>o.id));
-    const pendingLocalOrders=orders.filter(o=>pendingLocalOrderIds.has(o.id)&&!remoteOrderIds.has(o.id));
-    orders=[...remoteOrders,...pendingLocalOrders].sort((a,b)=>rowTime(b)-rowTime(a));
-    for(const id of [...pendingLocalOrderIds]){
-      if(remoteOrderIds.has(id))pendingLocalOrderIds.delete(id);
-    }
-    ordersLastCloudSyncAt=nowISO();
-  }
-  colorways=mergeCloudCollection(colorways,remoteColorways);
-
-  persist();setSyncState("synced","Synced",nowISO());if(showToast)toast("Synced")
+  if(!currentUser||!supabaseClient)return false;
+  if(!navigator.onLine){setSyncState("offline","Offline — viewing cached data");if(showToast)toast("Offline — showing cached data");return false}
+  setSyncState("syncing","Loading cloud data…");
+  try{
+    const [pr,fi,sa,or,cw]=await Promise.all([
+      supabaseClient.from("prints").select("*").eq("user_id",currentUser.id),
+      supabaseClient.from("filaments").select("*").eq("user_id",currentUser.id),
+      supabaseClient.from("sales").select("*").eq("user_id",currentUser.id),
+      supabaseClient.from("orders").select("*").eq("user_id",currentUser.id),
+      supabaseClient.from("colorways").select("*").eq("user_id",currentUser.id)
+    ]);
+    const errs=[pr,fi,sa,or,cw].map(x=>x.error).filter(Boolean);if(errs.length)throw errs[0];
+    const remoteHasData=[pr,fi,sa,or,cw].some(x=>(x.data||[]).length);
+    const localHasData=[items,filaments,sales,orders,colorways].some(a=>(a||[]).length);
+    if(!remoteHasData&&localHasData){setSyncState("error","Cloud is empty — use Upload local data once");if(showToast)toast("Cloud is empty — upload this device's old data once");return false}
+    const remoteItems=(pr.data||[]).map(({user_id,...x})=>({...x,multicolor_capable:!!x.multicolor_capable,variants:x.variants||[],filament_usage:x.filament_usage||[]}));
+    const pendingItems=items.filter(i=>pendingLocalProductIds.has(i.id)),pendingIds=new Set(pendingItems.map(i=>i.id));
+    items=[...pendingItems,...remoteItems.filter(i=>!pendingIds.has(i.id))].sort((a,b)=>rowTime(b)-rowTime(a));
+    filaments=(fi.data||[]).map(({user_id,...x})=>x).sort((a,b)=>rowTime(b)-rowTime(a));
+    sales=(sa.data||[]).map(({user_id,...x})=>x).sort((a,b)=>rowTime(b)-rowTime(a));
+    orders=(or.data||[]).map(({user_id,...x})=>({...x,print_id:x.print_id||""})).sort((a,b)=>rowTime(b)-rowTime(a));
+    colorways=(cw.data||[]).map(({user_id,...x})=>x).sort((a,b)=>rowTime(b)-rowTime(a));
+    localStorage.setItem(K.items,JSON.stringify(items));localStorage.setItem(K.filaments,JSON.stringify(filaments));localStorage.setItem(K.sales,JSON.stringify(sales));localStorage.setItem(K.orders,JSON.stringify(orders));localStorage.setItem(K.colorways,JSON.stringify(colorways));
+    renderAll();setSyncState("synced","Cloud current",nowISO());if(showToast)toast("Cloud data refreshed");return true;
+  }catch(err){console.error("Cloud snapshot failed",err);setSyncState("error","Cloud refresh failed — using cached data");if(showToast)toast("Couldn't refresh cloud data");return false}
 }
 async function refreshOrdersFromCloud({showToast=false}={}){
-  if(!supabaseClient||!currentUser||publicVisitorMode)return false;
+  if(!supabaseClient||!currentUser||publicVisitorMode||!navigator.onLine)return false;
   try{
-    const {data,error}=await supabaseClient
-      .from("orders")
-      .select("*")
-      .eq("user_id",currentUser.id)
-      .order("created_at",{ascending:false});
-    if(error)throw error;
-
-    const beforeIds=new Set(orders.map(o=>o.id));
-    const remote=(data||[]).map(({user_id,...x})=>({...x,print_id:x.print_id||""}));
-
-    // Supabase is the source of truth for orders. This is intentionally NOT
-    // mergeCloudCollection(): another device may have created/changed/deleted
-    // an order and every signed-in device needs to mirror that exact state.
-    const remoteIds=new Set(remote.map(o=>o.id));
-    const pendingLocal=orders.filter(o=>pendingLocalOrderIds.has(o.id)&&!remoteIds.has(o.id));
-    orders=[...remote,...pendingLocal].sort((a,b)=>rowTime(b)-rowTime(a));
-
-    // Any pending row that now exists in Supabase has successfully landed.
-    for(const id of [...pendingLocalOrderIds]){
-      if(remoteIds.has(id))pendingLocalOrderIds.delete(id);
-    }
-
-    ordersLastCloudSyncAt=nowISO();
-    localStorage.setItem(K.orders,JSON.stringify(orders));
-    renderOrders();
-    renderDashboard();
-    updateCloudUI();
-
-    const newRequested=remote.filter(o=>!beforeIds.has(o.id)&&String(o.status||"").toLowerCase()==="requested");
-    if(newRequested.length){
-      toast(newRequested.length===1
-        ?`New print request from ${newRequested[0].customer||"customer"}`
-        :`${newRequested.length} new print requests`);
-    }else if(showToast){
-      toast(`Requests synced · ${remote.length} in cloud`);
-    }
-    return true;
-  }catch(err){
-    console.warn("Could not refresh print requests",err);
-    if(showToast)toast("Couldn't refresh requests");
-    return false;
-  }
+    const {data,error}=await supabaseClient.from("orders").select("*").eq("user_id",currentUser.id).order("created_at",{ascending:false});if(error)throw error;
+    const beforeIds=new Set(orders.map(o=>o.id));orders=(data||[]).map(({user_id,...x})=>({...x,print_id:x.print_id||""}));
+    localStorage.setItem(K.orders,JSON.stringify(orders));renderOrders();renderDashboard();setSyncState("synced","Cloud current",nowISO());
+    const fresh=orders.filter(o=>!beforeIds.has(o.id)&&String(o.status||"").toLowerCase()==="requested");
+    if(fresh.length)toast(fresh.length===1?`New print request from ${fresh[0].customer||"customer"}`:`${fresh.length} new print requests`);else if(showToast)toast(`Requests refreshed · ${orders.length}`);return true;
+  }catch(err){console.warn("Order refresh failed",err);setSyncState("error","Order refresh failed");if(showToast)toast("Couldn't refresh requests");return false}
 }
 function startPublicRequestRefresh(){
   stopPublicRequestRefresh();
   if(!currentUser||publicVisitorMode)return;
   publicRequestRefreshTimer=setInterval(()=>{
     if(document.visibilityState==="visible")refreshOrdersFromCloud().catch(()=>{});
-  },10000);
+  },30000);
 }
 function stopPublicRequestRefresh(){
   if(publicRequestRefreshTimer)clearInterval(publicRequestRefreshTimer);
@@ -1468,19 +1425,9 @@ function stopPublicRequestRefresh(){
 }
 
 function startRealtime(){
-  if(!supabaseClient||!currentUser)return;stopRealtime();
-  startPublicRequestRefresh();
-  realtimeChannel=supabaseClient.channel(`printbook-${currentUser.id}`);
-  for(const table of ["prints","filaments","sales","orders","colorways"]){
-    realtimeChannel.on("postgres_changes",{event:"*",schema:"public",table,filter:`user_id=eq.${currentUser.id}`},()=>{
-      clearTimeout(realtimeTimer);
-      realtimeTimer=setTimeout(()=>{
-        if(table==="orders")refreshOrdersFromCloud().catch(()=>{});
-        else pullCloud(false)
-      },250)
-    })
-  }
-  realtimeChannel.subscribe()
+  if(!supabaseClient||!currentUser)return;stopRealtime();startPublicRequestRefresh();realtimeChannel=supabaseClient.channel(`printbook-${currentUser.id}`);
+  for(const table of ["prints","filaments","sales","orders","colorways"]){realtimeChannel.on("postgres_changes",{event:"*",schema:"public",table,filter:`user_id=eq.${currentUser.id}`},()=>{clearTimeout(realtimeTimer);realtimeTimer=setTimeout(()=>{if(table==="orders")refreshOrdersFromCloud().catch(()=>{});else pullCloud(false).catch(()=>{})},400)})}
+  realtimeChannel.subscribe(status=>{if(status==="SUBSCRIBED")setSyncState("synced","Live cloud sync",nowISO())});
 }
 function stopRealtime(){
   stopPublicRequestRefresh();
@@ -1691,3 +1638,7 @@ if("serviceWorker" in navigator)window.addEventListener("load",async()=>{
   }catch(err){console.warn("Service worker registration failed",err)}
 });
 populatePresetSelects();renderAll();setupSupabase();showView("shop");
+
+window.addEventListener("focus",()=>{if(currentUser&&!publicVisitorMode)pullCloud(false).catch(()=>{})});
+window.addEventListener("online",()=>{if(currentUser&&!publicVisitorMode)pullCloud(false).catch(()=>{})});
+window.addEventListener("offline",()=>{if(currentUser)setSyncState("offline","Offline — viewing cached data")});
