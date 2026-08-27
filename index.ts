@@ -38,7 +38,7 @@ Deno.serve(async req=>{
 
   if(req.method==="GET"){
     const [pr,fr,cr]=await Promise.all([
-      db.from("prints").select("id,name,category,price,hours,notes,favorite,photo_url,variants,filament_usage,deal_qty,deal_price,out_of_stock_behavior,made_qty,sold_qty,created_at,updated_at").eq("user_id",SHOP_OWNER_USER_ID),
+      db.from("prints").select("id,name,category,price,hours,notes,favorite,photo_url,variants,filament_usage,multicolor_capable,deal_qty,deal_price,out_of_stock_behavior,made_qty,sold_qty,created_at,updated_at").eq("user_id",SHOP_OWNER_USER_ID),
       db.from("filaments").select("id,brand,material,color,visual_color,remaining,spool_size").eq("user_id",SHOP_OWNER_USER_ID),
       db.from("colorways").select("id,usage").eq("user_id",SHOP_OWNER_USER_ID)
     ]);
@@ -59,7 +59,7 @@ Deno.serve(async req=>{
           multicolor_capable:variantUsage.length>1
         };
       }):[];
-      const multicolor_capable=baseUsage.length>1||variants.some((v:any)=>v.multicolor_capable);
+      const multicolor_capable=!!p.multicolor_capable;
       const {filament_usage,...safeProduct}=p;
       return {...safeProduct,price:Number(p.price??0),variants,multicolor_capable,deal_qty:Number(p.deal_qty??0),deal_price:Number(p.deal_price??0),made_qty:Number(p.made_qty??0),sold_qty:Number(p.sold_qty??0)}
     }).filter((p:any)=>{
@@ -81,7 +81,7 @@ Deno.serve(async req=>{
     const colorIds=Array.isArray(body.color_ids)?[...new Set(body.color_ids.map((x:any)=>clean(x,80)).filter(Boolean))].slice(0,8):[];
     if(!printId||!customer)return json({error:"Name and product are required."},400);
 
-    const {data:product,error:pe}=await db.from("prints").select("id,name,price,variants,filament_usage").eq("id",printId).eq("user_id",SHOP_OWNER_USER_ID).maybeSingle();
+    const {data:product,error:pe}=await db.from("prints").select("id,name,price,variants,filament_usage,multicolor_capable").eq("id",printId).eq("user_id",SHOP_OWNER_USER_ID).maybeSingle();
     if(pe||!product)return json({error:"That product is not available."},404);
     const variants=Array.isArray(product.variants)?product.variants:[],variant=variantId?variants.find((v:any)=>String(v.id)===variantId):null;
     if(variantId&&!variant)return json({error:"That product version is not available."},400);
@@ -95,8 +95,9 @@ Deno.serve(async req=>{
         variantUsage=Array.isArray(cw?.usage)?cw.usage:[];
       }
     }
-    // Multicolor is a customer request preference, not an admin-configured
-    // product requirement. The owner can confirm model compatibility later.
+    if(colorMode==="multi"&&!product.multicolor_capable){
+      return json({error:"This product is not available for multicolor requests."},400);
+    }
     if(colorMode==="multi"&&colorIds.length<2){
       return json({error:"Choose at least 2 colors."},400);
     }

@@ -517,7 +517,7 @@ function collectVariants(){return [...$("variantRows").querySelectorAll(".varian
 function resetEditor(){
   editingId=null;pendingPhotoFile=null;pendingPhotoData="";editorFavorite=false;
   ["nameInput","categoryInput","modelSourceInput","priceInput","hoursInput","extraCostInput","notesInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).value="");
-  $("madeInput").value=0;$("soldInput").value=0;$("outOfStockInput").value="show";$("presetInput").value=settings.defaultPresetId||presets[0]?.id;
+  $("madeInput").value=0;$("soldInput").value=0;$("outOfStockInput").value="show";$("multicolorCapableInput").value="false";$("presetInput").value=settings.defaultPresetId||presets[0]?.id;
   $("photoPreview").classList.add("hidden");$("photoPlaceholder").classList.remove("hidden");if($("photoCameraInput"))$("photoCameraInput").value="";if($("photoLibraryInput"))$("photoLibraryInput").value="";$("printFilamentRows").innerHTML="";$("variantRows").innerHTML="";
   $("deleteBtn").style.visibility="hidden";$("recordSaleFromPrintBtn").style.visibility="hidden";$("makePrintBtn").style.visibility="hidden";updateFavoriteButton();updatePricingPreviews()
 }
@@ -525,7 +525,7 @@ function updateFavoriteButton(){$("favoriteToggle").classList.toggle("active",ed
 window.openEditor=id=>{
   resetEditor();
   if(id){
-    const i=items.find(x=>x.id===id);if(!i)return;editingId=id;$("editorTitle").textContent="Edit print";$("nameInput").value=i.name||"";$("categoryInput").value=i.category||"";$("modelSourceInput").value=i.model_source||"";$("priceInput").value=i.price??"";$("presetInput").value=i.preset_id||settings.defaultPresetId;$("hoursInput").value=i.hours??"";$("extraCostInput").value=i.extra_cost??0;$("notesInput").value=i.notes||"";$("madeInput").value=i.made_qty??0;$("soldInput").value=i.sold_qty??0;$("dealQtyInput").value=i.deal_qty||"";$("dealPriceInput").value=i.deal_price||"";$("outOfStockInput").value=i.out_of_stock_behavior||"show";editorFavorite=!!i.favorite;updateFavoriteButton();
+    const i=items.find(x=>x.id===id);if(!i)return;editingId=id;$("editorTitle").textContent="Edit print";$("nameInput").value=i.name||"";$("categoryInput").value=i.category||"";$("modelSourceInput").value=i.model_source||"";$("priceInput").value=i.price??"";$("presetInput").value=i.preset_id||settings.defaultPresetId;$("hoursInput").value=i.hours??"";$("extraCostInput").value=i.extra_cost??0;$("notesInput").value=i.notes||"";$("madeInput").value=i.made_qty??0;$("soldInput").value=i.sold_qty??0;$("dealQtyInput").value=i.deal_qty||"";$("dealPriceInput").value=i.deal_price||"";$("outOfStockInput").value=i.out_of_stock_behavior||"show";$("multicolorCapableInput").value=i.multicolor_capable?"true":"false";editorFavorite=!!i.favorite;updateFavoriteButton();
     if(i.photo_url){$("photoPreview").src=i.photo_url;$("photoPreview").classList.remove("hidden");$("photoPlaceholder").classList.add("hidden")}
     (i.filament_usage||[]).forEach(u=>addUsageRow("printFilamentRows",u));(i.variants||[]).forEach(v=>addVariantRow(v));
     $("deleteBtn").style.visibility="visible";$("recordSaleFromPrintBtn").style.visibility="visible";$("makePrintBtn").style.visibility="visible"
@@ -619,6 +619,7 @@ async function savePrint(){
       deal_qty:Number($("dealQtyInput").value||0),
       deal_price:Number($("dealPriceInput").value||0),
       out_of_stock_behavior:$("outOfStockInput").value,
+      multicolor_capable:$("multicolorCapableInput").value==="true",
       photo_url:localPhoto || old?.photo_url || "",
       created_at:old?.created_at||nowISO(),
       updated_at:nowISO()
@@ -833,9 +834,19 @@ function updateRequestColorCount(){
   $("requestColorCount").textContent=`${n} selected`;
 }
 function updateRequestColorMode(){
-  const multi=$("requestColorMode").value==="multi";
+  const item=items.find(i=>i.id===currentRequestPrintId);
+  const capable=!!item?.multicolor_capable;
+
+  $("requestColorModeField").classList.toggle("hidden",!capable);
+
+  if(!capable){
+    $("requestColorMode").value="single";
+  }
+
+  const multi=capable && $("requestColorMode").value==="multi";
   $("requestMulticolorSection").classList.toggle("hidden",!multi);
   $("requestSingleColorField").classList.toggle("hidden",multi);
+
   if(multi)renderRequestColorChoices();
 }
 function requestUnitPrice(){
@@ -882,7 +893,7 @@ async function submitPrintRequest(){
   const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
   const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
   const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim(),estimate=requestUnitPrice()*qty;
-  const wantsMulticolor=$("requestColorMode").value==="multi";
+  const wantsMulticolor=!!item.multicolor_capable && $("requestColorMode").value==="multi";
   const colorIds=wantsMulticolor?selectedRequestColorIds():[];
   if(wantsMulticolor&&colorIds.length<2)return toast("Choose at least 2 colors");
 
@@ -1237,7 +1248,7 @@ function openSettings(){
 }
 function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();settings.customerModePin=normalizeCustomerPin($("customerModePinInput").value);persist();setupSupabase();$("settingsDialog").close();toast("Settings saved")}
 
-function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
+function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",multicolor_capable:!!i.multicolor_capable,photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
 async function syncUpsert(table,row){
   if(!supabaseClient||!currentUser)return; if(!navigator.onLine){setSyncState("offline","Offline — changes saved locally");return}
   setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).upsert(row);if(error){console.error(error);setSyncState("error",`Couldn't sync ${table}`);return false}setSyncState("synced","Synced",nowISO());return true
@@ -1346,14 +1357,14 @@ async function pullCloud(showToast=true){
   const remoteHasData=[pr.data,fi.data,sa.data,or.data,cw.data].some(a=>a&&a.length);
   const localHasData=[items,filaments,sales,orders,colorways].some(a=>a&&a.length);
   if(!remoteHasData&&localHasData){setSyncState("synced","Cloud empty — upload local data",nowISO());if(showToast)toast("Cloud is empty — use Upload local data");return}
-  const remoteItems=(pr.data||[]).map(({user_id,...x})=>({...x,variants:x.variants||[],filament_usage:x.filament_usage||[]}));
+  const remoteItems=(pr.data||[]).map(({user_id,...x})=>({...x,multicolor_capable:!!x.multicolor_capable,variants:x.variants||[],filament_usage:x.filament_usage||[]}));
   const remoteFilaments=(fi.data||[]).map(({user_id,...x})=>x);
   const remoteSales=(sa.data||[]).map(({user_id,...x})=>x);
   const remoteOrders=(or.data||[]).map(({user_id,...x})=>({...x,print_id:x.print_id||""}));
   const remoteColorways=(cw.data||[]).map(({user_id,...x})=>x);
 
   items=mergeCloudCollection(items,remoteItems,{
-    normalize:x=>({...x,variants:x.variants||[],filament_usage:x.filament_usage||[]}),
+    normalize:x=>({...x,multicolor_capable:!!x.multicolor_capable,variants:x.variants||[],filament_usage:x.filament_usage||[]}),
     preferLocalIds:pendingLocalProductIds
   });
   filaments=mergeCloudCollection(filaments,remoteFilaments);
