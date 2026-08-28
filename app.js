@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.6.5";
+window.PRINTBOOK_BUILD="5.6.6";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -729,13 +729,38 @@ function restockSuggestions(){
     return {f,pct,avg,units,low:Number(f.remaining||0)<=100||pct<=Number(settings.lowFilamentPct||15)};
   }).filter(x=>x.low).sort((a,b)=>a.pct-b.pct);
 }
+function orderCollectedAmount(o){
+  const paid=Math.max(0,Number(o?.payment_amount||0));
+  if(paid>0)return paid;
+  if(o?.payment_status==="paid")return Math.max(0,Number(o?.quoted_price||0));
+  if(o?.payment_status==="deposit_paid")return Math.max(0,Number(o?.deposit_amount||0));
+  return 0;
+}
+function orderDashboardProfit(o){
+  const revenue=orderCollectedAmount(o),item=items.find(i=>i.id===o?.print_id),qty=Math.max(1,Number(o?.quantity||1));
+  if(!item)return revenue;
+  return revenue-itemMaterialCost(item,o?.variant_id||"")*qty;
+}
+function dashboardTransactions(){
+  const direct=sales.map(s=>({
+    kind:"sale",id:s.id,date:s.date||s.created_at||"",title:(items.find(i=>i.id===s.print_id)?.name||"Deleted print"),
+    detail:`${Math.max(1,Number(s.quantity||1))} sold${s.channel?` · ${s.channel}`:""}`,
+    amount:Number(s.total ?? Number(s.unit_price||0)*Number(s.quantity||0)),profit:saleProfit(s)
+  }));
+  const paidOrders=orders.filter(o=>o.payment_status==="paid"||o.payment_status==="deposit_paid").map(o=>({
+    kind:"order",id:o.id,date:o.paid_at||o.updated_at||o.created_at||"",title:o.item||"Custom order",
+    detail:`${o.order_number?`${o.order_number} · `:""}${o.customer||"Customer"} · ${o.payment_status==="deposit_paid"?"deposit paid":"paid"}`,
+    amount:orderCollectedAmount(o),profit:orderDashboardProfit(o)
+  }));
+  return [...direct,...paidOrders].sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0));
+}
 function renderDashboard(){
-  const revenue=sales.reduce((a,s)=>a+Number(s.total ?? Number(s.unit_price||0)*Number(s.quantity||0)),0),profit=sales.reduce((a,s)=>a+saleProfit(s),0),stock=items.reduce((a,i)=>a+itemStock(i),0),open=orders.filter(o=>!["Completed","Cancelled","Paid"].includes(o.status));
-  $("dashRevenue").textContent=money(revenue);$("dashSalesCount").textContent=`${sales.length} sale${sales.length===1?"":"s"}`;$("dashProfit").textContent=money(profit);$("dashStock").textContent=stock;$("dashPrintTypes").textContent=`${items.length} print types`;$("dashOrders").textContent=open.length;$("dashOrderValue").textContent=`${money(open.reduce((a,o)=>a+Number(o.quoted_price||0),0))} quoted`;
+  const tx=dashboardTransactions(),revenue=tx.reduce((a,t)=>a+Number(t.amount||0),0),profit=tx.reduce((a,t)=>a+Number(t.profit||0),0),stock=items.reduce((a,i)=>a+itemStock(i),0),open=orders.filter(o=>!["Completed","Cancelled"].includes(o.status));
+  $("dashRevenue").textContent=money(revenue);$("dashSalesCount").textContent=`${tx.length} paid sale${tx.length===1?"":"s"}`;$("dashProfit").textContent=money(profit);$("dashStock").textContent=stock;$("dashPrintTypes").textContent=`${items.length} print types`;$("dashOrders").textContent=open.length;$("dashOrderValue").textContent=`${money(open.reduce((a,o)=>a+Number(o.quoted_price||0),0))} quoted`;
   const fav=items.filter(i=>i.favorite).slice(0,5);$("favoriteList").innerHTML=fav.length?fav.map(i=>miniRow(i.name,`${itemStock(i)} in stock`,money(i.price))).join(""):emptyMini("No favorites yet");
-  const rs=[...sales].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5);$("recentSales").innerHTML=rs.length?rs.map(s=>{const i=items.find(x=>x.id===s.print_id);return miniRow(i?.name||"Deleted print",`${s.quantity} sold · ${s.date}`,money(s.total ?? Number(s.unit_price)*Number(s.quantity)))}).join(""):emptyMini("No sales recorded");
+  const rs=tx.slice(0,5);$("recentSales").innerHTML=rs.length?rs.map(t=>miniRow(t.title,`${t.detail}${t.date?` · ${String(t.date).slice(0,10)}`:""}`,money(t.amount))).join(""):emptyMini("No paid sales recorded");
   const restock=restockSuggestions().slice(0,5);$("lowFilamentList").innerHTML=restock.length?restock.map(x=>miniRow(`${x.f.brand||""} ${x.f.color||x.f.material}`.trim(),`${Math.round(x.f.remaining||0)}g left${x.units!=null?` · ~${x.units} prints`:""}`,"BUY SOON")).join(""):emptyMini("No restocks suggested");
-  $("activeOrderList").innerHTML=open.slice(0,5).map(o=>miniRow(o.item||"Custom order",`${o.customer||"Customer"} · ${o.status}`,money(o.quoted_price))).join("")||emptyMini("No active orders");
+  $("activeOrderList").innerHTML=open.slice(0,5).map(o=>miniRow(o.item||"Custom order",`${o.customer||"Customer"} · ${o.status}${o.payment_status==="paid"?" · paid":""}`,money(o.quoted_price))).join("")||emptyMini("No active orders");
 }
 function renderPrints(){
   const q=$("search").value.trim().toLowerCase(),cat=$("categoryFilter").value,sf=$("stockFilter").value;
@@ -2195,7 +2220,26 @@ async function syncUpsert(table,row){
   // central place so every save path (payments, status changes, bulk sync, etc.)
   // is safe instead of relying on each caller to remember this conversion.
   if(table==="orders")row={...row,due_date:row?.due_date||null,print_id:row?.print_id||null};
-  setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).upsert(row);if(error){console.error(error);setSyncState("error",`Couldn't sync ${table}`);return false}setSyncState("syncing","Cloud write complete — refreshing…");return true
+  setSyncState("syncing","Syncing…");
+  let error=null;
+  if(table==="orders"&&row?.id){
+    // Existing orders are deliberately UPDATEd instead of UPSERTed. PostgreSQL
+    // runs BEFORE INSERT triggers during the insert half of an upsert, which can
+    // make a payment-only edit look like a brand-new stock reservation. A quick
+    // existence check keeps payment/status metadata independent from inventory.
+    const found=await supabaseClient.from("orders").select("id").eq("id",row.id).eq("user_id",currentUser.id).maybeSingle();
+    if(found.error){error=found.error}
+    else if(found.data){
+      const result=await supabaseClient.from("orders").update(row).eq("id",row.id).eq("user_id",currentUser.id);
+      error=result.error;
+    }else{
+      const result=await supabaseClient.from("orders").insert(row);
+      error=result.error;
+    }
+  }else{
+    const result=await supabaseClient.from(table).upsert(row);error=result.error;
+  }
+  if(error){console.error(error);setSyncState("error",`Couldn't sync ${table}`);return false}setSyncState("syncing","Cloud write complete — refreshing…");return true
 }
 async function syncDelete(table,id){
   if(!supabaseClient||!currentUser)return;if(!navigator.onLine){setSyncState("offline","Offline — deletion not uploaded");return false}
