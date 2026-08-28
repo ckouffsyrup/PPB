@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.6.6" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.7.0" />
 </head>
 <body>
 <div class="app-shell">
@@ -84,6 +84,7 @@
         </div>
         <div class="customer-order-bar-actions">
           <button class="secondary customer-order-find-btn" id="findMyOrderBtn" type="button">Find my order</button>
+          <button class="secondary customer-order-find-btn" id="customerShareStoreBtn" type="button">Share store QR</button>
           <span class="customer-lock-badge" id="customerModeBadge">LOCKED</span>
         </div>
       </div>
@@ -119,6 +120,7 @@
             <div class="storefront-status-row">
               <span class="storefront-status-pill" id="storefrontStatusPill"><i></i><span id="storefrontStatusText">Accepting orders</span></span>
               <span class="storefront-turnaround" id="storefrontTurnaround">Typical turnaround: 3–5 days</span>
+              <button class="secondary customer-share-inline" id="customerShareStoreHeroBtn" type="button">▦ Share store QR</button>
             </div>
           </div>
         </div>
@@ -269,7 +271,8 @@
 
       <div class="order-pipeline-summary">
         <div class="stat-card"><span>New requests</span><strong id="orderRequestedCount">0</strong><small>need review</small></div>
-        <div class="stat-card"><span>Waiting approval</span><strong id="orderQuotedCount">0</strong><small>quoted to customer</small></div>
+        <div class="stat-card"><span>Waiting on customer</span><strong id="orderQuotedCount">0</strong><small>quote sent</small></div>
+        <div class="stat-card"><span>Accepted</span><strong id="orderAcceptedCount">0</strong><small>ready for your approval</small></div>
         <div class="stat-card"><span>In production</span><strong id="orderProductionCount">0</strong><small>approved + printing</small></div>
         <div class="stat-card"><span>Ready</span><strong id="orderReadyCount">0</strong><small>waiting pickup/delivery</small></div>
       </div>
@@ -278,6 +281,7 @@
         <button class="active" data-status="">All</button>
         <button data-status="Requested">Requested</button>
         <button data-status="Quoted">Quoted</button>
+        <button data-status="Accepted">Accepted</button>
         <button data-status="Approved">Approved</button>
         <button data-status="Printing">Printing</button>
         <button data-status="Ready">Ready</button>
@@ -496,7 +500,7 @@
     <div class="form-grid">
       <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
       <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label>
-      <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
+      <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Accepted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
       <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
       <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
       <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
@@ -727,6 +731,10 @@
         <div><small id="customerPortalPaymentHint">PAYMENT</small><strong id="customerPortalPaymentMessage">Waiting for your final quote.</strong></div>
         <button class="primary hidden" id="customerPortalPayBtn" type="button">Open payment link</button>
       </div>
+      <div class="customer-order-payment-box customer-quote-accept hidden" id="customerQuoteAcceptWrap">
+        <div><small>QUOTE APPROVAL</small><strong>If everything looks right, accept this quote and Karcen will be notified.</strong></div>
+        <button class="primary" id="acceptCustomerQuoteBtn" type="button">Accept quote</button>
+      </div>
       <div class="customer-order-portal-actions">
         <button class="secondary" id="refreshCustomerOrderBtn" type="button">Refresh status</button>
         <button class="secondary" id="copyCustomerOrderLinkBtn" type="button">Copy private link</button>
@@ -761,6 +769,18 @@
   </div>
 </dialog>
 
+
+<!-- CUSTOMER STORE SHARE -->
+<dialog id="customerStoreShareDialog">
+  <div class="sheet narrow customer-store-share-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header"><div><p class="eyebrow">SHARE THE STORE</p><h2>Karcen's Prints</h2></div><button class="icon-btn" id="closeCustomerStoreShare" type="button">✕</button></div>
+    <p class="muted">Have someone scan this QR code to open the storefront.</p>
+    <div class="customer-share-qr"><img src="store-qr.png" alt="QR code for Karcen's Prints storefront" /></div>
+    <p class="customer-share-url">https://ckouffsyrup.github.io/PPB/</p>
+    <div class="sheet-actions customer-share-actions"><button class="secondary" id="copyCustomerStoreLinkBtn" type="button">Copy link</button><button class="primary" id="shareCustomerStoreBtn" type="button">Share store</button></div>
+  </div>
+</dialog>
 
 <!-- OWNER LOGIN FOR NEW DEVICES -->
 <dialog id="ownerLoginDialog">
@@ -977,6 +997,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.6.6"></script>
+<script src="app.js?v=5.7.0"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.6.6";
+window.PRINTBOOK_BUILD="5.7.0";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -801,29 +801,47 @@ function approvalStockCheck(o){
   return available>=qty?{ok:true}:{ok:false,message:`Only ${available} finished ${variant?variant.name:item.name} in stock, but this order needs ${qty}. Make more first or set the print to Made to order.`};
 }
 function orderNextStep(status){
-  return ({Requested:["Quoted","Mark quoted"],Quoted:["Approved","Approve"],Approved:["Printing","Start printing"],Printing:["Ready","Mark ready"],Ready:["Completed","Complete"]})[status]||null;
+  return ({Requested:["Quoted","Send quote"],Accepted:["Approved","Approve"],Approved:["Printing","Start printing"],Printing:["Ready","Mark ready"],Ready:["Completed","Complete"]})[status]||null;
+}
+async function adminCustomerOrderAction(action,orderId,{force=false}={}){
+  if(!currentUser||!supabaseClient)throw new Error("Sign in to PrintBook first.");
+  const session=(await supabaseClient.auth.getSession()).data.session;if(!session?.access_token)throw new Error("Your session expired — sign in again.");
+  const r=await fetch(CUSTOMER_ORDERS_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`,...(settings.supabaseKey?{apikey:settings.supabaseKey}:{})},body:JSON.stringify({action,order_id:orderId,force})});
+  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Customer email action failed.");return d;
+}
+async function sendQuoteEmailForOrder(orderId,{force=false,quiet=false}={}){
+  try{const d=await adminCustomerOrderAction("send_quote",orderId,{force});if(!quiet)toast(d.already_sent?"Quote email was already sent":"Quote emailed to customer");return true}catch(e){toast(e?.message||"Couldn't send quote email");return false}
+}
+async function sendReadyEmailForOrder(orderId,{force=false,quiet=false}={}){
+  try{const d=await adminCustomerOrderAction("send_ready",orderId,{force});if(!quiet)toast(d.already_sent?"Ready email was already sent":"Ready email sent");return true}catch(e){toast(e?.message||"Order is Ready, but the email couldn't be sent");return false}
 }
 async function advanceOrderStatus(id,event){
   event?.stopPropagation();
   const o=orders.find(x=>x.id===id);if(!o||!currentUser)return;
   const next=orderNextStep(o.status);if(!next)return;
-  const updated={...o,status:next[0],updated_at:nowISO()};
+  const previousStatus=o.status,updated={...o,status:next[0],updated_at:nowISO()};
   if(next[0]==="Approved"){const check=approvalStockCheck(updated);if(!check.ok)return toast(check.message)}
   const ok=await syncUpsert("orders",{...updated,user_id:currentUser.id,print_id:updated.print_id||null,due_date:updated.due_date||null});
   if(ok===false)return toast("Couldn't update order");
-  Object.assign(o,updated);persist();toast(`Order moved to ${next[0]}`);if(next[0]==="Approved")setTimeout(()=>pullCloud(false),150);
+  Object.assign(o,updated);persist();
+  if(previousStatus==="Requested"&&next[0]==="Quoted"){toast("Order quoted — sending customer email…");await sendQuoteEmailForOrder(id,{quiet:true});await pullOrdersCloud()}
+  else if(next[0]==="Ready"){toast("Order marked Ready — sending customer email…");await sendReadyEmailForOrder(id,{quiet:true});await pullOrdersCloud()}
+  else toast(`Order moved to ${next[0]}`);
+  if(next[0]==="Approved")setTimeout(()=>pullCloud(false),150);
 }
-window.advanceOrderStatus=advanceOrderStatus;
+window.advanceOrderStatus=advanceOrderStatus;window.sendQuoteEmailForOrder=sendQuoteEmailForOrder;
 function renderOrders(){
   const count=s=>orders.filter(o=>o.status===s).length;
   if($("orderRequestedCount"))$("orderRequestedCount").textContent=count("Requested");
   if($("orderQuotedCount"))$("orderQuotedCount").textContent=count("Quoted");
+  if($("orderAcceptedCount"))$("orderAcceptedCount").textContent=count("Accepted");
   if($("orderProductionCount"))$("orderProductionCount").textContent=count("Approved")+count("Printing");
   if($("orderReadyCount"))$("orderReadyCount").textContent=count("Ready");
   const list=orders.filter(o=>!orderStatusFilter||o.status===orderStatusFilter).sort((a,b)=>String(a.due_date||"9999").localeCompare(String(b.due_date||"9999"))||String(b.created_at||"").localeCompare(String(a.created_at||"")));
   $("orderList").innerHTML=list.map(o=>{
     const next=orderNextStep(o.status),notes=splitOrderPaymentInstructions(o.notes).cleanNotes.split("\n").filter(Boolean).slice(0,3).join(" · ");
-    return `<article class="order-card order-card-v2" onclick="openOrder('${o.id}')"><div class="order-main"><h4>${o.order_number?`<span class="muted">${safe(o.order_number)} · </span>`:""}${safe(o.item||"Custom order")}</h4><p>${safe(o.customer||"Customer")} · Qty ${o.quantity||1}${o.due_date?` · Due ${safe(o.due_date)}`:""}</p>${notes?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span><span class="status">${safe(orderPaymentLabel(o))}</span><strong>${money(o.quoted_price)}</strong>${Number(o.payment_amount||0)>0?`<p class="muted">Paid ${money(o.payment_amount)}</p>`:""}${next?`<div class="order-card-actions"><button class="primary order-advance-btn" type="button" onclick="advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button></div>`:""}</div></article>`;
+    const quoteState=o.status==="Quoted"?`<p class="muted">Waiting for customer acceptance${o.quote_email_sent_at?" · quote emailed":""}</p>`:o.status==="Accepted"?`<p class="muted">Customer accepted ${o.customer_accepted_price!=null?money(o.customer_accepted_price):"the quote"}</p>`:"";
+    return `<article class="order-card order-card-v2" onclick="openOrder('${o.id}')"><div class="order-main"><h4>${o.order_number?`<span class="muted">${safe(o.order_number)} · </span>`:""}${safe(o.item||"Custom order")}</h4><p>${safe(o.customer||"Customer")} · Qty ${o.quantity||1}${o.due_date?` · Due ${safe(o.due_date)}`:""}</p>${quoteState}${notes?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span><span class="status">${safe(orderPaymentLabel(o))}</span><strong>${money(o.quoted_price)}</strong>${Number(o.payment_amount||0)>0?`<p class="muted">Paid ${money(o.payment_amount)}</p>`:""}${o.status==="Quoted"?`<div class="order-card-actions"><button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendQuoteEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend quote</button></div>`:""}${next?`<div class="order-card-actions"><button class="primary order-advance-btn" type="button" onclick="advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button></div>`:""}</div></article>`;
   }).join("");
   $("orderEmpty").classList.toggle("hidden",!!list.length)
 }
@@ -1155,7 +1173,7 @@ function updateOrderPaymentButtons(){const quote=Math.max(0,Number($("orderPrice
 window.openOrder=id=>{resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;const paymentParts=splitOrderPaymentInstructions(o.notes);editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderCustomerEmail").value=o.customer_email||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";{const linked=items.find(i=>i.id===o.print_id),inferred=orderVariantForReservation(o,linked);populateOrderVariants(o.variant_id||inferred?.id||"")}$("orderNotes").value=paymentParts.cleanNotes;$("orderPaymentInstructions").value=o.payment_instructions||paymentParts.instructions||"";$("orderPaymentStatus").value=o.payment_status||"unpaid";$("orderPaymentAmount").value=Number(o.payment_amount||0);$("orderDepositAmount").value=Number(o.deposit_amount||0);$("orderPaymentMethod").value=o.payment_method==="Stripe"?"":(o.payment_method||"");$("orderPaymentLink").value=o.payment_link||"";$("deleteOrderBtn").style.visibility="visible";updateOrderPaymentButtons()}else $("orderTitle").textContent="New order";$("orderDialog").showModal()}
 async function saveOrder(){if(!requireOnlineAdminSave())return;
   const item=$("orderItem").value.trim();if(!item)return toast("Describe the order");
-  const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount").value||0)),o={id,...(prev.order_number?{order_number:prev.order_number}:{}),customer:$("orderCustomer").value.trim(),customer_email:$("orderCustomerEmail").value.trim().toLowerCase()||null,status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",variant_id:$("orderVariant")?.value||null,notes:joinOrderPaymentInstructions($("orderNotes").value,$("orderPaymentInstructions").value),payment_status:paymentStatus,payment_amount:paymentAmount,deposit_amount:Math.max(0,Number($("orderDepositAmount").value||0)),payment_method:$("orderPaymentMethod").value||null,payment_instructions:$("orderPaymentInstructions").value.trim()||null,payment_provider:prev.payment_provider||null,payment_reference:prev.payment_reference||null,paid_at:paymentStatus==="paid"?(prev.paid_at||nowISO()):null,payment_link:prev.payment_link||null,stripe_checkout_session_id:prev.stripe_checkout_session_id||null,stripe_payment_intent_id:prev.stripe_payment_intent_id||null,created_at:prev.created_at||nowISO(),updated_at:nowISO()};
+  const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount").value||0)),o={id,...(prev.order_number?{order_number:prev.order_number}:{}),customer:$("orderCustomer").value.trim(),customer_email:$("orderCustomerEmail").value.trim().toLowerCase()||null,status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",variant_id:$("orderVariant")?.value||null,notes:joinOrderPaymentInstructions($("orderNotes").value,$("orderPaymentInstructions").value),payment_status:paymentStatus,payment_amount:paymentAmount,deposit_amount:Math.max(0,Number($("orderDepositAmount").value||0)),payment_method:$("orderPaymentMethod").value||null,payment_instructions:$("orderPaymentInstructions").value.trim()||null,payment_provider:prev.payment_provider||null,payment_reference:prev.payment_reference||null,paid_at:paymentStatus==="paid"?(prev.paid_at||nowISO()):null,payment_link:prev.payment_link||null,stripe_checkout_session_id:prev.stripe_checkout_session_id||null,stripe_payment_intent_id:prev.stripe_payment_intent_id||null,quote_email_sent_at:prev.quote_email_sent_at||null,customer_accepted_at:prev.customer_accepted_at||null,customer_accepted_price:prev.customer_accepted_price??null,ready_email_sent_at:prev.ready_email_sent_at||null,created_at:prev.created_at||nowISO(),updated_at:nowISO()};
 
   if(o.status==="Approved"&&prev.status!=="Approved"&&!prev.inventory_reserved_at){const check=approvalStockCheck(o);if(!check.ok)return toast(check.message)}
 
@@ -1168,7 +1186,9 @@ async function saveOrder(){if(!requireOnlineAdminSave())return;
 
   const idx=orders.findIndex(x=>x.id===id);if(idx>=0)orders[idx]=o;else orders.unshift(o);
   persist();$("orderDialog").close();
-  toast(synced||!currentUser?"Order saved":"Order saved locally — waiting for cloud");
+  if(synced&&prev.status!==o.status&&o.status==="Quoted"){toast("Order quoted — sending customer email…");await sendQuoteEmailForOrder(id,{quiet:true});await pullOrdersCloud()}
+  else if(synced&&prev.status!==o.status&&o.status==="Ready"){toast("Order marked Ready — sending customer email…");await sendReadyEmailForOrder(id,{quiet:true});await pullOrdersCloud()}
+  else toast(synced||!currentUser?"Order saved":"Order saved locally — waiting for cloud");
 }
 async function createOrderPaymentLink(){
   if(!editingOrderId||!currentUser)return toast("Save the order and sign in first");
@@ -1392,7 +1412,7 @@ function showCustomerOrderConfirmation(result,itemName){
 }
 function customerPaymentLabel(status){return ({unpaid:"Unpaid",deposit_paid:"Deposit paid",paid:"Paid",refunded:"Refunded"})[status]||"Unpaid"}
 function customerOrderProgress(status){
-  const steps=["Requested","Quoted","Approved","Printing","Ready","Completed"];
+  const steps=["Requested","Quoted","Accepted","Approved","Printing","Ready","Completed"];
   const current=Math.max(0,steps.indexOf(status));
   if(status==="Cancelled")return `<div class="customer-order-cancelled">Order cancelled</div>`;
   return steps.map((step,i)=>`<div class="customer-order-progress-step ${i<=current?"done":""} ${i===current?"current":""}"><i></i><span>${safe(step)}</span></div>`).join("")
@@ -1417,10 +1437,18 @@ function renderCustomerPortalOrder(o){
   const amountPaid=Math.max(0,Number(o.payment_amount||0)),quote=Math.max(0,Number(o.quoted_price||0));
   const remaining=Math.max(0,quote-amountPaid);
   $("customerPortalPayBtn").classList.add("hidden");
+  const acceptWrap=$("customerQuoteAcceptWrap"),acceptBtn=$("acceptCustomerQuoteBtn");
+  if(acceptWrap)acceptWrap.classList.toggle("hidden",!o.can_accept_quote);
+  if(acceptBtn){acceptBtn.disabled=false;acceptBtn.textContent="Accept quote"}
   if(fullyPaid){$("customerPortalPaymentHint").textContent="PAYMENT RECEIVED";$("customerPortalPaymentMessage").textContent=`Paid ${money(amountPaid||quote)} — you're all set.`}
   else if(paymentInstructions&&quote>0){$("customerPortalPaymentHint").textContent="HOW TO PAY";$("customerPortalPaymentMessage").innerHTML=`<strong>Total to send: ${safe(money(remaining>0?remaining:quote))}</strong><br>${safe(paymentInstructions)}<br><br><strong>Important:</strong> Include <strong>${safe(o.order_number||"")}</strong> in the payment note so your payment can be matched to this order.`}
   else if(o.status==="Requested"){$("customerPortalPaymentHint").textContent="QUOTE PENDING";$("customerPortalPaymentMessage").textContent="Your request is in. Final pricing/payment instructions will appear here after review."}
   else{$("customerPortalPaymentHint").textContent="PAYMENT";$("customerPortalPaymentMessage").textContent="Payment instructions aren't ready yet. Check back shortly."}
+}
+async function acceptCustomerQuote(){
+  if(!activeCustomerPortalAccess)return;const btn=$("acceptCustomerQuoteBtn");if(btn){btn.disabled=true;btn.textContent="Accepting…"}
+  try{const r=await fetch(CUSTOMER_ORDERS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"accept_quote",order_number:activeCustomerPortalAccess.order_number,token:activeCustomerPortalAccess.token})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Couldn't accept the quote");toast("Quote accepted — Karcen has been notified");renderCustomerPortalOrder(d.order);}
+  catch(e){toast(e?.message||"Couldn't accept the quote");if(btn){btn.disabled=false;btn.textContent="Accept quote"}}
 }
 async function openCustomerOrderPortal(orderNumber,token,{updateUrl=true}={}){
   if(!orderNumber||!token)return;
@@ -1440,6 +1468,8 @@ async function openCustomerOrderPortal(orderNumber,token,{updateUrl=true}={}){
   }
 }
 function clearCustomerPortalUrl(){const u=new URL(location.href);u.searchParams.delete("order");u.searchParams.delete("token");history.replaceState({},"",u)}
+function openCustomerStoreShare(){if($("customerStoreShareDialog"))$("customerStoreShareDialog").showModal()}
+async function shareCustomerStore(){const url="https://ckouffsyrup.github.io/PPB/";try{if(navigator.share)await navigator.share({title:"Karcen's Prints",text:"Check out Karcen's Prints",url});else{await navigator.clipboard.writeText(url);toast("Store link copied")}}catch(e){if(e?.name!=="AbortError")toast("Couldn't open sharing")}}
 function openFindCustomerOrder(){
   const list=customerSavedOrders(),wrap=$("recentCustomerOrdersWrap");wrap.classList.toggle("hidden",!list.length);
   $("recentCustomerOrders").innerHTML=list.map(x=>`<button class="recent-order-row" type="button" data-order="${safe(x.order_number)}"><div><strong>${safe(x.order_number)}</strong><small>${safe(x.item||"Print order")}</small></div><span>View →</span></button>`).join("");
@@ -2603,7 +2633,8 @@ safeUiInit("startup-24",()=>{$("requestQty").oninput=updateRequestEstimate;});
 safeUiInit("startup-25",()=>{$("submitPrintRequestBtn").onclick=submitPrintRequest;});
 safeUiInit("startup-25a",()=>{$("findMyOrderBtn").onclick=openFindCustomerOrder;$('closeFindCustomerOrder').onclick=()=>$("findCustomerOrderDialog").close();$("sendCustomerOrderRecoveryBtn").onclick=recoverCustomerOrders;});
 safeUiInit("startup-25b",()=>{$("closeCustomerOrderConfirmation").onclick=()=>$("customerOrderConfirmationDialog").close();$("copyCustomerOrderNumberBtn").onclick=async()=>{const n=$("customerOrderConfirmationDialog").dataset.orderNumber||"";try{await navigator.clipboard.writeText(n);toast("Order number copied")}catch{toast(n)}};$("viewCustomerOrderBtn").onclick=()=>{const d=$("customerOrderConfirmationDialog");const n=d.dataset.orderNumber,t=d.dataset.token;d.close();openCustomerOrderPortal(n,t)};});
-safeUiInit("startup-25c",()=>{$("closeCustomerOrderPortal").onclick=()=>{$("customerOrderPortalDialog").close();clearCustomerPortalUrl()};$("refreshCustomerOrderBtn").onclick=()=>activeCustomerPortalAccess&&openCustomerOrderPortal(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);$("copyCustomerOrderLinkBtn").onclick=async()=>{if(!activeCustomerPortalAccess)return;const link=customerOrderPrivateUrl(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);try{await navigator.clipboard.writeText(link);toast("Private order link copied")}catch{toast("Couldn't copy the link")}};$("customerPortalPayBtn").onclick=()=>{if(activeCustomerPortalPaymentLink)location.href=activeCustomerPortalPaymentLink};});
+safeUiInit("startup-25c",()=>{$("closeCustomerOrderPortal").onclick=()=>{$("customerOrderPortalDialog").close();clearCustomerPortalUrl()};$("refreshCustomerOrderBtn").onclick=()=>activeCustomerPortalAccess&&openCustomerOrderPortal(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);$("copyCustomerOrderLinkBtn").onclick=async()=>{if(!activeCustomerPortalAccess)return;const link=customerOrderPrivateUrl(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);try{await navigator.clipboard.writeText(link);toast("Private order link copied")}catch{toast("Couldn't copy the link")}};$("customerPortalPayBtn").onclick=()=>{if(activeCustomerPortalPaymentLink)location.href=activeCustomerPortalPaymentLink};if($("acceptCustomerQuoteBtn"))$("acceptCustomerQuoteBtn").onclick=acceptCustomerQuote;});
+safeUiInit("startup-25d",()=>{if($("customerShareStoreBtn"))$("customerShareStoreBtn").onclick=openCustomerStoreShare;if($("customerShareStoreHeroBtn"))$("customerShareStoreHeroBtn").onclick=openCustomerStoreShare;if($("closeCustomerStoreShare"))$("closeCustomerStoreShare").onclick=()=>$("customerStoreShareDialog").close();if($("shareCustomerStoreBtn"))$("shareCustomerStoreBtn").onclick=shareCustomerStore;if($("copyCustomerStoreLinkBtn"))$("copyCustomerStoreLinkBtn").onclick=async()=>{try{await navigator.clipboard.writeText("https://ckouffsyrup.github.io/PPB/");toast("Store link copied")}catch{toast("Couldn't copy store link")}};});
 safeUiInit("startup-26",()=>{if($("refreshRequestsBtn"))$("refreshRequestsBtn").onclick=()=>refreshOrdersFromCloud({showToast:true});});
 safeUiInit("startup-27",()=>{document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));});
 safeUiInit("startup-28",()=>{$("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();});
