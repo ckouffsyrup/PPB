@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.4.0";
+window.PRINTBOOK_BUILD="5.5.0";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -108,10 +108,11 @@ let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=fals
 let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=null;
 let currentRequestPrintId=null;
 const PUBLIC_STOREFRONT_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-storefront";
+const PUBLIC_BRANDING_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/store-branding";
 let publicVisitorMode=false;
 let publicStoreLoaded=false;
 let publicStoreLoading=false;
-let storeAvailability={status:"open",turnaround:"3–5 days",notice:"",reopen_date:null,capacity_limit:null,auto_pause_at_capacity:false,active_orders:0,at_capacity:false,accepting_requests:true};
+let storeAvailability={status:"open",turnaround:"3–5 days",notice:"",reopen_date:null,capacity_limit:null,auto_pause_at_capacity:false,active_orders:0,at_capacity:false,accepting_requests:true,store_name:"Karcen\'s Prints",tagline:"Made layer by layer.",about:"Custom prints, useful parts, desk stuff, gifts, and whatever else looks fun to make.",accent_color:"#8b5cf6",logo_url:"",hero_url:""};
 let publicStoreLastDiagnostic="";
 let photoRepairInFlight=null;
 const photoRepairAttempts=new Set();
@@ -408,6 +409,7 @@ async function loadPublicStorefront(showError=true){
     items=(data.products||[]).map(normalizePublicPrint);
     filaments=(data.filaments||[]).map(normalizePublicFilament);
     if(data.store)storeAvailability={...storeAvailability,...data.store};
+    await loadPublicStoreBranding();
     publicStoreLoaded=true;
     setPublicStoreState("",false,false);
     renderAll();
@@ -448,7 +450,12 @@ function deactivatePublicVisitorMode(){
   publicVisitorMode=false;document.body.classList.remove("public-visitor");
   $("customerModeBarTitle").textContent="Customer Store Mode";
   $("customerModeBarText").textContent="Browse products and available filament colors.";
-  $("customerModeBadge").textContent="LOCKED"
+  $("customerModeBadge").textContent="LOCKED";
+  const headerTitle=document.querySelector("#brandOwnerTrigger h1");
+  const headerEyebrow=document.querySelector("#brandOwnerTrigger .eyebrow");
+  if(headerTitle)headerTitle.textContent="PrintBook";
+  if(headerEyebrow)headerEyebrow.textContent="3D PRINT SHOP";
+  document.title="PrintBook";
 }
 async function submitPublicPrintRequest(payload){
   const res=await fetch(PUBLIC_STOREFRONT_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"request_print",...payload})});
@@ -567,6 +574,70 @@ function wireProductImageFallbacks(root=document){
   });
 }
 
+function storeMonogram(name="Karcen's Prints"){
+  const parts=String(name||"").trim().split(/\s+/).filter(Boolean);
+  return (parts.slice(0,2).map(x=>x[0]).join("")||"KP").toUpperCase();
+}
+function normalizeStoreAccent(value){
+  const v=String(value||"").trim();
+  return /^#[0-9a-f]{6}$/i.test(v)?v:"#8b5cf6";
+}
+function renderStoreBranding(){
+  const a=storeAvailability||{};
+  const name=String(a.store_name||"Karcen's Prints").trim()||"Karcen's Prints";
+  const tagline=String(a.tagline||"Made layer by layer.").trim()||"Made layer by layer.";
+  const about=String(a.about||"").trim()||"Custom prints, useful parts, desk stuff, gifts, and whatever else looks fun to make.";
+  const accent=normalizeStoreAccent(a.accent_color);
+  document.documentElement.style.setProperty("--store-accent",accent);
+  document.documentElement.style.setProperty("--store-accent-soft",`${accent}26`);
+  if($("storefrontName"))$("storefrontName").textContent=name;
+  if($("storefrontTagline"))$("storefrontTagline").textContent=tagline;
+  const headerTitle=document.querySelector("#brandOwnerTrigger h1");
+  const headerEyebrow=document.querySelector("#brandOwnerTrigger .eyebrow");
+  if(customerMode&&headerTitle)headerTitle.textContent=name;
+  if(customerMode&&headerEyebrow)headerEyebrow.textContent="3D PRINT SHOP";
+  if(customerMode&&$("customerModeBarTitle"))$("customerModeBarTitle").textContent=name;
+  if($("storefrontAbout"))$("storefrontAbout").textContent=about;
+  if($("storefrontMonogram"))$("storefrontMonogram").textContent=storeMonogram(name);
+  if($("storefrontLogo")){
+    const logo=String(a.logo_url||"").trim();
+    $("storefrontLogo").classList.toggle("hidden",!logo);
+    if(logo)$("storefrontLogo").src=logo; else $("storefrontLogo").removeAttribute("src");
+    if($("storefrontMonogram"))$("storefrontMonogram").classList.toggle("hidden",!!logo);
+  }
+  if($("storefrontHero")){
+    const hero=String(a.hero_url||"").trim();
+    $("storefrontHero").style.setProperty("--store-hero-image",hero?`url("${hero.replace(/["\\]/g,"")}")`:"none");
+    $("storefrontHero").classList.toggle("has-store-hero",!!hero);
+  }
+  const accepting=a.accepting_requests!==false&&!a.at_capacity&&a.status!=="paused";
+  const busy=a.status==="busy";
+  const statusText=a.at_capacity?"Order capacity reached":a.status==="paused"?"Requests paused":busy?"Accepting orders · busy":"Accepting orders";
+  if($("storefrontStatusText"))$("storefrontStatusText").textContent=statusText;
+  if($("storefrontStatusPill"))$("storefrontStatusPill").classList.toggle("closed",!accepting);
+  if($("storefrontTurnaround"))$("storefrontTurnaround").textContent=`Typical turnaround: ${a.turnaround||"3–5 days"}`;
+  document.title=customerMode?name:"PrintBook";
+}
+function updateStoreBrandPreview(){
+  const name=$("storeNameInput")?.value.trim()||"Karcen's Prints";
+  const tagline=$("storeTaglineInput")?.value.trim()||"Made layer by layer.";
+  const accent=normalizeStoreAccent($("storeAccentInput")?.value);
+  if($("storeBrandPreviewName"))$("storeBrandPreviewName").textContent=name;
+  if($("storeBrandPreviewTagline"))$("storeBrandPreviewTagline").textContent=tagline;
+  const dot=$("storeBrandPreview")?.querySelector(".preview-dot");
+  if(dot)dot.style.background=accent;
+}
+async function loadPublicStoreBranding(){
+  try{
+    const res=await fetch(`${PUBLIC_BRANDING_URL}?t=${Date.now()}`,{headers:{Accept:"application/json"},cache:"no-store"});
+    if(!res.ok)return false;
+    const data=await res.json();
+    if(data?.branding)storeAvailability={...storeAvailability,...data.branding};
+    renderStoreBranding();
+    return true;
+  }catch(err){console.warn("Store branding load failed",err);return false}
+}
+
 function renderStoreAvailability(){
   if(!customerMode)return;
   const a=storeAvailability||{};
@@ -579,6 +650,7 @@ function renderStoreAvailability(){
   if(!accepting&&a.reopen_date)parts.push(`Expected reopening: ${a.reopen_date}`);
   $("customerModeBadge").textContent=label;
   $("customerModeBarText").textContent=parts.join(" · ")||(accepting?"New print requests are open.":"New print requests are temporarily paused.");
+  renderStoreBranding();
 }
 
 function renderShop(){
@@ -1878,7 +1950,7 @@ async function sendTestPush(){
 
 async function loadStoreAvailabilitySettings(){
   if(!supabaseClient||!currentUser)return;
-  const {data,error}=await supabaseClient.from("store_settings").select("availability_status,turnaround_text,storefront_notice,reopen_date,capacity_limit,auto_pause_at_capacity").eq("user_id",currentUser.id).maybeSingle();
+  const {data,error}=await supabaseClient.from("store_settings").select("availability_status,turnaround_text,storefront_notice,reopen_date,capacity_limit,auto_pause_at_capacity,store_name,storefront_tagline,storefront_about,storefront_accent,storefront_logo_url,storefront_hero_url").eq("user_id",currentUser.id).maybeSingle();
   if(error){console.error(error);return}
   const d=data||{};
   $("storeAvailabilityStatus").value=d.availability_status||"open";
@@ -1888,7 +1960,45 @@ async function loadStoreAvailabilitySettings(){
   $("storeCapacityInput").value=d.capacity_limit||"";
   $("storeAutoPauseInput").checked=!!d.auto_pause_at_capacity;
   $("storeAvailabilityBadge").textContent=(d.availability_status||"open").toUpperCase();
+  storeAvailability={...storeAvailability,status:d.availability_status||"open",turnaround:d.turnaround_text||"3–5 days",notice:d.storefront_notice||"",reopen_date:d.reopen_date||null,capacity_limit:d.capacity_limit||null,auto_pause_at_capacity:!!d.auto_pause_at_capacity,store_name:d.store_name||"Karcen's Prints",tagline:d.storefront_tagline||"Made layer by layer.",about:d.storefront_about||"",accent_color:normalizeStoreAccent(d.storefront_accent),logo_url:d.storefront_logo_url||"",hero_url:d.storefront_hero_url||""};
+  if($("storeNameInput"))$("storeNameInput").value=storeAvailability.store_name;
+  if($("storeTaglineInput"))$("storeTaglineInput").value=storeAvailability.tagline;
+  if($("storeAboutInput"))$("storeAboutInput").value=storeAvailability.about;
+  if($("storeAccentInput"))$("storeAccentInput").value=storeAvailability.accent_color;
+  if($("storeLogoUrlInput"))$("storeLogoUrlInput").value=storeAvailability.logo_url;
+  if($("storeHeroUrlInput"))$("storeHeroUrlInput").value=storeAvailability.hero_url;
+  updateStoreBrandPreview();
+  renderStoreBranding();
 }
+async function saveStoreBranding(){
+  if(!supabaseClient||!currentUser)return toast("Sign in to change storefront branding");
+  const btn=$("saveStoreBrandingBtn"),oldLabel=btn?.textContent||"Save Storefront Branding";
+  if(btn?.dataset.busy==="1")return;
+  if(btn){btn.dataset.busy="1";btn.disabled=true;btn.textContent="Saving…"}
+  try{
+    const row={
+      user_id:currentUser.id,
+      store_name:$("storeNameInput").value.trim()||"Karcen's Prints",
+      storefront_tagline:$("storeTaglineInput").value.trim()||"Made layer by layer.",
+      storefront_about:$("storeAboutInput").value.trim(),
+      storefront_accent:normalizeStoreAccent($("storeAccentInput").value),
+      storefront_logo_url:$("storeLogoUrlInput").value.trim(),
+      storefront_hero_url:$("storeHeroUrlInput").value.trim(),
+      updated_at:nowISO()
+    };
+    const result=await Promise.race([
+      supabaseClient.from("store_settings").upsert(row),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error("Saving storefront branding timed out")),10000))
+    ]);
+    if(result?.error)throw result.error;
+    storeAvailability={...storeAvailability,store_name:row.store_name,tagline:row.storefront_tagline,about:row.storefront_about,accent_color:row.storefront_accent,logo_url:row.storefront_logo_url,hero_url:row.storefront_hero_url};
+    renderStoreBranding();updateStoreBrandPreview();
+    if($("storeBrandingHelp"))$("storeBrandingHelp").textContent="Saved. Public storefront branding is live.";
+    toast("Storefront branding updated");
+  }catch(error){console.error(error);toast(error?.message||"Couldn't save storefront branding")}
+  finally{if(btn){btn.disabled=false;btn.textContent=oldLabel;delete btn.dataset.busy}}
+}
+
 async function saveStoreAvailability(){
   if(!supabaseClient||!currentUser)return toast("Sign in to change store availability");
   const btn=$("saveStoreAvailabilityBtn"),oldLabel=btn?.textContent||"Save availability";
@@ -1912,6 +2022,13 @@ function openSettings(){
   $("supabaseUrlInput").value=settings.supabaseUrl||"";
   $("supabaseKeyInput").value=settings.supabaseKey||"";
   $("customerModePinInput").value=settings.customerModePin||"";
+  if($("storeNameInput"))$("storeNameInput").value=storeAvailability.store_name||"Karcen's Prints";
+  if($("storeTaglineInput"))$("storeTaglineInput").value=storeAvailability.tagline||"Made layer by layer.";
+  if($("storeAboutInput"))$("storeAboutInput").value=storeAvailability.about||"";
+  if($("storeAccentInput"))$("storeAccentInput").value=normalizeStoreAccent(storeAvailability.accent_color);
+  if($("storeLogoUrlInput"))$("storeLogoUrlInput").value=storeAvailability.logo_url||"";
+  if($("storeHeroUrlInput"))$("storeHeroUrlInput").value=storeAvailability.hero_url||"";
+  updateStoreBrandPreview();
   renderPresets();updateCloudUI();
   loadStoreAvailabilitySettings().catch(console.error);
   $("settingsDialog").showModal();
@@ -2322,7 +2439,7 @@ safeUiInit("startup-42",()=>{$("addColorwayBtn").onclick=()=>openColorway();$("c
 safeUiInit("startup-43",()=>{$("openSalesBtn").onclick=openSalesHistory;$("closeSalesHistory").onclick=()=>$("salesHistoryDialog").close();$("closeSale").onclick=()=>$("saleDialog").close();$("salePrint").onchange=()=>{populateSaleVariants();syncSalePrice()};$("saleVariant").onchange=syncSalePrice;$("saleQty").oninput=()=>{autoDeal();updateSalePreview()};["salePrice","saleDiscountValue"].forEach(id=>$(id).oninput=updateSalePreview);$("saleDiscountType").onchange=updateSalePreview;$("saveSaleBtn").onclick=saveSale;});
 safeUiInit("startup-44",()=>{$("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDialog").close();$("saveOrderBtn").onclick=saveOrder;$("deleteOrderBtn").onclick=deleteOrder;$("createPaymentLinkBtn").onclick=createOrderPaymentLink;$("copyPaymentLinkBtn").onclick=copyOrderPaymentLink;$("markOrderPaidBtn").onclick=markOrderPaid;["orderPrice","orderPaymentAmount","orderDepositAmount"].forEach(id=>$(id).oninput=updateOrderPaymentButtons);document.querySelectorAll("#orderFilter button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#orderFilter button").forEach(x=>x.classList.remove("active"));b.classList.add("active");orderStatusFilter=b.dataset.status;renderOrders()});});
 safeUiInit("startup-45",()=>{$("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;});
-safeUiInit("startup-46",()=>{$("saveStoreAvailabilityBtn").onclick=saveStoreAvailability;});
+safeUiInit("startup-46",()=>{$("saveStoreAvailabilityBtn").onclick=saveStoreAvailability;$('saveStoreBrandingBtn').onclick=saveStoreBranding;["storeNameInput","storeTaglineInput","storeAccentInput"].forEach(id=>$(id).addEventListener("input",updateStoreBrandPreview));});
 safeUiInit("startup-47",()=>{$("closeSettings").onclick=()=>{$("settingsDialog").close()};$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;});
 safeUiInit("startup-48",()=>{window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));});
 document.addEventListener("visibilitychange",()=>{

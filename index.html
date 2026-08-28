@@ -12,6 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.5.0" />
 </head>
 <body>
 <div class="app-shell">
@@ -84,17 +85,47 @@
         <span class="customer-lock-badge" id="customerModeBadge">LOCKED</span>
       </div>
 
-      <section class="shop-hero">
-        <div>
-          <p class="eyebrow">YOUR SHOP</p>
-          <h2>What are we selling?</h2>
-          <p class="muted">This is the clean storefront-style home. Tap any item to open its details, edit stock, or record a sale.</p>
+      <section class="shop-hero" id="storefrontHero">
+        <div class="admin-shop-hero">
+          <div>
+            <p class="eyebrow">YOUR SHOP</p>
+            <h2>What are we selling?</h2>
+            <p class="muted">Manage the catalog customers see, keep stock current, and jump into Store Mode when you want to preview the shop.</p>
+          </div>
+          <div class="shop-hero-actions">
+            <button class="secondary" id="customerModeBtn" type="button">◫ Customer Store Mode</button>
+            <button class="primary admin-only" id="shopAddBtn">+ Add product</button>
+          </div>
         </div>
-        <div class="shop-hero-actions">
-          <button class="secondary" id="customerModeBtn" type="button">◫ Customer Store Mode</button>
-          <button class="primary admin-only" id="shopAddBtn">+ Add product</button>
+
+        <div class="storefront-brand customer-only" id="storefrontBrand">
+          <div class="storefront-brand-overlay"></div>
+          <div class="storefront-brand-content">
+            <div class="storefront-brand-lockup">
+              <div class="storefront-logo" id="storefrontLogoWrap">
+                <img id="storefrontLogo" class="hidden" alt="Store logo" />
+                <span id="storefrontMonogram">KP</span>
+              </div>
+              <div>
+                <p class="storefront-kicker">CUSTOM 3D PRINTS</p>
+                <h2 id="storefrontName">Karcen's Prints</h2>
+                <p class="storefront-tagline" id="storefrontTagline">Made layer by layer.</p>
+              </div>
+            </div>
+            <p class="storefront-about" id="storefrontAbout">Custom prints, useful parts, desk stuff, gifts, and whatever else looks fun to make.</p>
+            <div class="storefront-status-row">
+              <span class="storefront-status-pill" id="storefrontStatusPill"><i></i><span id="storefrontStatusText">Accepting orders</span></span>
+              <span class="storefront-turnaround" id="storefrontTurnaround">Typical turnaround: 3–5 days</span>
+            </div>
+          </div>
         </div>
       </section>
+
+      <div class="storefront-perks customer-only" aria-label="Store highlights">
+        <div><span>◈</span><strong>Made to order</strong><small>Each print is made for you.</small></div>
+        <div><span>◉</span><strong>Pick your colors</strong><small>Choose from available filament.</small></div>
+        <div><span>✦</span><strong>Custom requests</strong><small>Need something different? Ask.</small></div>
+      </div>
 
       <section class="shop-controls">
         <div class="search-wrap"><span>⌕</span><input id="shopSearch" type="search" placeholder="Search your products..." /></div>
@@ -688,6 +719,27 @@
 
     <section class="settings-section">
       <div class="section-heading">
+        <div><h3>Storefront Branding</h3><p class="muted">This is what customers see. PrintBook stays the admin app behind it.</p></div>
+        <span class="badge">v5.5</span>
+      </div>
+      <div class="form-grid">
+        <label>Store name<input id="storeNameInput" maxlength="80" placeholder="Karcen's Prints" /></label>
+        <label>Tagline<input id="storeTaglineInput" maxlength="120" placeholder="Made layer by layer." /></label>
+        <label class="full">About your shop<textarea id="storeAboutInput" maxlength="400" placeholder="A short intro customers will see on the storefront."></textarea></label>
+        <label>Accent color<input id="storeAccentInput" type="color" value="#8b5cf6" /></label>
+        <label>Logo image URL<input id="storeLogoUrlInput" type="url" placeholder="https://... (optional)" /></label>
+        <label class="full">Hero image URL<input id="storeHeroUrlInput" type="url" placeholder="https://... (optional background image)" /></label>
+      </div>
+      <div class="storefront-brand-preview" id="storeBrandPreview">
+        <span class="preview-dot"></span>
+        <div><strong id="storeBrandPreviewName">Karcen's Prints</strong><small id="storeBrandPreviewTagline">Made layer by layer.</small></div>
+      </div>
+      <div class="row"><button class="primary" id="saveStoreBrandingBtn" type="button">Save Storefront Branding</button></div>
+      <p class="muted tiny-note" id="storeBrandingHelp">Logo and hero image are optional. Leaving them blank keeps the clean built-in Karcen's Prints look.</p>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading">
         <div><h3>Store Availability</h3><p class="muted">Control whether customers can place new requests and show your current turnaround time.</p></div>
         <span class="badge" id="storeAvailabilityBadge">OPEN</span>
       </div>
@@ -810,6 +862,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.4.0"></script>
+<script src="app.js?v=5.5.0"></script>
 </body>
 </html>

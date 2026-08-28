@@ -1,5 +1,5 @@
-const CACHE="printbook-v5.4-payments";
-const CORE_ASSETS=["./","./index.html","./styles.css","./app.js"];
+const CACHE="printbook-v5.5-storefront-branding";
+const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js"];
 
 self.addEventListener("install",event=>{
   event.waitUntil((async()=>{
@@ -47,7 +47,7 @@ self.addEventListener("fetch",event=>{
   event.respondWith((async()=>{
     // Critical app files are network-first so a newly deployed PrintBook build
     // cannot be trapped behind an older service-worker cache.
-    const critical=/\/(app\.js|styles\.css)$/.test(url.pathname);
+    const critical=/\/(app\.js|styles\.css|storefront-v55\.css)$/.test(url.pathname);
     if(critical){
       try{
         const fresh=await fetch(new Request(event.request,{cache:"no-store"}));

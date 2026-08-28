@@ -1,0 +1,277 @@
+/* PrintBook v5.5 — customer storefront branding layer.
+   Admin UI stays PrintBook; these rules only reshape Store Mode/public storefront. */
+
+:root{
+  --store-accent:#8b5cf6;
+  --store-accent-soft:rgba(139,92,246,.15);
+}
+
+.customer-only{display:none!important}
+.admin-shop-hero{display:contents}
+
+.storefront-brand-preview{
+  margin:12px 0 4px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:13px 14px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  background:rgba(255,255,255,.025)
+}
+.storefront-brand-preview .preview-dot{
+  width:13px;height:13px;border-radius:999px;background:#8b5cf6;
+  box-shadow:0 0 0 5px rgba(139,92,246,.13)
+}
+.storefront-brand-preview div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.storefront-brand-preview strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.storefront-brand-preview small{opacity:.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+body.customer-mode{
+  background:
+    radial-gradient(circle at 50% -10%,var(--store-accent-soft),transparent 36rem),
+    #0b0911;
+}
+body.customer-mode .customer-only{display:flex!important}
+body.customer-mode .admin-shop-hero{display:none!important}
+body.customer-mode .shop-hero{
+  padding:0;
+  border:0;
+  background:transparent;
+  overflow:visible;
+}
+body.customer-mode .shop-hero::before,
+body.customer-mode .shop-hero::after{display:none}
+
+body.customer-mode .storefront-brand{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  width:100%;
+  min-height:310px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:26px;
+  background:
+    radial-gradient(circle at 82% 18%,var(--store-accent-soft),transparent 33%),
+    linear-gradient(135deg,#15111f 0%,#0d0b13 62%,#14101d 100%);
+  box-shadow:0 24px 70px rgba(0,0,0,.32);
+}
+body.customer-mode .storefront-brand.has-store-hero{
+  background-image:
+    linear-gradient(90deg,rgba(8,7,12,.94) 0%,rgba(8,7,12,.76) 45%,rgba(8,7,12,.38) 100%),
+    var(--store-hero-image);
+  background-size:cover;
+  background-position:center;
+}
+body.customer-mode .storefront-brand-overlay{
+  position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:
+    linear-gradient(115deg,transparent 52%,var(--store-accent-soft) 100%),
+    repeating-linear-gradient(135deg,rgba(255,255,255,.018) 0 1px,transparent 1px 12px);
+}
+body.customer-mode .storefront-brand-content{
+  width:min(700px,100%);
+  padding:clamp(28px,5vw,54px);
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:20px;
+}
+body.customer-mode .storefront-brand-lockup{display:flex;align-items:center;gap:18px}
+body.customer-mode .storefront-logo{
+  flex:0 0 auto;
+  width:74px;height:74px;
+  border-radius:22px;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  background:linear-gradient(145deg,var(--store-accent),rgba(255,255,255,.16));
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 14px 30px var(--store-accent-soft);
+}
+body.customer-mode .storefront-logo img{width:100%;height:100%;object-fit:cover;display:block}
+body.customer-mode .storefront-logo span{font-weight:900;font-size:24px;letter-spacing:-1px;color:white}
+body.customer-mode .storefront-kicker{
+  margin:0 0 5px;
+  color:var(--store-accent);
+  font-size:11px;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:.18em;
+}
+body.customer-mode #storefrontName{
+  margin:0;
+  color:#fff;
+  font-size:clamp(34px,7vw,58px);
+  line-height:.98;
+  letter-spacing:-.045em;
+}
+body.customer-mode .storefront-tagline{
+  margin:9px 0 0;
+  color:rgba(255,255,255,.72);
+  font-size:clamp(16px,2.3vw,20px);
+  font-weight:600;
+}
+body.customer-mode .storefront-about{
+  margin:0;
+  max-width:620px;
+  color:rgba(255,255,255,.66);
+  font-size:15px;
+  line-height:1.65;
+}
+body.customer-mode .storefront-status-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+body.customer-mode .storefront-status-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  min-height:34px;padding:0 13px;
+  border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--store-accent) 40%,transparent);
+  background:var(--store-accent-soft);
+  color:#fff;
+  font-size:12px;
+  font-weight:800;
+}
+body.customer-mode .storefront-status-pill i{
+  width:8px;height:8px;border-radius:99px;background:#57dc8c;
+  box-shadow:0 0 0 4px rgba(87,220,140,.12)
+}
+body.customer-mode .storefront-status-pill.closed{border-color:rgba(255,110,110,.22);background:rgba(255,110,110,.08)}
+body.customer-mode .storefront-status-pill.closed i{background:#ff6d6d;box-shadow:0 0 0 4px rgba(255,109,109,.10)}
+body.customer-mode .storefront-turnaround{color:rgba(255,255,255,.48);font-size:12px;font-weight:700}
+
+body.customer-mode .storefront-perks{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin:14px 0 22px;
+}
+body.customer-mode .storefront-perks>div{
+  min-width:0;
+  display:grid;
+  grid-template-columns:36px minmax(0,1fr);
+  grid-template-rows:auto auto;
+  column-gap:10px;
+  align-items:center;
+  padding:13px 14px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:16px;
+  background:rgba(255,255,255,.025);
+}
+body.customer-mode .storefront-perks>div>span{
+  grid-row:1/3;
+  width:34px;height:34px;border-radius:11px;
+  display:grid;place-items:center;
+  color:var(--store-accent);
+  background:var(--store-accent-soft);
+  font-size:14px;
+}
+body.customer-mode .storefront-perks strong{font-size:12px;color:#f7f5fa}
+body.customer-mode .storefront-perks small{margin-top:2px;font-size:10px;color:rgba(255,255,255,.43);line-height:1.3}
+
+body.customer-mode .shop-controls{
+  position:sticky;
+  top:max(8px,env(safe-area-inset-top));
+  z-index:8;
+  padding:9px;
+  margin-bottom:12px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:17px;
+  background:rgba(12,10,17,.78);
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+  box-shadow:0 12px 30px rgba(0,0,0,.18)
+}
+body.customer-mode .shop-summary{display:none!important}
+body.customer-mode .customer-store-tabs{
+  width:max-content;
+  max-width:100%;
+  margin:0 0 18px;
+  padding:4px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:13px;
+  background:rgba(255,255,255,.025)
+}
+body.customer-mode .customer-store-tabs button.active{
+  color:#fff;
+  border-color:color-mix(in srgb,var(--store-accent) 38%,transparent);
+  background:var(--store-accent-soft)
+}
+
+body.customer-mode .shop-grid{gap:16px}
+body.customer-mode .shop-card{
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.075);
+  border-radius:20px;
+  background:linear-gradient(180deg,rgba(255,255,255,.042),rgba(255,255,255,.018));
+  box-shadow:0 12px 34px rgba(0,0,0,.16);
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+@media (hover:hover){
+  body.customer-mode .shop-card:hover{
+    transform:translateY(-3px);
+    border-color:color-mix(in srgb,var(--store-accent) 42%,rgba(255,255,255,.08));
+    box-shadow:0 18px 42px rgba(0,0,0,.26)
+  }
+}
+body.customer-mode .shop-card-photo{aspect-ratio:4/3;min-height:0}
+body.customer-mode .shop-card-photo img{transition:transform .35s ease}
+@media (hover:hover){body.customer-mode .shop-card:hover .shop-card-photo img{transform:scale(1.025)}}
+body.customer-mode .price-chip{
+  top:12px;right:12px;
+  border:1px solid rgba(255,255,255,.13);
+  background:rgba(8,7,12,.78);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  color:#fff;
+  font-weight:900;
+}
+body.customer-mode .shop-card-body{padding:16px 16px 17px}
+body.customer-mode .shop-card-body h3{font-size:16px;letter-spacing:-.015em}
+body.customer-mode .shop-card-body>p{color:rgba(255,255,255,.43)}
+body.customer-mode .shop-price{color:#fff;font-size:17px;font-weight:900}
+body.customer-mode .shop-stock{color:rgba(255,255,255,.48)}
+body.customer-mode .shop-stock strong{color:var(--store-accent)}
+body.customer-mode .shop-deal{border-color:color-mix(in srgb,var(--store-accent) 25%,transparent);background:var(--store-accent-soft);color:#f6f0ff}
+
+body.customer-mode .customer-product-sheet .customer-request-button,
+body.customer-mode .request-sheet .primary{
+  background:var(--store-accent);
+  border-color:var(--store-accent);
+}
+body.customer-mode .customer-big-price{color:var(--store-accent)}
+body.customer-mode .availability-banner{border-color:color-mix(in srgb,var(--store-accent) 24%,transparent)}
+
+/* The public storefront should read like a shop, not an admin application. */
+body.public-visitor .customer-mode-bar{
+  border-color:rgba(255,255,255,.07);
+  background:rgba(255,255,255,.025)
+}
+body.public-visitor #customerModeBarTitle{font-size:12px}
+body.public-visitor .customer-lock-badge{border-color:color-mix(in srgb,var(--store-accent) 32%,transparent);background:var(--store-accent-soft);color:#fff}
+
+@media (max-width:720px){
+  body.customer-mode .storefront-brand{min-height:0;border-radius:22px}
+  body.customer-mode .storefront-brand-content{padding:26px 22px;gap:17px}
+  body.customer-mode .storefront-brand-lockup{align-items:flex-start;gap:13px}
+  body.customer-mode .storefront-logo{width:58px;height:58px;border-radius:17px}
+  body.customer-mode .storefront-logo span{font-size:19px}
+  body.customer-mode #storefrontName{font-size:clamp(31px,10vw,44px)}
+  body.customer-mode .storefront-tagline{font-size:15px}
+  body.customer-mode .storefront-about{font-size:13px;line-height:1.55}
+  body.customer-mode .storefront-perks{grid-template-columns:1fr;gap:7px}
+  body.customer-mode .storefront-perks>div{padding:10px 12px}
+  body.customer-mode .storefront-perks small{font-size:10px}
+  body.customer-mode .shop-controls{top:max(6px,env(safe-area-inset-top))}
+  body.customer-mode .shop-grid{gap:11px}
+  body.customer-mode .shop-card{border-radius:17px}
+}
+
+@media (max-width:430px){
+  body.customer-mode .storefront-brand-content{padding:23px 18px}
+  body.customer-mode .storefront-brand-lockup{gap:11px}
+  body.customer-mode .storefront-logo{width:52px;height:52px;border-radius:15px}
+  body.customer-mode .storefront-kicker{font-size:9px}
+  body.customer-mode #storefrontName{font-size:31px}
+  body.customer-mode .storefront-status-row{gap:8px}
+  body.customer-mode .storefront-status-pill{min-height:31px;padding:0 11px;font-size:11px}
+  body.customer-mode .storefront-turnaround{font-size:11px}
+}
