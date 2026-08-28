@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.5.1";
+window.PRINTBOOK_BUILD="5.5.2";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -2057,6 +2057,10 @@ function saveSettings(){
 function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",multicolor_capable:!!i.multicolor_capable,multicolor_max_colors:productMaxColors(i),multicolor_price_mode:i.multicolor_price_mode==="per_extra"?"per_extra":"flat",multicolor_surcharge:Math.max(0,Number(i.multicolor_surcharge||0)),photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
 async function syncUpsert(table,row){
   if(!supabaseClient||!currentUser)return; if(!navigator.onLine){setSyncState("offline","Offline — changes saved locally");return}
+  // Postgres DATE/UUID columns reject empty strings. Normalize order rows in one
+  // central place so every save path (payments, status changes, bulk sync, etc.)
+  // is safe instead of relying on each caller to remember this conversion.
+  if(table==="orders")row={...row,due_date:row?.due_date||null,print_id:row?.print_id||null};
   setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).upsert(row);if(error){console.error(error);setSyncState("error",`Couldn't sync ${table}`);return false}setSyncState("syncing","Cloud write complete — refreshing…");return true
 }
 async function syncDelete(table,id){
