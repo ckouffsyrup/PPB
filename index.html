@@ -329,6 +329,13 @@
       <label>Selling price<div class="money-input"><span>$</span><input id="priceInput" type="number" min="0" step="0.01" placeholder="10.00" /></div></label>
       <label>Pricing preset<select id="presetInput"></select></label>
 
+      <label>Inventory type
+        <select id="inventoryModeInput">
+          <option value="stocked">Stocked item</option>
+          <option value="made_to_order">Made to order</option>
+        </select>
+        <small>Stocked items are deducted when an order is approved. Made-to-order items do not use finished-product stock.</small>
+      </label>
       <label>Out-of-stock behavior
         <select id="outOfStockInput">
           <option value="show">Show “Out of stock”</option>
@@ -495,6 +502,7 @@
       <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
       <label>Due date<input id="orderDue" type="date" /></label>
       <label>Linked print<select id="orderPrint"><option value="">None / custom</option></select></label>
+      <label>Variant<select id="orderVariant"><option value="">Standard / no variant</option></select></label>
       <label>Payment status<select id="orderPaymentStatus"><option value="unpaid">Unpaid</option><option value="deposit_paid">Deposit paid</option><option value="paid">Paid</option><option value="refunded">Refunded</option></select></label>
       <label>Amount paid<div class="money-input"><span>$</span><input id="orderPaymentAmount" type="number" min="0" step="0.01" value="0" /></div></label>
       <label>Deposit required<div class="money-input"><span>$</span><input id="orderDepositAmount" type="number" min="0" step="0.01" value="0" /></div></label>
@@ -831,6 +839,22 @@
 
     <section class="settings-section">
       <div class="section-heading">
+        <div><h3>Share your store</h3><p class="muted">Customers can scan this instead of typing the GitHub Pages address.</p></div>
+        <span class="badge">QR</span>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:18px;align-items:center">
+        <img src="store-qr.png" alt="QR code for Karcen's Prints storefront" style="width:100%;max-width:210px;aspect-ratio:1;background:white;border-radius:18px;padding:10px" />
+        <div>
+          <strong>Karcen's Prints storefront</strong>
+          <p class="muted" style="word-break:break-all">https://ckouffsyrup.github.io/PPB/</p>
+          <div class="row" style="flex-wrap:wrap"><button class="primary" type="button" id="copyStoreLinkBtn">Copy store link</button><button class="secondary" type="button" id="openStoreLinkBtn">Open storefront</button></div>
+          <p class="muted tiny-note">The QR always uses the full working address, including the trailing slash.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading">
         <div><h3>Store Availability</h3><p class="muted">Control whether customers can place new requests and show your current turnaround time.</p></div>
         <span class="badge" id="storeAvailabilityBadge">OPEN</span>
       </div>
@@ -953,6 +977,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.6.3"></script>
+<script src="app.js?v=5.6.4"></script>
 </body>
 </html>

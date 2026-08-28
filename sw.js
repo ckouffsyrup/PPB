@@ -1,5 +1,5 @@
-const CACHE="printbook-v5.6.3-filament-stock-fix";
-const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js"];
+const CACHE="printbook-v5.6.4-stock-reservations-share-store";
+const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
   event.waitUntil((async()=>{
