@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.6.0";
+window.PRINTBOOK_BUILD="5.6.1";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -1310,9 +1310,13 @@ function customerSavedOrders(){
   try{return JSON.parse(localStorage.getItem(CUSTOMER_SAVED_ORDERS_KEY)||"[]").filter(x=>x?.order_number&&x?.token)}catch{return []}
 }
 function saveCustomerOrderAccess(orderNumber,token,item,email=""){
+  const existing=customerSavedOrders().find(x=>x.order_number===orderNumber);
   const list=customerSavedOrders().filter(x=>x.order_number!==orderNumber);
-  list.unshift({order_number:orderNumber,token,item:item||"Print order",email:email||"",saved_at:nowISO()});
+  list.unshift({order_number:orderNumber,token,item:item||existing?.item||"Print order",email:email||existing?.email||"",saved_at:nowISO()});
   localStorage.setItem(CUSTOMER_SAVED_ORDERS_KEY,JSON.stringify(list.slice(0,12)));
+}
+function removeCustomerOrderAccess(orderNumber){
+  try{localStorage.setItem(CUSTOMER_SAVED_ORDERS_KEY,JSON.stringify(customerSavedOrders().filter(x=>x.order_number!==orderNumber)))}catch{}
 }
 function customerOrderPrivateUrl(orderNumber,token){
   const u=new URL(location.href);u.search="";u.hash="";u.searchParams.set("order",orderNumber);u.searchParams.set("token",token);return u.toString()
@@ -1366,7 +1370,10 @@ async function openCustomerOrderPortal(orderNumber,token,{updateUrl=true}={}){
     renderCustomerPortalOrder(d.order);saveCustomerOrderAccess(orderNumber,token,d.order.item||"Print order");
     $("customerPortalLoading").classList.add("hidden");$("customerPortalContent").classList.remove("hidden");
     if(updateUrl){const u=new URL(location.href);u.searchParams.set("order",orderNumber);u.searchParams.set("token",token);history.replaceState({},"",u)}
-  }catch(err){$("customerPortalLoading").classList.add("hidden");$("customerPortalError").classList.remove("hidden");$("customerPortalErrorText").textContent=err?.message||"The private link may be invalid."}
+  }catch(err){
+    if(String(err?.message||"").toLowerCase().includes("invalid or no longer available")) removeCustomerOrderAccess(orderNumber);
+    $("customerPortalLoading").classList.add("hidden");$("customerPortalError").classList.remove("hidden");$("customerPortalErrorText").textContent=err?.message||"The private link may be invalid."
+  }
 }
 function clearCustomerPortalUrl(){const u=new URL(location.href);u.searchParams.delete("order");u.searchParams.delete("token");history.replaceState({},"",u)}
 function openFindCustomerOrder(){
