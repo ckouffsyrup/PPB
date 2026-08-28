@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.6.2";
+window.PRINTBOOK_BUILD="5.6.3";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -247,7 +247,7 @@ function renderCustomerFilaments(){
   if(!grid)return;
   const available=filaments.filter(f=>Number(f.remaining||0)>0).sort((a,b)=>String(a.color||a.material||"").localeCompare(String(b.color||b.material||"")));
   grid.innerHTML=available.map(f=>{
-    const remaining=Number(f.remaining||0),size=Number(f.spool_size||1000),pct=size?remaining/size*100:0,low=f.low_stock===true||remaining<=100||pct<=15;
+    const remaining=Number(f.remaining||0),size=Number(f.spool_size||1000),pct=size?remaining/size*100:0,low=f.public_only?f.low_stock===true:(f.low_stock===true||remaining<=100||pct<=15);
     return `<article class="customer-filament-card"><div class="customer-filament-color" style="background:${safe(f.visual_color||'#777777')}"></div><h3>${safe(f.color||"Unnamed color")}</h3><p>${safe([f.brand,f.material].filter(Boolean).join(" · ")||"Filament")}</p><span class="customer-filament-availability ${low?"low":""}">${low?"LOW STOCK":"AVAILABLE"}</span></article>`
   }).join("");
   if(!available.length)grid.innerHTML=`<div class="empty-state"><h3>No filament available</h3><p>There are no in-stock filament colors to show right now.</p></div>`;

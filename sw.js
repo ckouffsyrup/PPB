@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.6.2-manual-payments";
+const CACHE="printbook-v5.6.3-filament-stock-fix";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js"];
 
 self.addEventListener("install",event=>{
