@@ -362,3 +362,77 @@ body.public-visitor .customer-lock-badge{border-color:color-mix(in srgb,var(--st
 
 .customer-share-inline{padding:7px 11px;font-size:.78rem;white-space:nowrap}.public-visitor .customer-share-inline,.customer-mode .customer-share-inline{display:inline-flex}.admin-mode .customer-share-inline{display:none}
 @media(max-width:720px){.storefront-status-row{gap:8px!important;flex-wrap:wrap}.customer-share-inline{width:100%;justify-content:center;margin-top:2px}}
+
+
+/* PrintBook v5.7.3 — Center all menus / dialogs
+   Overrides the older side-sheet / bottom-sheet positioning everywhere. */
+dialog {
+  position: fixed !important;
+  inset: 0 !important;
+  margin: auto !important;
+  width: min(94vw, 760px) !important;
+  max-width: min(94vw, 760px) !important;
+  max-height: min(90dvh, 900px) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+  transform: none !important;
+}
+
+dialog[open] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+dialog > .sheet,
+dialog > form.sheet {
+  position: relative !important;
+  inset: auto !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  max-height: min(90dvh, 900px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  transform: none !important;
+  border-radius: 22px !important;
+}
+
+/* Keep the compact dialogs compact instead of stretching them to 760px. */
+#notificationsDialog { width: min(94vw, 620px) !important; max-width: min(94vw, 620px) !important; }
+#requestPrintDialog { width: min(94vw, 680px) !important; max-width: min(94vw, 680px) !important; }
+#customerOrderConfirmationDialog,
+#findCustomerOrderDialog,
+#customerStoreShareDialog,
+#ownerLoginDialog,
+#customerUnlockDialog { width: min(94vw, 620px) !important; max-width: min(94vw, 620px) !important; }
+
+@media (max-width: 720px) {
+  dialog {
+    width: min(92vw, 680px) !important;
+    max-width: min(92vw, 680px) !important;
+    max-height: 88dvh !important;
+  }
+
+  dialog > .sheet,
+  dialog > form.sheet {
+    max-height: 88dvh !important;
+    border-radius: 20px !important;
+  }
+}
+
+/* Toast/site notifications should also appear centered, not tucked to a side. */
+.toast {
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: max(24px, env(safe-area-inset-bottom)) !important;
+  width: min(calc(100vw - 32px), 520px) !important;
+  max-width: 520px !important;
+  margin: 0 !important;
+  transform: translateX(-50%) !important;
+  text-align: center !important;
+  z-index: 10000 !important;
+}
