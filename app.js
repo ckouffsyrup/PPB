@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.3.7";
+window.PRINTBOOK_BUILD="5.3.8";
 
 // Keep a failed/slow action from making the rest of PrintBook feel frozen.
 // Only the button that started an action may be temporarily disabled.
@@ -2238,61 +2238,69 @@ navigator.serviceWorker?.addEventListener("controllerchange",()=>{
 function exportData(){const payload={version:4,exported_at:nowISO(),settings:{...settings,supabaseKey:""},presets,filaments,colorways,items,sales,orders};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="printbook-v4-backup.json";a.click();URL.revokeObjectURL(a.href)}
 async function importData(e){const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(d.items)items=d.items;if(d.filaments)filaments=d.filaments;if(d.colorways)colorways=d.colorways;if(d.sales)sales=d.sales;if(d.orders)orders=d.orders;if(d.presets)presets=d.presets;if(d.settings)settings={...settings,...d.settings,supabaseKey:settings.supabaseKey};persist();toast("Backup imported")}catch{toast("Invalid backup")}}
 
-document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>showView(b.dataset.nav));
-document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>showView(b.dataset.go));
-$("menuBtn").onclick=openMenu;$("mobileMenuBtn").onclick=openMenu;$("closeMenuBtn").onclick=closeMenu;$("drawerBackdrop").onclick=closeMenu;
-$("drawerBackdrop").addEventListener("touchmove",e=>e.preventDefault(),{passive:false});
-$("sideDrawer").addEventListener("touchmove",e=>e.stopPropagation(),{passive:true});
-$("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=enterCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};
-$("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=enterCustomerMode;
-$("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;$("refreshPushDiagnosticsBtn").onclick=refreshPushDiagnostics;$("copyPushDiagnosticsBtn").onclick=copyPushDiagnostics;
-$("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
-$("applyAppUpdateBtn").onclick=applyAppUpdate;
-$("checkForUpdateBtn").onclick=()=>checkForAppUpdate(true);
-$("applyAppUpdateSettingsBtn").onclick=applyAppUpdate;
-$("retryPublicStoreBtn").onclick=()=>loadPublicStorefront(true);
-$("copyStoreDiagBtn").onclick=async()=>{
-  try{
-    await navigator.clipboard.writeText(publicStoreLastDiagnostic||"No diagnostics captured.");
-    toast("Store diagnostics copied");
-  }catch{
-    toast(publicStoreLastDiagnostic||"No diagnostics captured.")
+function safeUiInit(label,fn){
+  try{fn()}catch(err){
+    console.error(`[PrintBook UI] ${label} failed`,err);
   }
-};
-$("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;
-$("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();
-$("requestPrintBtn").onclick=openRequestPrint;
-$("closeRequestPrint").onclick=()=>$("requestPrintDialog").close();
-$("multicolorCapableInput").onchange=updateMulticolorAdminOptions;
-$("multicolorPriceModeInput").onchange=updateMulticolorAdminOptions;
-$("multicolorMaxColorsInput").oninput=updateMulticolorAdminOptions;
-$("requestVariant").onchange=()=>{updateRequestEstimate();updateRequestColorMode()};
-$("requestColorMode").onchange=updateRequestColorMode;
-$("requestQty").oninput=updateRequestEstimate;
-$("submitPrintRequestBtn").onclick=submitPrintRequest;
-if($("refreshRequestsBtn"))$("refreshRequestsBtn").onclick=()=>refreshOrdersFromCloud({showToast:true});
-document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));
-$("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();
-$("confirmCustomerUnlock").onclick=confirmCustomerUnlock;
-$("customerUnlockPin").addEventListener("keydown",e=>{if(e.key==="Enter")confirmCustomerUnlock()});
-$("brandOwnerTrigger").addEventListener("click",brandOwnerTap);
-$("brandOwnerTrigger").addEventListener("dblclick",e=>e.preventDefault());
-$("brandOwnerTrigger").addEventListener("selectstart",e=>e.preventDefault());
-$("closeOwnerLogin").onclick=()=>$("ownerLoginDialog").close();
-$("ownerLoginBtn").onclick=ownerLogin;
-$("ownerLoginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")ownerLogin()});
-$("closeEditor").onclick=()=>{savePrintInFlight=false;$("savePrintBtn").disabled=false;$("savePrintBtn").textContent="Save print";$("editorDialog").close()};$("savePrintBtn").onclick=savePrint;$("deleteBtn").onclick=deletePrint;$("favoriteToggle").onclick=()=>{editorFavorite=!editorFavorite;updateFavoriteButton()};$("modelSourceInput").oninput=updateModelLink;$("addPrintFilamentBtn").onclick=()=>addUsageRow("printFilamentRows");$("addVariantBtn").onclick=()=>addVariantRow();
-["hoursInput","extraCostInput","priceInput","madeInput","soldInput","presetInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).oninput=updatePricingPreviews);
-$("recordSaleFromPrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openSale(id)};$("makePrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openMake(id)};
-$("closeMake").onclick=()=>$("makeDialog").close();$("makeVariant").onchange=updateMakeCheck;$("makeQty").oninput=updateMakeCheck;$("confirmMakeBtn").onclick=confirmMake;
-$("addFilamentBtn").onclick=()=>openFilament();$("closeFilament").onclick=()=>$("filamentDialog").close();$("saveFilamentBtn").onclick=saveFilament;$("deleteFilamentBtn").onclick=deleteFilament;["filSpoolSize","filPrice","filRemainingInput"].forEach(id=>$(id).oninput=updateFilamentPreview);$("filVisualColor").oninput=()=>{$("filVisualHex").value=$("filVisualColor").value};$("filVisualHex").oninput=()=>{const v=$("filVisualHex").value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v))$("filVisualColor").value=v};
-$("addColorwayBtn").onclick=()=>openColorway();$("closeColorway").onclick=()=>$("colorwayDialog").close();$("addColorwayFilamentBtn").onclick=()=>addUsageRow("colorwayFilamentRows");$("saveColorwayBtn").onclick=saveColorway;$("deleteColorwayBtn").onclick=deleteColorway;
-$("openSalesBtn").onclick=openSalesHistory;$("closeSalesHistory").onclick=()=>$("salesHistoryDialog").close();$("closeSale").onclick=()=>$("saleDialog").close();$("salePrint").onchange=()=>{populateSaleVariants();syncSalePrice()};$("saleVariant").onchange=syncSalePrice;$("saleQty").oninput=()=>{autoDeal();updateSalePreview()};["salePrice","saleDiscountValue"].forEach(id=>$(id).oninput=updateSalePreview);$("saleDiscountType").onchange=updateSalePreview;$("saveSaleBtn").onclick=saveSale;
-$("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDialog").close();$("saveOrderBtn").onclick=saveOrder;$("deleteOrderBtn").onclick=deleteOrder;document.querySelectorAll("#orderFilter button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#orderFilter button").forEach(x=>x.classList.remove("active"));b.classList.add("active");orderStatusFilter=b.dataset.status;renderOrders()});
-$("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;
-$("saveStoreAvailabilityBtn").onclick=saveStoreAvailability;
-$("closeSettings").onclick=()=>{$("settingsDialog").close()};$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
-window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));
+}
+
+safeUiInit("startup-1",()=>{document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>showView(b.dataset.nav));});
+safeUiInit("startup-2",()=>{document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>showView(b.dataset.go));});
+safeUiInit("startup-3",()=>{$("menuBtn").onclick=openMenu;$("mobileMenuBtn").onclick=openMenu;$("closeMenuBtn").onclick=closeMenu;$("drawerBackdrop").onclick=closeMenu;});
+safeUiInit("startup-4",()=>{$("drawerBackdrop").addEventListener("touchmove",e=>e.preventDefault(),{passive:false});});
+safeUiInit("startup-5",()=>{$("sideDrawer").addEventListener("touchmove",e=>e.stopPropagation(),{passive:true});});
+safeUiInit("startup-6",()=>{$("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=enterCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};});
+safeUiInit("startup-7",()=>{$("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=enterCustomerMode;});
+safeUiInit("startup-8",()=>{$("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;$("refreshPushDiagnosticsBtn").onclick=refreshPushDiagnostics;if($("copyPushDiagnosticsBtn"))$("copyPushDiagnosticsBtn").onclick=copyPushDiagnostics;});
+safeUiInit("startup-9",()=>{$("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);});
+safeUiInit("startup-10",()=>{$("applyAppUpdateBtn").onclick=applyAppUpdate;});
+safeUiInit("startup-11",()=>{$("checkForUpdateBtn").onclick=()=>checkForAppUpdate(true);});
+safeUiInit("startup-12",()=>{$("applyAppUpdateSettingsBtn").onclick=applyAppUpdate;});
+safeUiInit("startup-13",()=>{$("retryPublicStoreBtn").onclick=()=>loadPublicStorefront(true);});
+safeUiInit("startup-14",()=>{
+  $("copyStoreDiagBtn").onclick=async()=>{
+    try{
+      await navigator.clipboard.writeText(publicStoreLastDiagnostic||"No diagnostics captured.");
+      toast("Store diagnostics copied");
+    }catch{
+      toast(publicStoreLastDiagnostic||"No diagnostics captured.")
+    }
+  };
+});
+safeUiInit("startup-15",()=>{$("shopSearch").oninput=renderShop;$("shopCategoryFilter").onchange=renderShop;$("search").oninput=renderPrints;$("categoryFilter").onchange=renderPrints;$("stockFilter").onchange=renderPrints;});
+safeUiInit("startup-16",()=>{$("closeCustomerProduct").onclick=()=>$("customerProductDialog").close();});
+safeUiInit("startup-17",()=>{$("requestPrintBtn").onclick=openRequestPrint;});
+safeUiInit("startup-18",()=>{$("closeRequestPrint").onclick=()=>$("requestPrintDialog").close();});
+safeUiInit("startup-19",()=>{$("multicolorCapableInput").onchange=updateMulticolorAdminOptions;});
+safeUiInit("startup-20",()=>{$("multicolorPriceModeInput").onchange=updateMulticolorAdminOptions;});
+safeUiInit("startup-21",()=>{$("multicolorMaxColorsInput").oninput=updateMulticolorAdminOptions;});
+safeUiInit("startup-22",()=>{$("requestVariant").onchange=()=>{updateRequestEstimate();updateRequestColorMode()};});
+safeUiInit("startup-23",()=>{$("requestColorMode").onchange=updateRequestColorMode;});
+safeUiInit("startup-24",()=>{$("requestQty").oninput=updateRequestEstimate;});
+safeUiInit("startup-25",()=>{$("submitPrintRequestBtn").onclick=submitPrintRequest;});
+safeUiInit("startup-26",()=>{if($("refreshRequestsBtn"))$("refreshRequestsBtn").onclick=()=>refreshOrdersFromCloud({showToast:true});});
+safeUiInit("startup-27",()=>{document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));});
+safeUiInit("startup-28",()=>{$("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();});
+safeUiInit("startup-29",()=>{$("confirmCustomerUnlock").onclick=confirmCustomerUnlock;});
+safeUiInit("startup-30",()=>{$("customerUnlockPin").addEventListener("keydown",e=>{if(e.key==="Enter")confirmCustomerUnlock()});});
+safeUiInit("startup-31",()=>{$("brandOwnerTrigger").addEventListener("click",brandOwnerTap);});
+safeUiInit("startup-32",()=>{$("brandOwnerTrigger").addEventListener("dblclick",e=>e.preventDefault());});
+safeUiInit("startup-33",()=>{$("brandOwnerTrigger").addEventListener("selectstart",e=>e.preventDefault());});
+safeUiInit("startup-34",()=>{$("closeOwnerLogin").onclick=()=>$("ownerLoginDialog").close();});
+safeUiInit("startup-35",()=>{$("ownerLoginBtn").onclick=ownerLogin;});
+safeUiInit("startup-36",()=>{$("ownerLoginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")ownerLogin()});});
+safeUiInit("startup-37",()=>{$("closeEditor").onclick=()=>{savePrintInFlight=false;$("savePrintBtn").disabled=false;$("savePrintBtn").textContent="Save print";$("editorDialog").close()};$("savePrintBtn").onclick=savePrint;$("deleteBtn").onclick=deletePrint;$("favoriteToggle").onclick=()=>{editorFavorite=!editorFavorite;updateFavoriteButton()};$("modelSourceInput").oninput=updateModelLink;$("addPrintFilamentBtn").onclick=()=>addUsageRow("printFilamentRows");$("addVariantBtn").onclick=()=>addVariantRow();});
+safeUiInit("startup-38",()=>{["hoursInput","extraCostInput","priceInput","madeInput","soldInput","presetInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).oninput=updatePricingPreviews);});
+safeUiInit("startup-39",()=>{$("recordSaleFromPrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openSale(id)};$("makePrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openMake(id)};});
+safeUiInit("startup-40",()=>{$("closeMake").onclick=()=>$("makeDialog").close();$("makeVariant").onchange=updateMakeCheck;$("makeQty").oninput=updateMakeCheck;$("confirmMakeBtn").onclick=confirmMake;});
+safeUiInit("startup-41",()=>{$("addFilamentBtn").onclick=()=>openFilament();$("closeFilament").onclick=()=>$("filamentDialog").close();$("saveFilamentBtn").onclick=saveFilament;$("deleteFilamentBtn").onclick=deleteFilament;["filSpoolSize","filPrice","filRemainingInput"].forEach(id=>$(id).oninput=updateFilamentPreview);$("filVisualColor").oninput=()=>{$("filVisualHex").value=$("filVisualColor").value};$("filVisualHex").oninput=()=>{const v=$("filVisualHex").value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v))$("filVisualColor").value=v};});
+safeUiInit("startup-42",()=>{$("addColorwayBtn").onclick=()=>openColorway();$("closeColorway").onclick=()=>$("colorwayDialog").close();$("addColorwayFilamentBtn").onclick=()=>addUsageRow("colorwayFilamentRows");$("saveColorwayBtn").onclick=saveColorway;$("deleteColorwayBtn").onclick=deleteColorway;});
+safeUiInit("startup-43",()=>{$("openSalesBtn").onclick=openSalesHistory;$("closeSalesHistory").onclick=()=>$("salesHistoryDialog").close();$("closeSale").onclick=()=>$("saleDialog").close();$("salePrint").onchange=()=>{populateSaleVariants();syncSalePrice()};$("saleVariant").onchange=syncSalePrice;$("saleQty").oninput=()=>{autoDeal();updateSalePreview()};["salePrice","saleDiscountValue"].forEach(id=>$(id).oninput=updateSalePreview);$("saleDiscountType").onchange=updateSalePreview;$("saveSaleBtn").onclick=saveSale;});
+safeUiInit("startup-44",()=>{$("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDialog").close();$("saveOrderBtn").onclick=saveOrder;$("deleteOrderBtn").onclick=deleteOrder;document.querySelectorAll("#orderFilter button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#orderFilter button").forEach(x=>x.classList.remove("active"));b.classList.add("active");orderStatusFilter=b.dataset.status;renderOrders()});});
+safeUiInit("startup-45",()=>{$("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;});
+safeUiInit("startup-46",()=>{$("saveStoreAvailabilityBtn").onclick=saveStoreAvailability;});
+safeUiInit("startup-47",()=>{$("closeSettings").onclick=()=>{$("settingsDialog").close()};$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;});
+safeUiInit("startup-48",()=>{window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));});
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="visible"){
     refreshPushStatus().catch(()=>{});
