@@ -677,6 +677,23 @@
     </section>
 
     <section class="settings-section">
+      <div class="section-heading">
+        <div><h3>Store Availability</h3><p class="muted">Control whether customers can place new requests and show your current turnaround time.</p></div>
+        <span class="badge" id="storeAvailabilityBadge">OPEN</span>
+      </div>
+      <div class="form-grid">
+        <label>Status<select id="storeAvailabilityStatus"><option value="open">Open</option><option value="busy">Busy</option><option value="paused">Paused</option></select></label>
+        <label>Turnaround estimate<input id="storeTurnaroundInput" placeholder="3–5 days" maxlength="80" /></label>
+        <label>Reopen date<input id="storeReopenDateInput" type="date" /></label>
+        <label>Active order capacity<input id="storeCapacityInput" type="number" min="1" step="1" placeholder="No limit" /></label>
+        <label class="full">Storefront notice<textarea id="storeNoticeInput" maxlength="300" placeholder="Optional message customers will see..."></textarea></label>
+        <label class="full"><input id="storeAutoPauseInput" type="checkbox" /> Automatically stop new requests when capacity is reached</label>
+      </div>
+      <div class="row"><button class="primary" id="saveStoreAvailabilityBtn" type="button">Save Store Availability</button></div>
+      <p class="muted tiny-note" id="storeAvailabilityHelp">These settings sync to the public storefront immediately.</p>
+    </section>
+
+    <section class="settings-section">
       <div class="section-heading"><h3>Cloud sync</h3><span id="cloudStatus" class="badge">Not connected</span></div><p class="muted tiny-note"><strong>Cloud-first sync:</strong> Supabase is the source of truth. Local data is only a cache, so your phone and PC no longer compete over which copy is newer.</p>
       <p class="muted">Optional. Connect Supabase to see the same data on phone and PC.</p>
       <div class="sync-detail"><strong id="settingsSyncState">Local only</strong><small id="settingsLastSync">Not synced yet</small></div>
@@ -727,11 +744,6 @@
       </div>
       <div class="row push-action-row push-diag-actions">
         <button class="secondary" type="button" id="refreshPushDiagnosticsBtn">Refresh diagnostics</button>
-        <button class="secondary" type="button" id="copyPushDiagnosticsBtn">Copy diagnostics</button>
-      </div>
-      <div class="push-worker-detail" id="pushWorkerDetail">
-        <strong>Background service details</strong>
-        <p id="pushWorkerDetailText">Waiting for service-worker check…</p>
       </div>
       <p class="muted tiny-note" id="pushLastTestText">No test push sent from this device yet.</p>
 

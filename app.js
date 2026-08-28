@@ -84,6 +84,7 @@ const PUBLIC_STOREFRONT_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/
 let publicVisitorMode=false;
 let publicStoreLoaded=false;
 let publicStoreLoading=false;
+let storeAvailability={status:"open",turnaround:"3–5 days",notice:"",reopen_date:null,capacity_limit:null,auto_pause_at_capacity:false,active_orders:0,at_capacity:false,accepting_requests:true};
 let publicStoreLastDiagnostic="";
 let photoRepairInFlight=null;
 const photoRepairAttempts=new Set();
@@ -353,6 +354,7 @@ async function loadPublicStorefront(showError=true){
 
     items=(data.products||[]).map(normalizePublicPrint);
     filaments=(data.filaments||[]).map(normalizePublicFilament);
+    if(data.store)storeAvailability={...storeAvailability,...data.store};
     publicStoreLoaded=true;
     setPublicStoreState("",false,false);
     renderAll();
@@ -512,6 +514,20 @@ function wireProductImageFallbacks(root=document){
   });
 }
 
+function renderStoreAvailability(){
+  if(!customerMode)return;
+  const a=storeAvailability||{};
+  const status=a.status||"open", full=!!a.at_capacity, accepting=a.accepting_requests!==false;
+  const label=full?"FULL":status.toUpperCase();
+  const parts=[];
+  if(a.turnaround)parts.push(`Estimated turnaround: ${a.turnaround}`);
+  if(Number(a.active_orders)>=0&&a.capacity_limit)parts.push(`${a.active_orders}/${a.capacity_limit} active orders`);
+  if(a.notice)parts.push(a.notice);
+  if(!accepting&&a.reopen_date)parts.push(`Expected reopening: ${a.reopen_date}`);
+  $("customerModeBadge").textContent=label;
+  $("customerModeBarText").textContent=parts.join(" · ")||(accepting?"New print requests are open.":"New print requests are temporarily paused.");
+}
+
 function renderShop(){
   if(publicVisitorMode&&!publicStoreLoaded){
     document.body.classList.toggle("customer-mode",true);
@@ -567,7 +583,8 @@ function renderShop(){
   $("customerStoreTabs").classList.toggle("hidden",!customerMode);
   document.body.classList.toggle("customer-mode",customerMode);
   document.body.classList.toggle("public-visitor",publicVisitorMode);
-  if(publicVisitorMode){$("customerModeBarTitle").textContent="Live Customer Store";$("customerModeBarText").textContent="Products and filament availability are synced from PrintBook.";$("customerModeBadge").textContent="LIVE"}
+  if(publicVisitorMode){$("customerModeBarTitle").textContent="Live Customer Store"}
+  renderStoreAvailability();
   setCustomerStoreTab(customerStoreTab);
 }
 
@@ -1104,6 +1121,7 @@ function openRequestPrint(){
 }
 async function submitPrintRequest(){
   const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
+  if((publicVisitorMode||customerMode)&&storeAvailability.accepting_requests===false)return toast(storeAvailability.at_capacity?"The store is at order capacity right now":"New print requests are temporarily paused");
   const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
   const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim();
   const wantsMulticolor=!!item.multicolor_capable && $("requestColorMode").value==="multi";
@@ -1785,11 +1803,34 @@ async function sendTestPush(){
   }catch(err){console.error(err);toast(err?.message||"Couldn't send test push");await refreshPushDiagnostics().catch(()=>{})}
 }
 
+async function loadStoreAvailabilitySettings(){
+  if(!supabaseClient||!currentUser)return;
+  const {data,error}=await supabaseClient.from("store_settings").select("availability_status,turnaround_text,storefront_notice,reopen_date,capacity_limit,auto_pause_at_capacity").eq("user_id",currentUser.id).maybeSingle();
+  if(error){console.error(error);return}
+  const d=data||{};
+  $("storeAvailabilityStatus").value=d.availability_status||"open";
+  $("storeTurnaroundInput").value=d.turnaround_text||"3–5 days";
+  $("storeNoticeInput").value=d.storefront_notice||"";
+  $("storeReopenDateInput").value=d.reopen_date||"";
+  $("storeCapacityInput").value=d.capacity_limit||"";
+  $("storeAutoPauseInput").checked=!!d.auto_pause_at_capacity;
+  $("storeAvailabilityBadge").textContent=(d.availability_status||"open").toUpperCase();
+}
+async function saveStoreAvailability(){
+  if(!supabaseClient||!currentUser)return toast("Sign in to change store availability");
+  const row={user_id:currentUser.id,availability_status:$("storeAvailabilityStatus").value,turnaround_text:$("storeTurnaroundInput").value.trim()||"3–5 days",storefront_notice:$("storeNoticeInput").value.trim(),reopen_date:$("storeReopenDateInput").value||null,capacity_limit:$("storeCapacityInput").value?Math.max(1,Number($("storeCapacityInput").value)):null,auto_pause_at_capacity:$("storeAutoPauseInput").checked,updated_at:nowISO()};
+  const {error}=await supabaseClient.from("store_settings").upsert(row);
+  if(error){console.error(error);return toast("Couldn't save store availability")}
+  storeAvailability={...storeAvailability,status:row.availability_status,turnaround:row.turnaround_text,notice:row.storefront_notice,reopen_date:row.reopen_date,capacity_limit:row.capacity_limit,auto_pause_at_capacity:row.auto_pause_at_capacity};
+  $("storeAvailabilityBadge").textContent=row.availability_status.toUpperCase();toast("Store availability updated");
+}
+
 function openSettings(){
   $("supabaseUrlInput").value=settings.supabaseUrl||"";
   $("supabaseKeyInput").value=settings.supabaseKey||"";
   $("customerModePinInput").value=settings.customerModePin||"";
   renderPresets();updateCloudUI();
+  loadStoreAvailabilitySettings().catch(console.error);
   $("settingsDialog").showModal();
   resolveCurrentUser().then(async()=>{await refreshPushStatus();await refreshPushDiagnostics()}).catch(()=>refreshPushStatus().catch(()=>{}));
 }
@@ -2130,6 +2171,7 @@ $("addColorwayBtn").onclick=()=>openColorway();$("closeColorway").onclick=()=>$(
 $("openSalesBtn").onclick=openSalesHistory;$("closeSalesHistory").onclick=()=>$("salesHistoryDialog").close();$("closeSale").onclick=()=>$("saleDialog").close();$("salePrint").onchange=()=>{populateSaleVariants();syncSalePrice()};$("saleVariant").onchange=syncSalePrice;$("saleQty").oninput=()=>{autoDeal();updateSalePreview()};["salePrice","saleDiscountValue"].forEach(id=>$(id).oninput=updateSalePreview);$("saleDiscountType").onchange=updateSalePreview;$("saveSaleBtn").onclick=saveSale;
 $("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDialog").close();$("saveOrderBtn").onclick=saveOrder;$("deleteOrderBtn").onclick=deleteOrder;document.querySelectorAll("#orderFilter button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#orderFilter button").forEach(x=>x.classList.remove("active"));b.classList.add("active");orderStatusFilter=b.dataset.status;renderOrders()});
 $("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;
+$("saveStoreAvailabilityBtn").onclick=saveStoreAvailability;
 $("closeSettings").onclick=()=>$("settingsDialog").close();$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
 window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));
 document.addEventListener("visibilitychange",()=>{

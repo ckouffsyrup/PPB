@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.2.6-customer-mode-push";
+const CACHE="printbook-v5.3-store-availability";
 const CORE_ASSETS=["./","./index.html","./styles.css","./app.js"];
 
 self.addEventListener("install",event=>{
