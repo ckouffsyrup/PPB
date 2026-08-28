@@ -642,3 +642,12 @@ body.menu-open{
 .push-diag-cell strong.warn{color:var(--yellow)}
 .push-diag-actions{margin-top:8px}
 @media(max-width:620px){.push-diagnostics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* v5.2.2 background-service diagnostics */
+.push-worker-detail{margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#0e0c13;overflow-wrap:anywhere}
+.push-worker-detail strong{display:block;font-size:11px;margin-bottom:5px}
+.push-worker-detail p{margin:0;color:var(--muted);font-size:10px;line-height:1.5;white-space:pre-wrap}
+.push-worker-detail.problem{border-color:#7b3341;background:#241117}
+.push-worker-detail.problem p{color:#ff9aaa}
+.push-worker-detail.ok{border-color:#285b49;background:#0e1b17}
+.push-worker-detail.ok p{color:#82dfb7}

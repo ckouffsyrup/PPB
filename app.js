@@ -88,6 +88,8 @@ let publicStoreLastDiagnostic="";
 let photoRepairInFlight=null;
 const photoRepairAttempts=new Set();
 let brandOwnerTapCount=0,brandOwnerTapTimer=null;
+let lastServiceWorkerProbe=null;
+let lastServiceWorkerError="";
 let publicRequestRefreshTimer=null;
 let waitingServiceWorker=null;
 let pendingPushLaunchView=new URL(location.href).searchParams.get("open")||"";
@@ -1223,6 +1225,72 @@ async function getPushPublicKey(){
   if(!data.publicKey) throw new Error("VAPID public key is not configured in Supabase.");
   return data.publicKey;
 }
+function serviceWorkerScriptUrl(){
+  return new URL("./sw.js",document.baseURI).href;
+}
+function serviceWorkerScopeUrl(){
+  return new URL("./",document.baseURI).href;
+}
+function serviceWorkerErrorMessage(err){
+  if(!err)return "";
+  return `${err?.name?err.name+": ":""}${err?.message||String(err)}`;
+}
+async function probeServiceWorkerScript(){
+  const url=serviceWorkerScriptUrl();
+  const probe={url,scope:serviceWorkerScopeUrl(),status:null,ok:false,contentType:"",finalUrl:"",sample:"",error:""};
+  try{
+    const join=url.includes("?")?"&":"?";
+    const res=await fetch(`${url}${join}pb_sw_probe=${Date.now()}`,{
+      method:"GET",cache:"no-store",credentials:"same-origin",
+      headers:{"Accept":"application/javascript,text/javascript,*/*;q=0.1"}
+    });
+    probe.status=res.status;probe.ok=res.ok;
+    probe.contentType=res.headers.get("content-type")||"";
+    probe.finalUrl=res.url||url;
+    const text=await res.text();
+    probe.sample=text.slice(0,120).replace(/\s+/g," ").trim();
+    if(!res.ok)probe.error=`sw.js returned HTTP ${res.status}`;
+    else if(/text\/html/i.test(probe.contentType))probe.error="sw.js returned HTML instead of JavaScript";
+    else if(!/(javascript|ecmascript|text\/plain|application\/octet-stream)/i.test(probe.contentType||"")){
+      probe.error=`Unexpected Content-Type: ${probe.contentType||"(missing)"}`;
+    }
+  }catch(err){probe.error=serviceWorkerErrorMessage(err)}
+  lastServiceWorkerProbe=probe;
+  return probe;
+}
+function formatWorkerDetail(info=null){
+  const p=lastServiceWorkerProbe,parts=[];
+  if(p){
+    parts.push(`Script: ${p.url}`);
+    parts.push(`HTTP: ${p.status??"no response"}${p.contentType?` · ${p.contentType}`:""}`);
+    if(p.finalUrl&&p.finalUrl!==p.url)parts.push(`Final URL: ${p.finalUrl}`);
+    if(p.error)parts.push(`Probe: ${p.error}`);
+  }
+  if(info)parts.push(`Registration: ${info.registered?"yes":"no"} · active: ${info.active?"yes":"no"} · controlling: ${info.controlling?"yes":"no"}${info.state?` · state: ${info.state}`:""}`);
+  if(lastServiceWorkerError)parts.push(`Last error: ${lastServiceWorkerError}`);
+  return parts.join("\n")||"No service-worker diagnostic data yet.";
+}
+function renderWorkerDetail(info=null){
+  const box=$("pushWorkerDetail"),text=$("pushWorkerDetailText");
+  if(!box||!text)return;
+  text.textContent=formatWorkerDetail(info);
+  const bad=!!lastServiceWorkerError||!!lastServiceWorkerProbe?.error||info?.supported===false;
+  box.classList.toggle("problem",bad);
+  box.classList.toggle("ok",!bad&&!!info?.active);
+}
+async function copyPushDiagnostics(){
+  const info=await inspectServiceWorker().catch(()=>null);
+  const lines=[
+    "PrintBook push diagnostics",
+    `Page: ${location.href}`,
+    `Standalone: ${isStandalonePWA()}`,
+    `Permission: ${typeof Notification!=="undefined"?Notification.permission:"unsupported"}`,
+    formatWorkerDetail(info),
+    `User agent: ${navigator.userAgent}`
+  ];
+  try{await navigator.clipboard.writeText(lines.join("\n"));toast("Push diagnostics copied")}
+  catch{toast("Couldn't copy diagnostics")}
+}
 function withTimeout(promise,ms,label="Operation"){
   let timer;
   return Promise.race([
@@ -1234,65 +1302,73 @@ function withTimeout(promise,ms,label="Operation"){
 }
 async function inspectServiceWorker(){
   if(!("serviceWorker" in navigator)){
-    return {supported:false,registered:false,active:false,controlling:false,state:"Unsupported",registration:null};
+    const info={supported:false,registered:false,active:false,controlling:false,state:"Unsupported",registration:null};
+    renderWorkerDetail(info);return info;
   }
-
   let registration=null;
   try{
-    registration=await navigator.serviceWorker.getRegistration();
+    registration=await navigator.serviceWorker.getRegistration(serviceWorkerScopeUrl());
     if(!registration){
       const regs=await navigator.serviceWorker.getRegistrations();
-      registration=regs.find(r=>location.href.startsWith(r.scope))||regs[0]||null;
+      registration=regs.find(r=>location.href.startsWith(r.scope))||null;
     }
   }catch(err){
-    return {supported:true,registered:false,active:false,controlling:!!navigator.serviceWorker.controller,state:"Inspection error",registration:null,error:err};
+    lastServiceWorkerError=serviceWorkerErrorMessage(err);
+    const info={supported:true,registered:false,active:false,controlling:!!navigator.serviceWorker.controller,state:"Inspection error",registration:null,error:err};
+    renderWorkerDetail(info);return info;
   }
-
   const worker=registration?.active||registration?.waiting||registration?.installing||null;
-  const controlling=!!navigator.serviceWorker.controller;
-
-  return {
-    supported:true,
-    registered:!!registration,
-    active:!!registration?.active,
-    controlling,
-    state:worker?.state|| (registration?"Registered":"Missing"),
-    registration
+  const info={
+    supported:true,registered:!!registration,active:!!registration?.active,
+    controlling:!!navigator.serviceWorker.controller,
+    state:worker?.state||(registration?"Registered":"Missing"),registration
   };
+  renderWorkerDetail(info);return info;
 }
 async function ensureServiceWorkerReady({timeoutMs=12000,registerIfMissing=true}={}){
   if(!("serviceWorker" in navigator))throw new Error("Service workers are not supported on this device.");
 
-  let info=await inspectServiceWorker();
+  const probe=await probeServiceWorkerScript();
+  if(!probe.ok||probe.error){
+    lastServiceWorkerError=probe.error||`sw.js returned HTTP ${probe.status}`;
+    renderWorkerDetail(await inspectServiceWorker().catch(()=>null));
+    throw new Error(`Background-service file check failed: ${lastServiceWorkerError}`);
+  }
 
-  if(!info.registration && registerIfMissing){
+  let info=await inspectServiceWorker();
+  if(!info.registration&&registerIfMissing){
     try{
-      await navigator.serviceWorker.register("sw.js");
+      lastServiceWorkerError="";
+      const reg=await navigator.serviceWorker.register(serviceWorkerScriptUrl(),{
+        scope:new URL("./",document.baseURI).pathname,
+        updateViaCache:"none"
+      });
+      try{await reg.update()}catch{}
     }catch(err){
-      throw new Error(`PrintBook couldn't register its service worker: ${err?.message||err}`);
+      lastServiceWorkerError=serviceWorkerErrorMessage(err);
+      renderWorkerDetail(await inspectServiceWorker().catch(()=>null));
+      throw new Error(`PrintBook couldn't register its service worker: ${lastServiceWorkerError}`);
     }
     info=await inspectServiceWorker();
   }
 
   if(!info.registration){
-    throw new Error("PrintBook has no service worker registration.");
+    lastServiceWorkerError=lastServiceWorkerError||"Registration call completed but no registration exists.";
+    renderWorkerDetail(info);
+    throw new Error("PrintBook still has no service worker registration. Check Background service details below.");
   }
 
-  let reg;
   try{
-    reg=await withTimeout(navigator.serviceWorker.ready,timeoutMs,"Service worker readiness");
+    const reg=await withTimeout(navigator.serviceWorker.ready,timeoutMs,"Service worker readiness");
+    lastServiceWorkerError="";
+    renderWorkerDetail(await inspectServiceWorker());
+    return reg;
   }catch(err){
     const after=await inspectServiceWorker();
-    const details=[
-      after.registered?"registered":"not registered",
-      after.active?"active":"not active",
-      after.controlling?"controlling page":"not controlling page",
-      after.state?`state ${after.state}`:""
-    ].filter(Boolean).join(" · ");
-    throw new Error(`${err.message}. Current state: ${details}.`);
+    lastServiceWorkerError=`${err.message}. ${after.registered?"registered":"not registered"} · ${after.active?"active":"not active"} · ${after.controlling?"controlling":"not controlling"} · ${after.state||"unknown state"}`;
+    renderWorkerDetail(after);
+    throw new Error(lastServiceWorkerError);
   }
-
-  return reg;
 }
 async function getCurrentPushSubscription(){
   if(!pushSupported())return null;
@@ -1370,6 +1446,7 @@ function setPushDiag(id,text,state=""){
   const el=$(id);if(!el)return;el.textContent=text;el.className=state;
 }
 async function refreshPushDiagnostics(){
+  await probeServiceWorkerScript();
   const last=localStorage.getItem("printbook:lastPushTest");
   if($("pushLastTestText"))$("pushLastTestText").textContent=last?`Last test: ${new Date(last).toLocaleString()}`:"No test push sent from this device yet.";
   setPushDiag("pushDiagPermission",pushSupported()?Notification.permission:"Unsupported",pushSupported()?(Notification.permission==="granted"?"ok":Notification.permission==="denied"?"bad":"warn"):"bad");
@@ -1392,6 +1469,8 @@ async function refreshPushDiagnostics(){
     console.warn("Service worker diagnostic failed",err);
     setPushDiag("pushDiagWorker","Inspection error","bad");
   }
+
+  renderWorkerDetail(workerInfo);
 
   let sub=null;
   try{
@@ -1981,7 +2060,7 @@ $("drawerBackdrop").addEventListener("touchmove",e=>e.preventDefault(),{passive:
 $("sideDrawer").addEventListener("touchmove",e=>e.stopPropagation(),{passive:true});
 $("drawerPriceBtn").onclick=()=>{closeMenu();openPriceHelper()};$("drawerSalesBtn").onclick=()=>{closeMenu();openSalesHistory()};$("drawerSettingsBtn").onclick=()=>{closeMenu();openSettings()};$("drawerCustomerBtn").onclick=enterCustomerMode;$("drawerNotificationsBtn").onclick=()=>{closeMenu();openNotifications()};
 $("dashboardAddBtn").onclick=$("addBtn").onclick=$("mobileAddBtn").onclick=$("shopAddBtn").onclick=()=>openEditor();$("dashboardPriceBtn").onclick=$("helpPriceBtn").onclick=openPriceHelper;$("customerModeBtn").onclick=enterCustomerMode;
-$("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;$("refreshPushDiagnosticsBtn").onclick=refreshPushDiagnostics;
+$("notificationBtn").onclick=openNotifications;$("closeNotifications").onclick=()=>$("notificationsDialog").close();$("openNotificationsFromSettingsBtn").onclick=openNotifications;$("enableNotificationsBtn").onclick=enableBrowserNotifications;$("testPushBtn").onclick=sendTestPush;$("disablePushBtn").onclick=disablePush;$("refreshPushDiagnosticsBtn").onclick=refreshPushDiagnostics;$("copyPushDiagnosticsBtn").onclick=copyPushDiagnostics;
 $("settingsBtn").onclick=openSettings;$("syncBtn").onclick=()=>pullCloud(true);
 $("applyAppUpdateBtn").onclick=applyAppUpdate;
 $("checkForUpdateBtn").onclick=()=>checkForAppUpdate(true);
@@ -2046,14 +2125,29 @@ document.addEventListener("keydown",e=>{
 });
 async function registerPrintBookServiceWorker(){
   if(!("serviceWorker" in navigator))return null;
+  const probe=await probeServiceWorkerScript();
+  if(!probe.ok||probe.error){
+    lastServiceWorkerError=probe.error||`sw.js returned HTTP ${probe.status}`;
+    console.warn("Service worker probe failed",probe);
+    renderWorkerDetail(await inspectServiceWorker().catch(()=>null));
+    return null;
+  }
   try{
-    const reg=await navigator.serviceWorker.register("sw.js");
+    const reg=await navigator.serviceWorker.register(serviceWorkerScriptUrl(),{
+      scope:new URL("./",document.baseURI).pathname,
+      updateViaCache:"none"
+    });
+    lastServiceWorkerError="";
     watchServiceWorkerRegistration(reg);
     rememberWaitingWorker(reg);
     initAppUpdateFlow();
+    try{await reg.update()}catch{}
+    renderWorkerDetail(await inspectServiceWorker());
     return reg;
   }catch(err){
+    lastServiceWorkerError=serviceWorkerErrorMessage(err);
     console.warn("Service worker registration failed",err);
+    renderWorkerDetail(await inspectServiceWorker().catch(()=>null));
     return null;
   }
 }
