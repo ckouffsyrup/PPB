@@ -9,18 +9,18 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
+window.PRINTBOOK_BUILD="5.3.5";
 
-// v5.3.4: bind Cloud Sync sign-in at the document level immediately.
-// This survives a later UI-initialization error that could prevent the old
-// bottom-of-file `signInBtn.onclick = signIn` assignment from ever running.
+// v5.3.5: resilient Cloud Sync sign-in binding.
+// Keep this delegated so it survives later UI setup errors, but do NOT stop
+// propagation globally; that could interfere with other controls in some WebKit builds.
 document.addEventListener("click",event=>{
   const btn=event.target?.closest?.("#signInBtn");
   if(!btn)return;
   event.preventDefault();
-  event.stopImmediatePropagation();
   if(btn.dataset.loginRunning==="1")return;
   signIn();
-},true);
+});
 
 const defaultPresets=[
   {id:"normal",name:"Normal",machineRate:2,markup:1.5,minimum:8,roundTo:1},

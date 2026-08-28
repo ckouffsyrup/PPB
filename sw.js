@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.3.4-signin-button-fix";
+const CACHE="printbook-v5.3.5-cache-reset";
 const CORE_ASSETS=["./","./index.html","./styles.css","./app.js"];
 
 self.addEventListener("install",event=>{
@@ -45,6 +45,22 @@ self.addEventListener("fetch",event=>{
   }
 
   event.respondWith((async()=>{
+    // Critical app files are network-first so a newly deployed PrintBook build
+    // cannot be trapped behind an older service-worker cache.
+    const critical=/\/(app\.js|styles\.css)$/.test(url.pathname);
+    if(critical){
+      try{
+        const fresh=await fetch(new Request(event.request,{cache:"no-store"}));
+        if(fresh.ok){
+          const cache=await caches.open(CACHE);
+          cache.put(event.request,fresh.clone()).catch(()=>{});
+        }
+        return fresh;
+      }catch{
+        const cached=await caches.match(event.request,{ignoreSearch:true});
+        return cached||new Response("",{status:504,statusText:"Offline"});
+      }
+    }
     const cached=await caches.match(event.request);
     if(cached)return cached;
     try{
