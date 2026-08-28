@@ -216,18 +216,23 @@ body.customer-mode .shop-card{
 body.customer-mode .shop-card-photo{aspect-ratio:4/3;min-height:0}
 body.customer-mode .shop-card-photo img{transition:transform .35s ease}
 @media (hover:hover){body.customer-mode .shop-card:hover .shop-card-photo img{transform:scale(1.025)}}
-body.customer-mode .price-chip{
-  top:12px;right:12px;
-  border:1px solid rgba(255,255,255,.13);
-  background:rgba(8,7,12,.78);
-  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+body.customer-mode .price-chip{display:none !important}
+body.customer-mode .shop-card-footer{
+  margin-top:14px;
+  padding-top:13px;
+  border-top:1px solid rgba(255,255,255,.07);
+  align-items:end;
+}
+body.customer-mode .shop-price{
   color:#fff;
+  font-size:21px;
+  line-height:1;
   font-weight:900;
+  letter-spacing:-.025em
 }
 body.customer-mode .shop-card-body{padding:16px 16px 17px}
 body.customer-mode .shop-card-body h3{font-size:16px;letter-spacing:-.015em}
 body.customer-mode .shop-card-body>p{color:rgba(255,255,255,.43)}
-body.customer-mode .shop-price{color:#fff;font-size:17px;font-weight:900}
 body.customer-mode .shop-stock{color:rgba(255,255,255,.48)}
 body.customer-mode .shop-stock strong{color:var(--store-accent)}
 body.customer-mode .shop-deal{border-color:color-mix(in srgb,var(--store-accent) 25%,transparent);background:var(--store-accent-soft);color:#f6f0ff}
