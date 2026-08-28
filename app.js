@@ -1112,7 +1112,7 @@ async function submitPrintRequest(){
   if(wantsMulticolor&&colorIds.length>maxColors)return toast(`Choose no more than ${maxColors} colors`);
   const estimate=requestUnitPrice()*qty;
 
-  if(publicVisitorMode){
+  if(publicVisitorMode||customerMode){
     const btn=$("submitPrintRequestBtn"),oldLabel=btn.textContent;btn.disabled=true;btn.textContent="Submitting…";
     try{
       await submitPublicPrintRequest({print_id:item.id,variant_id:variantId||"",filament_id:wantsMulticolor?"":(filamentId||""),color_mode:wantsMulticolor?"multi":"single",color_ids:colorIds,customer,contact,quantity:qty,notes:userNotes});
