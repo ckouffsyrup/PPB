@@ -654,9 +654,9 @@
 
 <!-- SETTINGS -->
 <dialog id="settingsDialog">
-  <div class="sheet settings-sheet">
+  <form method="dialog" class="sheet settings-sheet" id="settingsForm">
     <div class="sheet-grabber"></div>
-    <div class="sheet-header"><div><p class="eyebrow">SETTINGS</p><h2>PrintBook setup</h2></div><button class="icon-btn" type="button" id="closeSettings">✕</button></div>
+    <div class="sheet-header"><div><p class="eyebrow">SETTINGS</p><h2>PrintBook setup</h2></div><button class="icon-btn" type="submit" value="cancel" id="closeSettings" aria-label="Close settings">✕</button></div>
 
     <section class="settings-section">
       <div class="section-heading"><div><h3>Pricing presets</h3><p class="muted">Normal, friend, event, wholesale — whatever you use.</p></div><button class="secondary small" id="addPresetBtn" type="button">+ Preset</button></div>
@@ -778,8 +778,8 @@
       <div class="row"><button class="secondary" type="button" id="exportBtn">Export JSON</button><label class="button-like">Import JSON<input id="importInput" type="file" accept=".json,application/json" hidden /></label></div>
     </section>
 
-    <button class="primary full-width" id="saveSettingsBtn" type="button">Save settings</button>
-  </div>
+    <button class="primary full-width" id="saveSettingsBtn" type="submit" value="save">Save settings</button>
+  </form>
 </dialog>
 
 <!-- PRESET EDITOR -->
@@ -800,6 +800,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.3.6"></script>
+<script src="app.js?v=5.3.7"></script>
 </body>
 </html>

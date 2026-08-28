@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.3.6";
+window.PRINTBOOK_BUILD="5.3.7";
 
 // Keep a failed/slow action from making the rest of PrintBook feel frozen.
 // Only the button that started an action may be temporarily disabled.
@@ -2291,7 +2291,7 @@ $("openSalesBtn").onclick=openSalesHistory;$("closeSalesHistory").onclick=()=>$(
 $("addOrderBtn").onclick=()=>openOrder();$("closeOrder").onclick=()=>$("orderDialog").close();$("saveOrderBtn").onclick=saveOrder;$("deleteOrderBtn").onclick=deleteOrder;document.querySelectorAll("#orderFilter button").forEach(b=>b.onclick=()=>{document.querySelectorAll("#orderFilter button").forEach(x=>x.classList.remove("active"));b.classList.add("active");orderStatusFilter=b.dataset.status;renderOrders()});
 $("closePriceHelper").onclick=()=>$("priceHelperDialog").close();$("hpAddFilament").onclick=()=>addUsageRow("hpFilamentRows");["hpHours","hpExtra","hpComplexity","hpPreset"].forEach(id=>$(id).oninput=updateHelperPreview);$("hpUsePriceBtn").onclick=helperToPrint;
 $("saveStoreAvailabilityBtn").onclick=saveStoreAvailability;
-$("closeSettings").onclick=()=>$("settingsDialog").close();$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
+$("closeSettings").onclick=()=>{$("settingsDialog").close()};$("saveSettingsBtn").onclick=saveSettings;$("addPresetBtn").onclick=()=>openPreset();$("closePreset").onclick=()=>$("presetDialog").close();$("savePresetBtn").onclick=savePreset;$("deletePresetBtn").onclick=deletePreset;$("signInBtn").onclick=signIn;$("signUpBtn").onclick=signUp;$("signOutBtn").onclick=signOut;$("pushLocalBtn").onclick=pushLocal;$("exportBtn").onclick=exportData;$("importInput").onchange=importData;
 window.addEventListener("online",()=>{if(currentUser)pullCloud(false);else setSyncState("local","Back online")});window.addEventListener("offline",()=>setSyncState("offline","Offline — changes saved locally"));
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="visible"){
