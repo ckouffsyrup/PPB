@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.3.5-cache-reset";
+const CACHE="printbook-v5.3.6-cache-reset";
 const CORE_ASSETS=["./","./index.html","./styles.css","./app.js"];
 
 self.addEventListener("install",event=>{

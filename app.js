@@ -9,7 +9,18 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.3.5";
+window.PRINTBOOK_BUILD="5.3.6";
+
+// Keep a failed/slow action from making the rest of PrintBook feel frozen.
+// Only the button that started an action may be temporarily disabled.
+function restoreInteractiveButtons(){
+  document.querySelectorAll('button[data-busy="1"]').forEach(btn=>{
+    btn.disabled=false;
+    delete btn.dataset.busy;
+  });
+}
+window.addEventListener("pageshow",()=>restoreInteractiveButtons());
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")restoreInteractiveButtons()});
 
 // v5.3.5: resilient Cloud Sync sign-in binding.
 // Keep this delegated so it survives later UI setup errors, but do NOT stop
@@ -1856,11 +1867,21 @@ async function loadStoreAvailabilitySettings(){
 }
 async function saveStoreAvailability(){
   if(!supabaseClient||!currentUser)return toast("Sign in to change store availability");
-  const row={user_id:currentUser.id,availability_status:$("storeAvailabilityStatus").value,turnaround_text:$("storeTurnaroundInput").value.trim()||"3–5 days",storefront_notice:$("storeNoticeInput").value.trim(),reopen_date:$("storeReopenDateInput").value||null,capacity_limit:$("storeCapacityInput").value?Math.max(1,Number($("storeCapacityInput").value)):null,auto_pause_at_capacity:$("storeAutoPauseInput").checked,updated_at:nowISO()};
-  const {error}=await supabaseClient.from("store_settings").upsert(row);
-  if(error){console.error(error);return toast("Couldn't save store availability")}
-  storeAvailability={...storeAvailability,status:row.availability_status,turnaround:row.turnaround_text,notice:row.storefront_notice,reopen_date:row.reopen_date,capacity_limit:row.capacity_limit,auto_pause_at_capacity:row.auto_pause_at_capacity};
-  $("storeAvailabilityBadge").textContent=row.availability_status.toUpperCase();toast("Store availability updated");
+  const btn=$("saveStoreAvailabilityBtn"),oldLabel=btn?.textContent||"Save availability";
+  if(btn?.dataset.busy==="1")return;
+  if(btn){btn.dataset.busy="1";btn.disabled=true;btn.textContent="Saving…"}
+  try{
+    const row={user_id:currentUser.id,availability_status:$("storeAvailabilityStatus").value,turnaround_text:$("storeTurnaroundInput").value.trim()||"3–5 days",storefront_notice:$("storeNoticeInput").value.trim(),reopen_date:$("storeReopenDateInput").value||null,capacity_limit:$("storeCapacityInput").value?Math.max(1,Number($("storeCapacityInput").value)):null,auto_pause_at_capacity:$("storeAutoPauseInput").checked,updated_at:nowISO()};
+    const result=await Promise.race([
+      supabaseClient.from("store_settings").upsert(row),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error("Saving store availability timed out")),10000))
+    ]);
+    if(result?.error)throw result.error;
+    storeAvailability={...storeAvailability,status:row.availability_status,turnaround:row.turnaround_text,notice:row.storefront_notice,reopen_date:row.reopen_date,capacity_limit:row.capacity_limit,auto_pause_at_capacity:row.auto_pause_at_capacity};
+    $("storeAvailabilityBadge").textContent=row.availability_status.toUpperCase();
+    toast("Store availability updated");
+  }catch(error){console.error(error);toast(error?.message||"Couldn't save store availability")}
+  finally{if(btn){btn.disabled=false;btn.textContent=oldLabel;delete btn.dataset.busy}}
 }
 
 function openSettings(){
@@ -1872,7 +1893,25 @@ function openSettings(){
   $("settingsDialog").showModal();
   resolveCurrentUser().then(async()=>{await refreshPushStatus();await refreshPushDiagnostics()}).catch(()=>refreshPushStatus().catch(()=>{}));
 }
-function saveSettings(){settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();settings.customerModePin=normalizeCustomerPin($("customerModePinInput").value);persist();setupSupabase();$("settingsDialog").close();toast("Settings saved")}
+function saveSettings(){
+  const nextUrl=$("supabaseUrlInput").value.trim();
+  const nextKey=$("supabaseKeyInput").value.trim();
+  const credentialsChanged=nextUrl!==settings.supabaseUrl||nextKey!==settings.supabaseKey;
+  settings.supabaseUrl=nextUrl;
+  settings.supabaseKey=nextKey;
+  settings.customerModePin=normalizeCustomerPin($("customerModePinInput").value);
+  persist();
+  // Saving settings must never lock the rest of the UI. Close immediately and
+  // only rebuild the Supabase client when its credentials actually changed.
+  $("settingsDialog").close();
+  toast("Settings saved");
+  if(credentialsChanged){
+    setTimeout(()=>setupSupabase({skipPublicFallback:true}).catch(err=>{
+      console.error("Background Supabase reconfigure failed",err);
+      setSyncState("error","Cloud reconnect failed");
+    }),0);
+  }
+}
 
 function dbPrint(i){return {id:i.id,user_id:currentUser.id,name:i.name,category:i.category,price:i.price,hours:i.hours||null,extra_cost:i.extra_cost||0,notes:i.notes,favorite:!!i.favorite,model_source:i.model_source||null,made_qty:i.made_qty||0,sold_qty:i.sold_qty||0,preset_id:i.preset_id||null,filament_usage:i.filament_usage||[],variants:i.variants||[],deal_qty:i.deal_qty||0,deal_price:i.deal_price||0,out_of_stock_behavior:i.out_of_stock_behavior||"show",multicolor_capable:!!i.multicolor_capable,multicolor_max_colors:productMaxColors(i),multicolor_price_mode:i.multicolor_price_mode==="per_extra"?"per_extra":"flat",multicolor_surcharge:Math.max(0,Number(i.multicolor_surcharge||0)),photo_url:i.photo_url||null,created_at:i.created_at,updated_at:i.updated_at||nowISO()}}
 async function syncUpsert(table,row){
