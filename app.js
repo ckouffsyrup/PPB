@@ -1871,18 +1871,48 @@ function updateCloudUI(){
   if(!c&&syncState!=="error")setSyncState("local",settings.supabaseUrl?"Ready to sign in":"Local only")
 }
 async function signIn(){
+  const started=performance.now();
   settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();localStorage.setItem(K.settings,JSON.stringify(settings));
-  // Login should authenticate first. Do not make the user wait for a public-storefront
-  // fetch before Supabase can even check their email/password.
-  await setupSupabase({skipPublicFallback:true});
-  if(!supabaseClient)return toast("Add Supabase URL and key first");
-  setSyncState("syncing","Signing in…");
-  const {data,error}=await supabaseClient.auth.signInWithPassword({email:$("emailInput").value.trim(),password:$("passwordInput").value});
-  if(error){setSyncState("error",error.message);return toast(error.message)}
-  currentUser=data.user;deactivatePublicVisitorMode();customerMode=false;updateCloudUI();startRealtime();
-  setSyncState("syncing","Signed in · syncing data…");toast("Signed in");handlePushLaunchIntent();
-  // The auth-state listener schedules the cloud refresh. Keep login responsive and
-  // avoid a second blocking pullCloud() here.
+  if(!settings.supabaseUrl||!settings.supabaseKey)return toast("Add Supabase URL and key first");
+
+  // IMPORTANT: setupSupabase() already runs when PrintBook starts. Calling it again
+  // here used to recreate the client, call getSession(), and attach another auth
+  // listener before the password request was even sent. Repeated login attempts could
+  // therefore stack listeners and cloud refreshes. Reuse the ready client instead.
+  if(!supabaseClient){
+    if(!window.supabase)return toast("Supabase library isn't ready yet");
+    supabaseClient=window.supabase.createClient(settings.supabaseUrl,settings.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true}});
+  }
+
+  const btn=$("signInBtn");
+  const oldLabel=btn?.textContent||"Sign in";
+  if(btn){btn.disabled=true;btn.textContent="Signing in…"}
+  setSyncState("syncing","Contacting account server…");
+  let timer=setInterval(()=>{
+    const secs=Math.max(1,Math.round((performance.now()-started)/1000));
+    setSyncState("syncing",`Signing in… ${secs}s`);
+  },1000);
+  try{
+    const authPromise=supabaseClient.auth.signInWithPassword({email:$("emailInput").value.trim(),password:$("passwordInput").value});
+    const result=await Promise.race([
+      authPromise,
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error("Account server did not answer within 15 seconds")),15000))
+    ]);
+    const {data,error}=result;
+    if(error){setSyncState("error",error.message);return toast(error.message)}
+    currentUser=data.user;deactivatePublicVisitorMode();customerMode=false;updateCloudUI();startRealtime();
+    const ms=Math.round(performance.now()-started);
+    setSyncState("syncing",`Signed in in ${(ms/1000).toFixed(1)}s · syncing data…`);toast(`Signed in · ${(ms/1000).toFixed(1)}s`);handlePushLaunchIntent();
+    // Cloud data remains background work; auth success is never blocked by pullCloud().
+    setTimeout(()=>pullCloud(false).catch(()=>{}),0);
+  }catch(err){
+    const msg=err?.message||"Sign in failed";
+    console.error("PrintBook sign-in timing",{elapsed_ms:Math.round(performance.now()-started),message:msg});
+    setSyncState("error",msg);toast(msg);
+  }finally{
+    clearInterval(timer);
+    if(btn){btn.disabled=false;btn.textContent=oldLabel}
+  }
 }
 async function signUp(){
   settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();localStorage.setItem(K.settings,JSON.stringify(settings));await setupSupabase();if(!supabaseClient)return toast("Add Supabase URL and key first");
