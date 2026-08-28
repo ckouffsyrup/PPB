@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.7.1";
+window.PRINTBOOK_BUILD="5.7.2";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -1469,7 +1469,7 @@ async function openCustomerOrderPortal(orderNumber,token,{updateUrl=true}={}){
 }
 function clearCustomerPortalUrl(){const u=new URL(location.href);u.searchParams.delete("order");u.searchParams.delete("token");history.replaceState({},"",u)}
 function openCustomerStoreShare(){if($("customerStoreShareDialog"))$("customerStoreShareDialog").showModal()}
-async function shareCustomerStore(){const url="https://ckouffsyrup.github.io/PPB/";try{if(navigator.share)await navigator.share({title:"Karcen's Prints",text:"Check out Karcen's Prints",url});else{await navigator.clipboard.writeText(url);toast("Store link copied")}}catch(e){if(e?.name!=="AbortError")toast("Couldn't open sharing")}}
+async function shareCustomerStore(){const url="https://madebykarcen.com/";try{if(navigator.share)await navigator.share({title:"Karcen's Prints",text:"Check out Karcen's Prints",url});else{await navigator.clipboard.writeText(url);toast("Store link copied")}}catch(e){if(e?.name!=="AbortError")toast("Couldn't open sharing")}}
 function openFindCustomerOrder(){
   const list=customerSavedOrders(),wrap=$("recentCustomerOrdersWrap");wrap.classList.toggle("hidden",!list.length);
   $("recentCustomerOrders").innerHTML=list.map(x=>`<button class="recent-order-row" type="button" data-order="${safe(x.order_number)}"><div><strong>${safe(x.order_number)}</strong><small>${safe(x.item||"Print order")}</small></div><span>View →</span></button>`).join("");
@@ -2204,7 +2204,7 @@ async function saveStoreAvailability(){
   finally{if(btn){btn.disabled=false;btn.textContent=oldLabel;delete btn.dataset.busy}}
 }
 
-const PUBLIC_STORE_URL="https://ckouffsyrup.github.io/PPB/";
+const PUBLIC_STORE_URL="https://madebykarcen.com/";
 async function copyPublicStoreLink(){try{await navigator.clipboard.writeText(PUBLIC_STORE_URL);toast("Store link copied")}catch{toast(PUBLIC_STORE_URL)}}
 function openPublicStoreLink(){window.open(PUBLIC_STORE_URL,"_blank","noopener")}
 function openSettings(){
@@ -2634,7 +2634,7 @@ safeUiInit("startup-25",()=>{$("submitPrintRequestBtn").onclick=submitPrintReque
 safeUiInit("startup-25a",()=>{$("findMyOrderBtn").onclick=openFindCustomerOrder;$('closeFindCustomerOrder').onclick=()=>$("findCustomerOrderDialog").close();$("sendCustomerOrderRecoveryBtn").onclick=recoverCustomerOrders;});
 safeUiInit("startup-25b",()=>{$("closeCustomerOrderConfirmation").onclick=()=>$("customerOrderConfirmationDialog").close();$("copyCustomerOrderNumberBtn").onclick=async()=>{const n=$("customerOrderConfirmationDialog").dataset.orderNumber||"";try{await navigator.clipboard.writeText(n);toast("Order number copied")}catch{toast(n)}};$("viewCustomerOrderBtn").onclick=()=>{const d=$("customerOrderConfirmationDialog");const n=d.dataset.orderNumber,t=d.dataset.token;d.close();openCustomerOrderPortal(n,t)};});
 safeUiInit("startup-25c",()=>{$("closeCustomerOrderPortal").onclick=()=>{$("customerOrderPortalDialog").close();clearCustomerPortalUrl()};$("refreshCustomerOrderBtn").onclick=()=>activeCustomerPortalAccess&&openCustomerOrderPortal(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);$("copyCustomerOrderLinkBtn").onclick=async()=>{if(!activeCustomerPortalAccess)return;const link=customerOrderPrivateUrl(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);try{await navigator.clipboard.writeText(link);toast("Private order link copied")}catch{toast("Couldn't copy the link")}};$("customerPortalPayBtn").onclick=()=>{if(activeCustomerPortalPaymentLink)location.href=activeCustomerPortalPaymentLink};if($("acceptCustomerQuoteBtn"))$("acceptCustomerQuoteBtn").onclick=acceptCustomerQuote;});
-safeUiInit("startup-25d",()=>{if($("customerShareStoreBtn"))$("customerShareStoreBtn").onclick=openCustomerStoreShare;if($("customerShareStoreHeroBtn"))$("customerShareStoreHeroBtn").onclick=openCustomerStoreShare;if($("closeCustomerStoreShare"))$("closeCustomerStoreShare").onclick=()=>$("customerStoreShareDialog").close();if($("shareCustomerStoreBtn"))$("shareCustomerStoreBtn").onclick=shareCustomerStore;if($("copyCustomerStoreLinkBtn"))$("copyCustomerStoreLinkBtn").onclick=async()=>{try{await navigator.clipboard.writeText("https://ckouffsyrup.github.io/PPB/");toast("Store link copied")}catch{toast("Couldn't copy store link")}};});
+safeUiInit("startup-25d",()=>{if($("customerShareStoreBtn"))$("customerShareStoreBtn").onclick=openCustomerStoreShare;if($("customerShareStoreHeroBtn"))$("customerShareStoreHeroBtn").onclick=openCustomerStoreShare;if($("closeCustomerStoreShare"))$("closeCustomerStoreShare").onclick=()=>$("customerStoreShareDialog").close();if($("shareCustomerStoreBtn"))$("shareCustomerStoreBtn").onclick=shareCustomerStore;if($("copyCustomerStoreLinkBtn"))$("copyCustomerStoreLinkBtn").onclick=async()=>{try{await navigator.clipboard.writeText("https://madebykarcen.com/");toast("Store link copied")}catch{toast("Couldn't copy store link")}};});
 safeUiInit("startup-26",()=>{if($("refreshRequestsBtn"))$("refreshRequestsBtn").onclick=()=>refreshOrdersFromCloud({showToast:true});});
 safeUiInit("startup-27",()=>{document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));});
 safeUiInit("startup-28",()=>{$("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();});
