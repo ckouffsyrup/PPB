@@ -1223,9 +1223,82 @@ async function getPushPublicKey(){
   if(!data.publicKey) throw new Error("VAPID public key is not configured in Supabase.");
   return data.publicKey;
 }
+function withTimeout(promise,ms,label="Operation"){
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>{
+      timer=setTimeout(()=>reject(new Error(`${label} timed out after ${Math.round(ms/1000)}s`)),ms);
+    })
+  ]).finally(()=>clearTimeout(timer));
+}
+async function inspectServiceWorker(){
+  if(!("serviceWorker" in navigator)){
+    return {supported:false,registered:false,active:false,controlling:false,state:"Unsupported",registration:null};
+  }
+
+  let registration=null;
+  try{
+    registration=await navigator.serviceWorker.getRegistration();
+    if(!registration){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      registration=regs.find(r=>location.href.startsWith(r.scope))||regs[0]||null;
+    }
+  }catch(err){
+    return {supported:true,registered:false,active:false,controlling:!!navigator.serviceWorker.controller,state:"Inspection error",registration:null,error:err};
+  }
+
+  const worker=registration?.active||registration?.waiting||registration?.installing||null;
+  const controlling=!!navigator.serviceWorker.controller;
+
+  return {
+    supported:true,
+    registered:!!registration,
+    active:!!registration?.active,
+    controlling,
+    state:worker?.state|| (registration?"Registered":"Missing"),
+    registration
+  };
+}
+async function ensureServiceWorkerReady({timeoutMs=12000,registerIfMissing=true}={}){
+  if(!("serviceWorker" in navigator))throw new Error("Service workers are not supported on this device.");
+
+  let info=await inspectServiceWorker();
+
+  if(!info.registration && registerIfMissing){
+    try{
+      await navigator.serviceWorker.register("sw.js");
+    }catch(err){
+      throw new Error(`PrintBook couldn't register its service worker: ${err?.message||err}`);
+    }
+    info=await inspectServiceWorker();
+  }
+
+  if(!info.registration){
+    throw new Error("PrintBook has no service worker registration.");
+  }
+
+  let reg;
+  try{
+    reg=await withTimeout(navigator.serviceWorker.ready,timeoutMs,"Service worker readiness");
+  }catch(err){
+    const after=await inspectServiceWorker();
+    const details=[
+      after.registered?"registered":"not registered",
+      after.active?"active":"not active",
+      after.controlling?"controlling page":"not controlling page",
+      after.state?`state ${after.state}`:""
+    ].filter(Boolean).join(" · ");
+    throw new Error(`${err.message}. Current state: ${details}.`);
+  }
+
+  return reg;
+}
 async function getCurrentPushSubscription(){
   if(!pushSupported())return null;
-  const reg=await navigator.serviceWorker.ready;
+  const info=await inspectServiceWorker();
+  if(!info.registration)return null;
+  const reg=info.active ? info.registration : await ensureServiceWorkerReady({timeoutMs:7000,registerIfMissing:false});
   return reg.pushManager.getSubscription();
 }
 function deviceLabel(){
@@ -1301,13 +1374,37 @@ async function refreshPushDiagnostics(){
   if($("pushLastTestText"))$("pushLastTestText").textContent=last?`Last test: ${new Date(last).toLocaleString()}`:"No test push sent from this device yet.";
   setPushDiag("pushDiagPermission",pushSupported()?Notification.permission:"Unsupported",pushSupported()?(Notification.permission==="granted"?"ok":Notification.permission==="denied"?"bad":"warn"):"bad");
   setPushDiag("pushDiagStandalone",isIOS()?(isStandalonePWA()?"Installed":"Not installed"):(isStandalonePWA()?"Installed":"Browser"),isIOS()&&!isStandalonePWA()?"bad":"ok");
+  let workerInfo=null;
   try{
-    const reg="serviceWorker" in navigator?await navigator.serviceWorker.ready:null;
-    setPushDiag("pushDiagWorker",reg?"Ready":"Missing",reg?"ok":"bad");
-  }catch{setPushDiag("pushDiagWorker","Error","bad")}
+    workerInfo=await inspectServiceWorker();
+    if(!workerInfo.supported){
+      setPushDiag("pushDiagWorker","Unsupported","bad");
+    }else if(!workerInfo.registered){
+      setPushDiag("pushDiagWorker","Not registered","bad");
+    }else if(workerInfo.active&&workerInfo.controlling){
+      setPushDiag("pushDiagWorker","Active · controlling","ok");
+    }else if(workerInfo.active&&!workerInfo.controlling){
+      setPushDiag("pushDiagWorker","Active · reopen app","warn");
+    }else{
+      setPushDiag("pushDiagWorker",`Registered · ${workerInfo.state||"starting"}`,"warn");
+    }
+  }catch(err){
+    console.warn("Service worker diagnostic failed",err);
+    setPushDiag("pushDiagWorker","Inspection error","bad");
+  }
+
   let sub=null;
-  try{sub=await getCurrentPushSubscription();setPushDiag("pushDiagBrowserSub",sub?"Present":"Missing",sub?"ok":"bad")}
-  catch{setPushDiag("pushDiagBrowserSub","Error","bad")}
+  try{
+    if(workerInfo?.active){
+      sub=await workerInfo.registration.pushManager.getSubscription();
+      setPushDiag("pushDiagBrowserSub",sub?"Present":"Missing",sub?"ok":"warn");
+    }else{
+      setPushDiag("pushDiagBrowserSub","Waiting for worker","warn");
+    }
+  }catch(err){
+    console.warn("Browser subscription diagnostic failed",err);
+    setPushDiag("pushDiagBrowserSub","Error","bad");
+  }
   try{
     await resolveCurrentUser();
     const row=await cloudPushRegistration(sub);
@@ -1370,9 +1467,23 @@ async function refreshPushStatus(){
   }
 
   const permission=Notification.permission;
+
+  const workerInfo=await inspectServiceWorker();
+  if(!workerInfo.registered){
+    badge.textContent="Worker setup needed";
+    badge.classList.add("problem");
+    title.textContent="PrintBook's background service isn't registered yet";
+    text.textContent="Tap Enable Mobile Push. PrintBook will register the service worker before creating your phone subscription.";
+    $("enableNotificationsBtn").textContent="Set Up Push";
+    settings.pushEnabled=false;
+    localStorage.setItem(K.settings,JSON.stringify(settings));
+    await refreshPushDiagnostics();
+    return;
+  }
+
   let sub=null;
   try{
-    sub=await getCurrentPushSubscription();
+    if(workerInfo.active)sub=await workerInfo.registration.pushManager.getSubscription();
   }catch(err){
     console.warn("Could not inspect push subscription",err);
   }
@@ -1470,7 +1581,36 @@ async function enableBrowserNotifications(){
       return toast("Notification permission wasn't granted");
     }
 
-    const reg=await navigator.serviceWorker.ready;
+    const enableBtn=$("enableNotificationsBtn");
+    const originalEnableText=enableBtn?.textContent||"Enable Mobile Push";
+    if(enableBtn){
+      enableBtn.disabled=true;
+      enableBtn.textContent="Preparing background service…";
+    }
+    setPushDiag("pushDiagWorker","Preparing…","warn");
+
+    let reg;
+    try{
+      reg=await ensureServiceWorkerReady({timeoutMs:15000,registerIfMissing:true});
+    }catch(err){
+      if(enableBtn){
+        enableBtn.disabled=false;
+        enableBtn.textContent=originalEnableText;
+      }
+      await refreshPushDiagnostics().catch(()=>{});
+      throw err;
+    }
+
+    const afterWorker=await inspectServiceWorker();
+    if(!afterWorker.active){
+      if(enableBtn){
+        enableBtn.disabled=false;
+        enableBtn.textContent=originalEnableText;
+      }
+      throw new Error("The PrintBook service worker registered but did not become active. Fully close and reopen the Home Screen app once, then try again.");
+    }
+
+    if(enableBtn)enableBtn.textContent="Creating phone subscription…";
 
     // If permission is already granted (common after the iOS prompt), don't ask
     // again; just repair/create the actual Web Push subscription.
@@ -1484,14 +1624,16 @@ async function enableBrowserNotifications(){
     }
 
     if(!sub){
-      sub=await reg.pushManager.subscribe({
+      if(enableBtn)enableBtn.textContent="Registering with iPhone…";
+      sub=await withTimeout(reg.pushManager.subscribe({
         userVisibleOnly:true,
         applicationServerKey:urlBase64ToUint8Array(publicKey)
-      });
+      }),15000,"iPhone push subscription");
     }
 
     if(!sub)throw new Error("iPhone allowed notifications, but no push subscription was created.");
 
+    if(enableBtn)enableBtn.textContent="Saving device registration…";
     await savePushSubscription(sub);
 
     settings.pushEnabled=true;
@@ -1892,7 +2034,7 @@ document.addEventListener("visibilitychange",()=>{
     refreshOrdersFromCloud().catch(()=>{});
   }
 });
-window.addEventListener("load",()=>{if("serviceWorker" in navigator)navigator.serviceWorker.ready.then(()=>refreshPushStatus().catch(()=>{})).catch(()=>{})});
+window.addEventListener("load",()=>{if("serviceWorker" in navigator)setTimeout(()=>{refreshPushStatus().catch(()=>{});refreshPushDiagnostics().catch(()=>{})},300)});
 // Defensive recovery from older installed builds that may have left the
 // body fixed/offset. This runs before normal interaction and on page restore.
 clearLegacyMenuLock();
@@ -1902,13 +2044,27 @@ window.addEventListener("orientationchange",()=>setTimeout(clearLegacyMenuLock,8
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&$("sideDrawer").classList.contains("open")) closeMenu();
 });
-if("serviceWorker" in navigator)window.addEventListener("load",async()=>{
+async function registerPrintBookServiceWorker(){
+  if(!("serviceWorker" in navigator))return null;
   try{
     const reg=await navigator.serviceWorker.register("sw.js");
     watchServiceWorkerRegistration(reg);
     rememberWaitingWorker(reg);
     initAppUpdateFlow();
-  }catch(err){console.warn("Service worker registration failed",err)}
+    return reg;
+  }catch(err){
+    console.warn("Service worker registration failed",err);
+    return null;
+  }
+}
+registerPrintBookServiceWorker().then(()=>{
+  refreshPushDiagnostics().catch(()=>{});
+});
+window.addEventListener("load",()=>{
+  registerPrintBookServiceWorker().then(()=>{
+    refreshPushStatus().catch(()=>{});
+    refreshPushDiagnostics().catch(()=>{});
+  });
 });
 populatePresetSelects();renderAll();setupSupabase();showView("shop");
 
