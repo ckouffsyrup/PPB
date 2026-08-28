@@ -1225,6 +1225,12 @@ async function getPushPublicKey(){
   if(!data.publicKey) throw new Error("VAPID public key is not configured in Supabase.");
   return data.publicKey;
 }
+function setPushSetupStage(label){
+  const text=$("pushWorkerDetailText");
+  if(!text)return;
+  const detail=formatWorkerDetail?.(null)||"";
+  text.textContent=`Setup stage: ${label}\n${detail}`;
+}
 function serviceWorkerScriptUrl(){
   return new URL("./sw.js",document.baseURI).href;
 }
@@ -1240,10 +1246,17 @@ async function probeServiceWorkerScript(){
   const probe={url,scope:serviceWorkerScopeUrl(),status:null,ok:false,contentType:"",finalUrl:"",sample:"",error:""};
   try{
     const join=url.includes("?")?"&":"?";
-    const res=await fetch(`${url}${join}pb_sw_probe=${Date.now()}`,{
-      method:"GET",cache:"no-store",credentials:"same-origin",
-      headers:{"Accept":"application/javascript,text/javascript,*/*;q=0.1"}
-    });
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),5000);
+    let res;
+    try{
+      res=await fetch(`${url}${join}pb_sw_probe=${Date.now()}`,{
+        method:"GET",cache:"no-store",credentials:"same-origin",signal:controller.signal,
+        headers:{"Accept":"application/javascript,text/javascript,*/*;q=0.1"}
+      });
+    }finally{
+      clearTimeout(timer);
+    }
     probe.status=res.status;probe.ok=res.ok;
     probe.contentType=res.headers.get("content-type")||"";
     probe.finalUrl=res.url||url;
@@ -1356,6 +1369,14 @@ async function ensureServiceWorkerReady({timeoutMs=12000,registerIfMissing=true}
     lastServiceWorkerError=lastServiceWorkerError||"Registration call completed but no registration exists.";
     renderWorkerDetail(info);
     throw new Error("PrintBook still has no service worker registration. Check Background service details below.");
+  }
+
+  // iOS can leave navigator.serviceWorker.ready pending even while this
+  // registration is already active and controlling the installed PWA.
+  if(info.active){
+    lastServiceWorkerError="";
+    renderWorkerDetail(info);
+    return info.registration;
   }
 
   try{
@@ -1634,99 +1655,98 @@ async function refreshPushStatus(){
   await refreshPushDiagnostics();
 }
 async function enableBrowserNotifications(){
+  const enableBtn=$("enableNotificationsBtn");
+  const originalEnableText=enableBtn?.textContent||"Enable Mobile Push";
+  let setupWatchdog=null;
   try{
+    setupWatchdog=setTimeout(()=>{
+      lastServiceWorkerError="Push setup exceeded 25 seconds. Retry and check the last setup stage below.";
+      if(enableBtn){enableBtn.disabled=false;enableBtn.textContent="Retry Push Setup"}
+      setPushSetupStage("timed out");
+      toast("Push setup timed out — diagnostics updated");
+    },25000);
+
     await resolveCurrentUser();
-    if(!currentUser)return toast("Sign in to Cloud Sync first");
+    if(!currentUser)throw new Error("Sign in to Cloud Sync first");
 
     if(!pushSupported()){
       if(isIOS())$("iosPushHelp").classList.remove("hidden");
-      return toast(isIOS()?"Add PrintBook to your Home Screen first":"This browser does not support Web Push");
+      throw new Error(isIOS()?"Add PrintBook to your Home Screen first":"This browser does not support Web Push");
     }
-
     if(isIOS()&&!isStandalonePWA()){
       $("iosPushHelp").classList.remove("hidden");
-      return toast("Open PrintBook from its Home Screen icon first");
+      throw new Error("Open PrintBook from its Home Screen icon first");
     }
 
     let permission=Notification.permission;
-    if(permission==="default"){
-      permission=await Notification.requestPermission();
-    }
+    if(permission==="default")permission=await withTimeout(Notification.requestPermission(),10000,"Notification permission");
+    if(permission!=="granted")throw new Error("Notification permission wasn't granted");
 
-    if(permission!=="granted"){
-      settings.pushEnabled=false;
-      localStorage.setItem(K.settings,JSON.stringify(settings));
-      await refreshPushStatus();
-      return toast("Notification permission wasn't granted");
-    }
-
-    const enableBtn=$("enableNotificationsBtn");
-    const originalEnableText=enableBtn?.textContent||"Enable Mobile Push";
-    if(enableBtn){
-      enableBtn.disabled=true;
-      enableBtn.textContent="Preparing background service…";
-    }
+    if(enableBtn){enableBtn.disabled=true;enableBtn.textContent="Preparing background service…"}
     setPushDiag("pushDiagWorker","Preparing…","warn");
+    setPushSetupStage("checking active service worker");
 
-    let reg;
-    try{
-      reg=await ensureServiceWorkerReady({timeoutMs:15000,registerIfMissing:true});
-    }catch(err){
-      if(enableBtn){
-        enableBtn.disabled=false;
-        enableBtn.textContent=originalEnableText;
-      }
-      await refreshPushDiagnostics().catch(()=>{});
-      throw err;
-    }
+    const reg=await withTimeout(
+      ensureServiceWorkerReady({timeoutMs:8000,registerIfMissing:true}),
+      10000,
+      "Service worker setup"
+    );
 
     const afterWorker=await inspectServiceWorker();
-    if(!afterWorker.active){
-      if(enableBtn){
-        enableBtn.disabled=false;
-        enableBtn.textContent=originalEnableText;
-      }
-      throw new Error("The PrintBook service worker registered but did not become active. Fully close and reopen the Home Screen app once, then try again.");
-    }
+    if(!afterWorker.active)throw new Error("The service worker is registered but not active yet. Fully close and reopen PrintBook, then try again.");
 
-    if(enableBtn)enableBtn.textContent="Creating phone subscription…";
+    if(enableBtn)enableBtn.textContent="Checking phone subscription…";
+    setPushSetupStage("checking existing browser subscription");
+    let sub=await withTimeout(reg.pushManager.getSubscription(),5000,"Existing push subscription check");
 
-    // If permission is already granted (common after the iOS prompt), don't ask
-    // again; just repair/create the actual Web Push subscription.
-    let sub=await reg.pushManager.getSubscription();
-    const publicKey=await getPushPublicKey();
+    if(enableBtn)enableBtn.textContent="Loading push key…";
+    setPushSetupStage("loading VAPID public key");
+    const publicKey=await withTimeout(getPushPublicKey(),7000,"Push backend public key");
+
     if(sub&&!subscriptionUsesPublicKey(sub,publicKey)){
+      setPushSetupStage("repairing old browser subscription");
       try{
         if(currentUser&&supabaseClient)await supabaseClient.from("push_subscriptions").delete().eq("user_id",currentUser.id).eq("endpoint",sub.endpoint);
       }catch{}
-      await sub.unsubscribe();sub=null;
+      await withTimeout(sub.unsubscribe(),5000,"Old subscription removal");
+      sub=null;
     }
 
     if(!sub){
       if(enableBtn)enableBtn.textContent="Registering with iPhone…";
+      setPushSetupStage("requesting iPhone push subscription");
       sub=await withTimeout(reg.pushManager.subscribe({
         userVisibleOnly:true,
         applicationServerKey:urlBase64ToUint8Array(publicKey)
-      }),15000,"iPhone push subscription");
+      }),12000,"iPhone push subscription");
     }
 
     if(!sub)throw new Error("iPhone allowed notifications, but no push subscription was created.");
 
     if(enableBtn)enableBtn.textContent="Saving device registration…";
-    await savePushSubscription(sub);
+    setPushSetupStage("saving subscription to Supabase");
+    await withTimeout(savePushSubscription(sub),8000,"Cloud subscription registration");
 
     settings.pushEnabled=true;
     settings.browserNotifications=false;
     localStorage.setItem(K.settings,JSON.stringify(settings));
 
+    clearTimeout(setupWatchdog);setupWatchdog=null;
+    if(enableBtn){enableBtn.disabled=false;enableBtn.textContent="Push Enabled"}
+    setPushSetupStage("complete");
     await refreshPushStatus();
     toast("Mobile push is enabled");
   }catch(err){
+    if(setupWatchdog)clearTimeout(setupWatchdog);
     console.error("Enable/repair push failed",err);
+    lastServiceWorkerError=err?.message||String(err);
     settings.pushEnabled=false;
     localStorage.setItem(K.settings,JSON.stringify(settings));
+    if(enableBtn){enableBtn.disabled=false;enableBtn.textContent="Retry Push Setup"}
+    setPushSetupStage(`failed — ${lastServiceWorkerError}`);
+    await refreshPushDiagnostics().catch(()=>{});
     await refreshPushStatus().catch(()=>{});
-    toast(err?.message||"Couldn't finish push setup");
+    toast(lastServiceWorkerError||"Couldn't finish push setup");
   }
 }
 async function disablePush(){

@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.2.2-worker-diagnostics";
+const CACHE="printbook-v5.2.3-push-hang-fix";
 const CORE_ASSETS=["./","./index.html","./styles.css","./app.js"];
 
 self.addEventListener("install",event=>{
