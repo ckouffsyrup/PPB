@@ -10,6 +10,18 @@ const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
 
+// v5.3.4: bind Cloud Sync sign-in at the document level immediately.
+// This survives a later UI-initialization error that could prevent the old
+// bottom-of-file `signInBtn.onclick = signIn` assignment from ever running.
+document.addEventListener("click",event=>{
+  const btn=event.target?.closest?.("#signInBtn");
+  if(!btn)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if(btn.dataset.loginRunning==="1")return;
+  signIn();
+},true);
+
 const defaultPresets=[
   {id:"normal",name:"Normal",machineRate:2,markup:1.5,minimum:8,roundTo:1},
   {id:"friend",name:"Friend",machineRate:1.5,markup:1.25,minimum:6,roundTo:1},
@@ -1914,9 +1926,11 @@ async function signIn(){
   const oldLabel=btn?.textContent||"Sign in";
   if(btn){btn.disabled=true;btn.textContent="Signing in…"}
   setSyncState("syncing","Contacting account server…");
+  if(btn)btn.dataset.loginRunning="1";
   let timer=setInterval(()=>{
     const secs=Math.max(1,Math.round((performance.now()-started)/1000));
     setSyncState("syncing",`Signing in… ${secs}s`);
+    if(btn)btn.textContent=`Signing in… ${secs}s`;
   },1000);
   try{
     const authPromise=supabaseClient.auth.signInWithPassword({email:$("emailInput").value.trim(),password:$("passwordInput").value});
@@ -1937,7 +1951,7 @@ async function signIn(){
     setSyncState("error",msg);toast(msg);
   }finally{
     clearInterval(timer);
-    if(btn){btn.disabled=false;btn.textContent=oldLabel}
+    if(btn){btn.disabled=false;btn.textContent=oldLabel;delete btn.dataset.loginRunning}
   }
 }
 async function signUp(){

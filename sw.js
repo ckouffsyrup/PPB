@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.3.3-owner-login-speed-fix";
+const CACHE="printbook-v5.3.4-signin-button-fix";
 const CORE_ASSETS=["./","./index.html","./styles.css","./app.js"];
 
 self.addEventListener("install",event=>{
