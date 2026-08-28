@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.6.4-stock-reservations-share-store";
+const CACHE="printbook-v5.6.5-stock-reservations-share-store";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
