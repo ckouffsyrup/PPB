@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.3.8-ui-binding-safety";
+const CACHE="printbook-v5.4-payments";
 const CORE_ASSETS=["./","./index.html","./styles.css","./app.js"];
 
 self.addEventListener("install",event=>{

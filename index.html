@@ -460,6 +460,16 @@
       <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
       <label>Due date<input id="orderDue" type="date" /></label>
       <label>Linked print<select id="orderPrint"><option value="">None / custom</option></select></label>
+      <label>Payment status<select id="orderPaymentStatus"><option value="unpaid">Unpaid</option><option value="deposit_paid">Deposit paid</option><option value="paid">Paid</option><option value="refunded">Refunded</option></select></label>
+      <label>Amount paid<div class="money-input"><span>$</span><input id="orderPaymentAmount" type="number" min="0" step="0.01" value="0" /></div></label>
+      <label>Deposit required<div class="money-input"><span>$</span><input id="orderDepositAmount" type="number" min="0" step="0.01" value="0" /></div></label>
+      <label>Payment method<select id="orderPaymentMethod"><option value="">Not set</option><option>Stripe</option><option>Cash</option><option>Venmo</option><option>Cash App</option><option>Zelle</option><option>Other</option></select></label>
+      <label class="full">Stripe payment link<input id="orderPaymentLink" readonly placeholder="Create a Stripe Checkout link below" /></label>
+      <div class="full sheet-actions" style="justify-content:flex-start;flex-wrap:wrap">
+        <button type="button" class="secondary" id="createPaymentLinkBtn">Create payment link</button>
+        <button type="button" class="secondary" id="copyPaymentLinkBtn">Copy link</button>
+        <button type="button" class="secondary" id="markOrderPaidBtn">Mark paid</button>
+      </div>
       <label class="full">Notes<textarea id="orderNotes" placeholder="Colors, size, delivery details..."></textarea></label>
     </div>
     <div class="sheet-actions">
@@ -800,6 +810,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.3.8"></script>
+<script src="app.js?v=5.4.0"></script>
 </body>
 </html>
