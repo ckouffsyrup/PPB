@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.5.2";
+window.PRINTBOOK_BUILD="5.6.0";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -108,6 +108,8 @@ let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=fals
 let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=null;
 let currentRequestPrintId=null;
 const PUBLIC_STOREFRONT_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-storefront";
+const CUSTOMER_ORDERS_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/customer-orders";
+const CUSTOMER_SAVED_ORDERS_KEY="printbook_customer_orders_v1";
 const PUBLIC_BRANDING_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/store-branding";
 let publicVisitorMode=false;
 let publicStoreLoaded=false;
@@ -458,7 +460,7 @@ function deactivatePublicVisitorMode(){
   document.title="PrintBook";
 }
 async function submitPublicPrintRequest(payload){
-  const res=await fetch(PUBLIC_STOREFRONT_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"request_print",...payload})});
+  const res=await fetch(CUSTOMER_ORDERS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"request_print",...payload})});
   let data={};try{data=await res.json()}catch{}
   if(!res.ok)throw new Error(data.error||`Request failed (${res.status})`);
   return data
@@ -779,7 +781,7 @@ function renderOrders(){
   const list=orders.filter(o=>!orderStatusFilter||o.status===orderStatusFilter).sort((a,b)=>String(a.due_date||"9999").localeCompare(String(b.due_date||"9999"))||String(b.created_at||"").localeCompare(String(a.created_at||"")));
   $("orderList").innerHTML=list.map(o=>{
     const next=orderNextStep(o.status),notes=String(o.notes||"").split("\n").filter(Boolean).slice(0,3).join(" · ");
-    return `<article class="order-card order-card-v2" onclick="openOrder('${o.id}')"><div class="order-main"><h4>${safe(o.item||"Custom order")}</h4><p>${safe(o.customer||"Customer")} · Qty ${o.quantity||1}${o.due_date?` · Due ${safe(o.due_date)}`:""}</p>${notes?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span><span class="status">${safe(orderPaymentLabel(o))}</span><strong>${money(o.quoted_price)}</strong>${Number(o.payment_amount||0)>0?`<p class="muted">Paid ${money(o.payment_amount)}</p>`:""}${next?`<div class="order-card-actions"><button class="primary order-advance-btn" type="button" onclick="advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button></div>`:""}</div></article>`;
+    return `<article class="order-card order-card-v2" onclick="openOrder('${o.id}')"><div class="order-main"><h4>${o.order_number?`<span class="muted">${safe(o.order_number)} · </span>`:""}${safe(o.item||"Custom order")}</h4><p>${safe(o.customer||"Customer")} · Qty ${o.quantity||1}${o.due_date?` · Due ${safe(o.due_date)}`:""}</p>${notes?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span><span class="status">${safe(orderPaymentLabel(o))}</span><strong>${money(o.quoted_price)}</strong>${Number(o.payment_amount||0)>0?`<p class="muted">Paid ${money(o.payment_amount)}</p>`:""}${next?`<div class="order-card-actions"><button class="primary order-advance-btn" type="button" onclick="advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button></div>`:""}</div></article>`;
   }).join("");
   $("orderEmpty").classList.toggle("hidden",!!list.length)
 }
@@ -1088,13 +1090,13 @@ async function saveSale(){if(!requireOnlineAdminSave())return;
 }
 function openSalesHistory(){const sorted=[...sales].sort((a,b)=>String(b.date).localeCompare(String(a.date)));$("salesHistoryList").innerHTML=sorted.map(s=>{const i=items.find(x=>x.id===s.print_id),v=(i?.variants||[]).find(x=>x.id===s.variant_id);return `<article class="order-card"><div class="order-main"><h4>${safe(i?.name||"Deleted print")}${v?` · ${safe(v.name)}`:""}</h4><p>${safe(s.date)} · Qty ${s.quantity}${s.channel?` · ${safe(s.channel)}`:""}${Number(s.discount_amount)>0?` · ${money(s.discount_amount)} off`:""}</p></div><div class="order-side"><strong>${money(s.total ?? Number(s.unit_price)*Number(s.quantity))}</strong><p class="muted">Profit ${money(saleProfit(s))}</p></div></article>`}).join("")||`<div class="empty-state"><p>No sales yet.</p></div>`;$("salesHistoryDialog").showModal()}
 
-function resetOrder(){editingOrderId=null;["orderCustomer","orderItem","orderPrice","orderDue","orderNotes","orderPaymentLink"].forEach(id=>$(id).value="");$("orderQty").value=1;$("orderStatus").value="Requested";$("orderPrint").value="";$("orderPaymentStatus").value="unpaid";$("orderPaymentAmount").value=0;$("orderDepositAmount").value=0;$("orderPaymentMethod").value="";$("deleteOrderBtn").style.visibility="hidden";updateOrderPaymentButtons()}
+function resetOrder(){editingOrderId=null;["orderCustomer","orderCustomerEmail","orderItem","orderPrice","orderDue","orderNotes","orderPaymentLink"].forEach(id=>$(id).value="");$("orderQty").value=1;$("orderStatus").value="Requested";$("orderPrint").value="";$("orderPaymentStatus").value="unpaid";$("orderPaymentAmount").value=0;$("orderDepositAmount").value=0;$("orderPaymentMethod").value="";$("deleteOrderBtn").style.visibility="hidden";updateOrderPaymentButtons()}
 function orderPaymentLabel(o){return ({unpaid:"Unpaid",deposit_paid:"Deposit paid",paid:"Paid",refunded:"Refunded"})[o?.payment_status]||"Unpaid"}
 function updateOrderPaymentButtons(){if(!$("createPaymentLinkBtn"))return;const quote=Math.max(0,Number($("orderPrice")?.value||0)),paid=Math.max(0,Number($("orderPaymentAmount")?.value||0)),deposit=Math.max(0,Number($("orderDepositAmount")?.value||0)),remaining=Math.max(0,quote-paid);const needsDeposit=deposit>paid;$("createPaymentLinkBtn").textContent=needsDeposit?`Create deposit link (${money(Math.max(0,Math.min(quote,deposit)-paid))})`:`Create payment link (${money(remaining)})`;$("createPaymentLinkBtn").disabled=!editingOrderId||remaining<=0;$("copyPaymentLinkBtn").disabled=!$("orderPaymentLink").value;$("markOrderPaidBtn").disabled=!editingOrderId||quote<=0||paid>=quote}
-window.openOrder=id=>{resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";$("orderNotes").value=o.notes||"";$("orderPaymentStatus").value=o.payment_status||"unpaid";$("orderPaymentAmount").value=Number(o.payment_amount||0);$("orderDepositAmount").value=Number(o.deposit_amount||0);$("orderPaymentMethod").value=o.payment_method||"";$("orderPaymentLink").value=o.payment_link||"";$("deleteOrderBtn").style.visibility="visible";updateOrderPaymentButtons()}else $("orderTitle").textContent="New order";$("orderDialog").showModal()}
+window.openOrder=id=>{resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderCustomerEmail").value=o.customer_email||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";$("orderNotes").value=o.notes||"";$("orderPaymentStatus").value=o.payment_status||"unpaid";$("orderPaymentAmount").value=Number(o.payment_amount||0);$("orderDepositAmount").value=Number(o.deposit_amount||0);$("orderPaymentMethod").value=o.payment_method||"";$("orderPaymentLink").value=o.payment_link||"";$("deleteOrderBtn").style.visibility="visible";updateOrderPaymentButtons()}else $("orderTitle").textContent="New order";$("orderDialog").showModal()}
 async function saveOrder(){if(!requireOnlineAdminSave())return;
   const item=$("orderItem").value.trim();if(!item)return toast("Describe the order");
-  const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount").value||0)),o={id,customer:$("orderCustomer").value.trim(),status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",notes:$("orderNotes").value.trim(),payment_status:paymentStatus,payment_amount:paymentAmount,deposit_amount:Math.max(0,Number($("orderDepositAmount").value||0)),payment_method:$("orderPaymentMethod").value||null,payment_provider:prev.payment_provider||($("orderPaymentMethod").value==="Stripe"?"stripe":null),payment_reference:prev.payment_reference||null,paid_at:paymentStatus==="paid"?(prev.paid_at||nowISO()):null,payment_link:$("orderPaymentLink").value||null,stripe_checkout_session_id:prev.stripe_checkout_session_id||null,stripe_payment_intent_id:prev.stripe_payment_intent_id||null,created_at:prev.created_at||nowISO(),updated_at:nowISO()};
+  const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount").value||0)),o={id,...(prev.order_number?{order_number:prev.order_number}:{}),customer:$("orderCustomer").value.trim(),customer_email:$("orderCustomerEmail").value.trim().toLowerCase()||null,status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",notes:$("orderNotes").value.trim(),payment_status:paymentStatus,payment_amount:paymentAmount,deposit_amount:Math.max(0,Number($("orderDepositAmount").value||0)),payment_method:$("orderPaymentMethod").value||null,payment_provider:prev.payment_provider||($("orderPaymentMethod").value==="Stripe"?"stripe":null),payment_reference:prev.payment_reference||null,paid_at:paymentStatus==="paid"?(prev.paid_at||nowISO()):null,payment_link:$("orderPaymentLink").value||null,stripe_checkout_session_id:prev.stripe_checkout_session_id||null,stripe_payment_intent_id:prev.stripe_payment_intent_id||null,created_at:prev.created_at||nowISO(),updated_at:nowISO()};
 
   let synced=false;
   if(currentUser){
@@ -1242,6 +1244,7 @@ function openRequestPrint(){
 
   $("requestPrintTitle").textContent=`Request ${item.name}`;
   $("requestCustomerName").value="";
+  $("requestCustomerEmail").value="";
   $("requestContact").value="";
   $("requestNotes").value="";
   $("requestQty").value=1;
@@ -1268,6 +1271,7 @@ async function submitPrintRequest(){
   const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
   if((publicVisitorMode||customerMode)&&storeAvailability.accepting_requests===false)return toast(storeAvailability.at_capacity?"The store is at order capacity right now":"New print requests are temporarily paused");
   const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
+  const email=$("requestCustomerEmail").value.trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return toast("Enter a valid email so you can recover your order");
   const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim();
   const wantsMulticolor=!!item.multicolor_capable && $("requestColorMode").value==="multi";
   const colorIds=wantsMulticolor?selectedRequestColorIds():[],maxColors=productMaxColors(item);
@@ -1278,8 +1282,11 @@ async function submitPrintRequest(){
   if(publicVisitorMode||customerMode){
     const btn=$("submitPrintRequestBtn"),oldLabel=btn.textContent;btn.disabled=true;btn.textContent="Submitting…";
     try{
-      await submitPublicPrintRequest({print_id:item.id,variant_id:variantId||"",filament_id:wantsMulticolor?"":(filamentId||""),color_mode:wantsMulticolor?"multi":"single",color_ids:colorIds,customer,contact,quantity:qty,notes:userNotes});
-      $("requestPrintDialog").close();toast("Print request sent");return
+      const result=await submitPublicPrintRequest({print_id:item.id,variant_id:variantId||"",filament_id:wantsMulticolor?"":(filamentId||""),color_mode:wantsMulticolor?"multi":"single",color_ids:colorIds,customer,email,contact,quantity:qty,notes:userNotes});
+      $("requestPrintDialog").close();
+      if(result?.order_number&&result?.access_token){saveCustomerOrderAccess(result.order_number,result.access_token,item.name,email);showCustomerOrderConfirmation(result,item.name)}
+      else toast("Print request sent");
+      return
     }catch(err){console.error("Public request failed",err);toast(err?.message||"Couldn't send the print request");return}
     finally{btn.disabled=false;btn.textContent=oldLabel}
   }
@@ -1297,6 +1304,84 @@ async function submitPrintRequest(){
   }
   orders.unshift(order);persist();$("requestPrintDialog").close();toast("Print request submitted");
 }
+
+
+function customerSavedOrders(){
+  try{return JSON.parse(localStorage.getItem(CUSTOMER_SAVED_ORDERS_KEY)||"[]").filter(x=>x?.order_number&&x?.token)}catch{return []}
+}
+function saveCustomerOrderAccess(orderNumber,token,item,email=""){
+  const list=customerSavedOrders().filter(x=>x.order_number!==orderNumber);
+  list.unshift({order_number:orderNumber,token,item:item||"Print order",email:email||"",saved_at:nowISO()});
+  localStorage.setItem(CUSTOMER_SAVED_ORDERS_KEY,JSON.stringify(list.slice(0,12)));
+}
+function customerOrderPrivateUrl(orderNumber,token){
+  const u=new URL(location.href);u.search="";u.hash="";u.searchParams.set("order",orderNumber);u.searchParams.set("token",token);return u.toString()
+}
+let activeCustomerPortalAccess=null,activeCustomerPortalPaymentLink="";
+function showCustomerOrderConfirmation(result,itemName){
+  $("customerOrderConfirmNumber").textContent=result.order_number;
+  $("customerOrderConfirmItem").textContent=itemName||"Your print request";
+  $("customerOrderConfirmationDialog").dataset.orderNumber=result.order_number;
+  $("customerOrderConfirmationDialog").dataset.token=result.access_token;
+  $("customerOrderConfirmationDialog").showModal();
+}
+function customerPaymentLabel(status){return ({unpaid:"Unpaid",deposit_paid:"Deposit paid",paid:"Paid",refunded:"Refunded"})[status]||"Unpaid"}
+function customerOrderProgress(status){
+  const steps=["Requested","Quoted","Approved","Printing","Ready","Completed"];
+  const current=Math.max(0,steps.indexOf(status));
+  if(status==="Cancelled")return `<div class="customer-order-cancelled">Order cancelled</div>`;
+  return steps.map((step,i)=>`<div class="customer-order-progress-step ${i<=current?"done":""} ${i===current?"current":""}"><i></i><span>${safe(step)}</span></div>`).join("")
+}
+function renderCustomerPortalOrder(o){
+  $("customerPortalNumber").textContent=o.order_number||"—";
+  $("customerPortalStatus").textContent=o.status||"Requested";
+  $("customerPortalPrice").textContent=money(o.quoted_price||0);
+  $("customerPortalItem").textContent=o.item||"Print order";
+  $("customerPortalQty").textContent=String(o.quantity||1);
+  $("customerPortalPayment").textContent=customerPaymentLabel(o.payment_status);
+  $("customerPortalDue").textContent=o.due_date||"Not set";
+  $("customerPortalProgress").innerHTML=customerOrderProgress(o.status);
+  const notes=Array.isArray(o.notes)?o.notes.filter(Boolean):[];
+  $("customerPortalNotesWrap").classList.toggle("hidden",!notes.length);
+  $("customerPortalNotes").innerHTML=notes.map(n=>`<p>${safe(n)}</p>`).join("");
+  activeCustomerPortalPaymentLink=o.payment_link||"";
+  const fullyPaid=o.payment_status==="paid";
+  const amountPaid=Math.max(0,Number(o.payment_amount||0)),quote=Math.max(0,Number(o.quoted_price||0));
+  const remaining=Math.max(0,quote-amountPaid);
+  $("customerPortalPayBtn").classList.toggle("hidden",!activeCustomerPortalPaymentLink||fullyPaid);
+  if(fullyPaid){$("customerPortalPaymentHint").textContent="PAYMENT RECEIVED";$("customerPortalPaymentMessage").textContent=`Paid ${money(amountPaid||quote)} — you're all set.`}
+  else if(activeCustomerPortalPaymentLink){$("customerPortalPaymentHint").textContent=amountPaid>0?"BALANCE READY":"PAYMENT READY";$("customerPortalPaymentMessage").textContent=`${remaining>0?money(remaining):money(quote)} remaining. Pay securely through Stripe.`}
+  else if(o.status==="Requested"){$("customerPortalPaymentHint").textContent="QUOTE PENDING";$("customerPortalPaymentMessage").textContent="Your request is in. Final pricing/payment will appear here after review."}
+  else{$("customerPortalPaymentHint").textContent="PAYMENT";$("customerPortalPaymentMessage").textContent="Your payment link isn't ready yet. Check back shortly."}
+}
+async function openCustomerOrderPortal(orderNumber,token,{updateUrl=true}={}){
+  if(!orderNumber||!token)return;
+  activeCustomerPortalAccess={order_number:orderNumber,token};
+  $("customerPortalLoading").classList.remove("hidden");$("customerPortalContent").classList.add("hidden");$("customerPortalError").classList.add("hidden");
+  if(!$("customerOrderPortalDialog").open)$("customerOrderPortalDialog").showModal();
+  try{
+    const r=await fetch(CUSTOMER_ORDERS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"get_order",order_number:orderNumber,token})});
+    let d={};try{d=await r.json()}catch{}
+    if(!r.ok||!d.order)throw new Error(d.error||"Couldn't load this order");
+    renderCustomerPortalOrder(d.order);saveCustomerOrderAccess(orderNumber,token,d.order.item||"Print order");
+    $("customerPortalLoading").classList.add("hidden");$("customerPortalContent").classList.remove("hidden");
+    if(updateUrl){const u=new URL(location.href);u.searchParams.set("order",orderNumber);u.searchParams.set("token",token);history.replaceState({},"",u)}
+  }catch(err){$("customerPortalLoading").classList.add("hidden");$("customerPortalError").classList.remove("hidden");$("customerPortalErrorText").textContent=err?.message||"The private link may be invalid."}
+}
+function clearCustomerPortalUrl(){const u=new URL(location.href);u.searchParams.delete("order");u.searchParams.delete("token");history.replaceState({},"",u)}
+function openFindCustomerOrder(){
+  const list=customerSavedOrders(),wrap=$("recentCustomerOrdersWrap");wrap.classList.toggle("hidden",!list.length);
+  $("recentCustomerOrders").innerHTML=list.map(x=>`<button class="recent-order-row" type="button" data-order="${safe(x.order_number)}"><div><strong>${safe(x.order_number)}</strong><small>${safe(x.item||"Print order")}</small></div><span>View →</span></button>`).join("");
+  $("recentCustomerOrders").querySelectorAll("[data-order]").forEach(btn=>btn.onclick=()=>{const x=list.find(v=>v.order_number===btn.dataset.order);if(x){$("findCustomerOrderDialog").close();openCustomerOrderPortal(x.order_number,x.token)}});
+  const last=list.find(x=>x.email);$("customerOrderRecoveryEmail").value=last?.email||"";$("customerOrderRecoveryStatus").textContent="";$("findCustomerOrderDialog").showModal()
+}
+async function recoverCustomerOrders(){
+  const email=$("customerOrderRecoveryEmail").value.trim().toLowerCase();if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))return toast("Enter the email used for your order");
+  const btn=$("sendCustomerOrderRecoveryBtn"),old=btn.textContent;btn.disabled=true;btn.textContent="Sending…";$("customerOrderRecoveryStatus").textContent="";
+  try{const r=await fetch(CUSTOMER_ORDERS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"recover",email})});let d={};try{d=await r.json()}catch{};if(!r.ok)throw new Error(d.error||"Couldn't request recovery");$("customerOrderRecoveryStatus").textContent=d.email_recovery_configured===false?"Order recovery is ready, but email delivery still needs to be connected by the shop owner.":"If that email matches an order, check your inbox for a private link."}
+  catch(err){$("customerOrderRecoveryStatus").textContent=err?.message||"Couldn't request recovery right now."}finally{btn.disabled=false;btn.textContent=old}
+}
+function openCustomerPortalFromUrl(){const u=new URL(location.href),order=u.searchParams.get("order"),token=u.searchParams.get("token");if(order&&token)setTimeout(()=>openCustomerOrderPortal(order,token,{updateUrl:false}),350)}
 
 function normalizeCustomerPin(v){return String(v||"").replace(/\D/g,"").slice(0,8)}
 function enterCustomerMode(){
@@ -2423,6 +2508,9 @@ safeUiInit("startup-22",()=>{$("requestVariant").onchange=()=>{updateRequestEsti
 safeUiInit("startup-23",()=>{$("requestColorMode").onchange=updateRequestColorMode;});
 safeUiInit("startup-24",()=>{$("requestQty").oninput=updateRequestEstimate;});
 safeUiInit("startup-25",()=>{$("submitPrintRequestBtn").onclick=submitPrintRequest;});
+safeUiInit("startup-25a",()=>{$("findMyOrderBtn").onclick=openFindCustomerOrder;$('closeFindCustomerOrder').onclick=()=>$("findCustomerOrderDialog").close();$("sendCustomerOrderRecoveryBtn").onclick=recoverCustomerOrders;});
+safeUiInit("startup-25b",()=>{$("closeCustomerOrderConfirmation").onclick=()=>$("customerOrderConfirmationDialog").close();$("copyCustomerOrderNumberBtn").onclick=async()=>{const n=$("customerOrderConfirmationDialog").dataset.orderNumber||"";try{await navigator.clipboard.writeText(n);toast("Order number copied")}catch{toast(n)}};$("viewCustomerOrderBtn").onclick=()=>{const d=$("customerOrderConfirmationDialog");const n=d.dataset.orderNumber,t=d.dataset.token;d.close();openCustomerOrderPortal(n,t)};});
+safeUiInit("startup-25c",()=>{$("closeCustomerOrderPortal").onclick=()=>{$("customerOrderPortalDialog").close();clearCustomerPortalUrl()};$("refreshCustomerOrderBtn").onclick=()=>activeCustomerPortalAccess&&openCustomerOrderPortal(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);$("copyCustomerOrderLinkBtn").onclick=async()=>{if(!activeCustomerPortalAccess)return;const link=customerOrderPrivateUrl(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);try{await navigator.clipboard.writeText(link);toast("Private order link copied")}catch{toast("Couldn't copy the link")}};$("customerPortalPayBtn").onclick=()=>{if(activeCustomerPortalPaymentLink)location.href=activeCustomerPortalPaymentLink};});
 safeUiInit("startup-26",()=>{if($("refreshRequestsBtn"))$("refreshRequestsBtn").onclick=()=>refreshOrdersFromCloud({showToast:true});});
 safeUiInit("startup-27",()=>{document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));});
 safeUiInit("startup-28",()=>{$("closeCustomerUnlock").onclick=()=>$("customerUnlockDialog").close();});
@@ -2499,7 +2587,7 @@ window.addEventListener("load",()=>{
     refreshPushDiagnostics().catch(()=>{});
   });
 });
-populatePresetSelects();renderAll();setupSupabase();showView("shop");
+populatePresetSelects();renderAll();setupSupabase();showView("shop");openCustomerPortalFromUrl();
 
 window.addEventListener("focus",()=>{if(currentUser&&!publicVisitorMode)pullCloud(false).catch(()=>{})});
 window.addEventListener("online",()=>{if(currentUser&&!publicVisitorMode)pullCloud(false).catch(()=>{})});

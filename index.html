@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.5.1" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.6.0" />
 </head>
 <body>
 <div class="app-shell">
@@ -82,7 +82,10 @@
           <strong id="customerModeBarTitle">Customer Store Mode</strong>
           <small id="customerModeBarText">Browse products and available filament colors.</small>
         </div>
-        <span class="customer-lock-badge" id="customerModeBadge">LOCKED</span>
+        <div class="customer-order-bar-actions">
+          <button class="secondary customer-order-find-btn" id="findMyOrderBtn" type="button">Find my order</button>
+          <span class="customer-lock-badge" id="customerModeBadge">LOCKED</span>
+        </div>
       </div>
 
       <section class="shop-hero" id="storefrontHero">
@@ -485,6 +488,7 @@
     <div class="sheet-header"><div><p class="eyebrow">CUSTOM ORDER</p><h2 id="orderTitle">New order</h2></div><button class="icon-btn" id="closeOrder" type="button">✕</button></div>
     <div class="form-grid">
       <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
+      <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label>
       <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
       <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
       <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
@@ -614,6 +618,10 @@
         <input id="requestCustomerName" placeholder="Name / nickname" autocomplete="name" />
       </label>
 
+      <label>Email for your order
+        <input id="requestCustomerEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      </label>
+
       <label>Quantity
         <input id="requestQty" type="number" min="1" step="1" value="1" />
       </label>
@@ -644,8 +652,8 @@
         <div class="request-color-grid" id="requestColorGrid"></div>
       </div>
 
-      <label class="full">How should I contact you?
-        <input id="requestContact" placeholder="Phone, Discord, email, etc." />
+      <label class="full">Other contact <span class="muted">(optional)</span>
+        <input id="requestContact" placeholder="Phone, Discord, Instagram, etc." />
       </label>
 
       <label class="full">Notes / changes
@@ -659,6 +667,89 @@
     </div>
 
     <button class="primary full-width" id="submitPrintRequestBtn" type="button">Submit Print Request</button>
+  </div>
+</dialog>
+
+
+<!-- CUSTOMER ORDER CONFIRMATION -->
+<dialog id="customerOrderConfirmationDialog">
+  <div class="sheet narrow customer-order-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="customer-order-success-icon">✓</div>
+    <p class="eyebrow">REQUEST RECEIVED</p>
+    <h2>Your order is saved</h2>
+    <p class="muted">Keep this order number for reference. This device also saves your private order link automatically.</p>
+    <div class="customer-order-number-card">
+      <small>ORDER NUMBER</small>
+      <strong id="customerOrderConfirmNumber">KP-0000</strong>
+      <span id="customerOrderConfirmItem">Your print request</span>
+    </div>
+    <div class="customer-order-confirm-actions">
+      <button class="primary full-width" id="viewCustomerOrderBtn" type="button">View my order</button>
+      <button class="secondary full-width" id="copyCustomerOrderNumberBtn" type="button">Copy order number</button>
+    </div>
+    <p class="muted tiny-note">If you lose this number, use <strong>Find my order</strong> and we'll send a new private link to your email.</p>
+    <button class="text-button" id="closeCustomerOrderConfirmation" type="button">Back to shop</button>
+  </div>
+</dialog>
+
+<!-- CUSTOMER ORDER PORTAL -->
+<dialog id="customerOrderPortalDialog">
+  <div class="sheet customer-order-sheet customer-order-portal-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">KARCEN'S PRINTS</p><h2>Order <span id="customerPortalNumber">—</span></h2></div>
+      <button class="icon-btn" id="closeCustomerOrderPortal" type="button">✕</button>
+    </div>
+    <div id="customerPortalLoading" class="customer-order-loading">Loading your order…</div>
+    <div id="customerPortalContent" class="hidden">
+      <div class="customer-portal-topline">
+        <div><small>STATUS</small><strong id="customerPortalStatus">Requested</strong></div>
+        <div class="customer-portal-price"><small>ORDER TOTAL</small><strong id="customerPortalPrice">$0.00</strong></div>
+      </div>
+      <div class="customer-order-progress" id="customerPortalProgress"></div>
+      <div class="customer-order-details">
+        <div><small>PRINT</small><strong id="customerPortalItem">—</strong></div>
+        <div><small>QUANTITY</small><strong id="customerPortalQty">1</strong></div>
+        <div><small>PAYMENT</small><strong id="customerPortalPayment">Unpaid</strong></div>
+        <div><small>DUE DATE</small><strong id="customerPortalDue">Not set</strong></div>
+      </div>
+      <div class="customer-order-notes hidden" id="customerPortalNotesWrap"><small>ORDER DETAILS</small><div id="customerPortalNotes"></div></div>
+      <div class="customer-order-payment-box" id="customerPortalPaymentBox">
+        <div><small id="customerPortalPaymentHint">PAYMENT</small><strong id="customerPortalPaymentMessage">Waiting for your final quote.</strong></div>
+        <button class="primary" id="customerPortalPayBtn" type="button">Pay securely with Stripe</button>
+      </div>
+      <div class="customer-order-portal-actions">
+        <button class="secondary" id="refreshCustomerOrderBtn" type="button">Refresh status</button>
+        <button class="secondary" id="copyCustomerOrderLinkBtn" type="button">Copy private link</button>
+      </div>
+      <p class="muted tiny-note">Your private link acts like a key to this order. Don't post it publicly.</p>
+    </div>
+    <div id="customerPortalError" class="empty-state hidden"><h3>Couldn't open this order</h3><p id="customerPortalErrorText">The private link may be invalid.</p></div>
+  </div>
+</dialog>
+
+<!-- FIND CUSTOMER ORDER -->
+<dialog id="findCustomerOrderDialog">
+  <div class="sheet narrow customer-order-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">YOUR ORDERS</p><h2>Find my order</h2></div>
+      <button class="icon-btn" id="closeFindCustomerOrder" type="button">✕</button>
+    </div>
+    <div id="recentCustomerOrdersWrap" class="hidden">
+      <p class="customer-order-section-label">SAVED ON THIS DEVICE</p>
+      <div id="recentCustomerOrders" class="recent-customer-orders"></div>
+    </div>
+    <div class="customer-order-recovery-card">
+      <h3>Lost your order number?</h3>
+      <p class="muted">Enter the same email you used when submitting your request. For privacy, we'll only send order links to that inbox.</p>
+      <label>Email
+        <input id="customerOrderRecoveryEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      </label>
+      <button class="primary full-width" id="sendCustomerOrderRecoveryBtn" type="button">Email my order links</button>
+      <p class="muted tiny-note" id="customerOrderRecoveryStatus"></p>
+    </div>
   </div>
 </dialog>
 
@@ -862,6 +953,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.5.2"></script>
+<script src="app.js?v=5.6.0"></script>
 </body>
 </html>
