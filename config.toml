@@ -1,5 +1,0 @@
-[functions.public-storefront]
-verify_jwt = false
-
-[functions.push-notifications]
-verify_jwt = false
