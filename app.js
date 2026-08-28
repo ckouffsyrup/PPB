@@ -1213,7 +1213,7 @@ function urlBase64ToUint8Array(base64String){
   return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
 }
 function pushFunctionUrl(){
-  return `${String(settings.supabaseUrl||"").replace(/\/$/,"")}/functions/v1/push-notifications`;
+  return `${String(settings.supabaseUrl||"").replace(/\/$/,"")}/functions/v1/bright-task`;
 }
 async function getPushPublicKey(){
   if(!settings.supabaseUrl) throw new Error("Supabase URL is missing.");
