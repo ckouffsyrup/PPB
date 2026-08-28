@@ -274,41 +274,67 @@ async function ownerLogin(){
   const password=$("ownerLoginPassword").value;
   if(!email||!password)return toast("Enter your email and password");
 
+  const started=performance.now();
   const btn=$("ownerLoginBtn"),old=btn.textContent;
   btn.disabled=true;btn.textContent="Signing in…";
-  $("ownerLoginStatus").textContent="Connecting to PrintBook…";
+  $("ownerLoginStatus").textContent="Contacting account server…";
+  const timer=setInterval(()=>{
+    const secs=Math.max(1,Math.floor((performance.now()-started)/1000));
+    $("ownerLoginStatus").textContent=`Signing in… ${secs}s`;
+  },1000);
 
   try{
-    const cfg=await getPublicSupabaseConfig();
+    // Customer/owner mode was the slow login path. It used to fetch config,
+    // recreate the Supabase client, authenticate, then await setupSupabase(),
+    // which itself waited for a full cloud pull before closing this dialog.
+    // Reuse the already-configured client whenever possible and never block
+    // successful authentication on the data sync.
+    if(!supabaseClient){
+      if(!settings.supabaseUrl||!settings.supabaseKey){
+        const cfg=await Promise.race([
+          getPublicSupabaseConfig(),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error("Login configuration took too long to load")),5000))
+        ]);
+        settings.supabaseUrl=cfg.supabase_url;
+        settings.supabaseKey=cfg.anon_key;
+        localStorage.setItem(K.settings,JSON.stringify(settings));
+      }
+      if(!window.supabase)throw new Error("Supabase library isn't ready yet");
+      supabaseClient=window.supabase.createClient(settings.supabaseUrl,settings.supabaseKey,{
+        auth:{persistSession:true,autoRefreshToken:true}
+      });
+    }
 
-    // The anon/publishable key is intended for browser clients.
-    settings.supabaseUrl=cfg.supabase_url;
-    settings.supabaseKey=cfg.anon_key;
-    localStorage.setItem(K.settings,JSON.stringify(settings));
-
-    supabaseClient=window.supabase.createClient(settings.supabaseUrl,settings.supabaseKey,{
-      auth:{persistSession:true,autoRefreshToken:true}
-    });
-
-    const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+    const result=await Promise.race([
+      supabaseClient.auth.signInWithPassword({email,password}),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error("Account server did not answer within 15 seconds")),15000))
+    ]);
+    const {data,error}=result;
     if(error)throw error;
     if(!data?.user)throw new Error("Sign-in did not return a user.");
 
     currentUser=data.user;
     deactivatePublicVisitorMode();
     customerMode=false;
+    updateCloudUI();
+    startRealtime();
     $("ownerLoginDialog").close();
-
-    // Re-run our normal setup so realtime/sync/auth listeners are attached.
-    await setupSupabase();
     currentView="shop";
     renderAll();
-    toast("Admin signed in");
+
+    const secs=((performance.now()-started)/1000).toFixed(1);
+    setSyncState("syncing",`Signed in in ${secs}s · syncing data…`);
+    toast(`Admin signed in · ${secs}s`);
+    handlePushLaunchIntent();
+
+    // Finish cloud refresh after the login UI is already complete.
+    setTimeout(()=>pullCloud(false).catch(err=>console.error("Background post-login sync failed",err)),0);
   }catch(err){
-    console.error("Owner login failed",err);
+    console.error("Owner login failed",{elapsed_ms:Math.round(performance.now()-started),error:err});
     $("ownerLoginStatus").textContent=err?.message||"Sign-in failed.";
     toast(err?.message||"Couldn't sign in");
   }finally{
+    clearInterval(timer);
     btn.disabled=false;btn.textContent=old
   }
 }
