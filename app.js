@@ -1845,10 +1845,10 @@ async function syncDelete(table,id){
   if(!supabaseClient||!currentUser)return;if(!navigator.onLine){setSyncState("offline","Offline — deletion not uploaded");return false}
   setSyncState("syncing","Syncing…");const {error}=await supabaseClient.from(table).delete().eq("id",id).eq("user_id",currentUser.id);if(error){console.error(error);setSyncState("error",`Couldn't delete ${table}`);return false}setSyncState("syncing","Cloud write complete — refreshing…");return true
 }
-async function setupSupabase(){
+async function setupSupabase({skipPublicFallback=false}={}){
   if(!settings.supabaseUrl||!settings.supabaseKey||!window.supabase){
     supabaseClient=null;currentUser=null;stopRealtime();setSyncState("local","Public storefront");updateCloudUI();
-    await activatePublicVisitorMode();return
+    if(!skipPublicFallback)await activatePublicVisitorMode();return
   }
   try{
     supabaseClient=window.supabase.createClient(settings.supabaseUrl,settings.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true}});
@@ -1863,7 +1863,7 @@ async function setupSupabase(){
       setTimeout(()=>refreshPushStatus().catch(()=>{}),0);
     });
     if(currentUser){deactivatePublicVisitorMode();customerMode=false;startRealtime();await pullCloud(false);handlePushLaunchIntent()}
-    else{setSyncState("local","Public storefront");await activatePublicVisitorMode()}
+    else{setSyncState("local","Public storefront");if(!skipPublicFallback)await activatePublicVisitorMode()}
   }catch(e){console.error(e);currentUser=null;setSyncState("error","Supabase setup failed");updateCloudUI()}
 }
 function updateCloudUI(){
@@ -1871,8 +1871,18 @@ function updateCloudUI(){
   if(!c&&syncState!=="error")setSyncState("local",settings.supabaseUrl?"Ready to sign in":"Local only")
 }
 async function signIn(){
-  settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();localStorage.setItem(K.settings,JSON.stringify(settings));await setupSupabase();if(!supabaseClient)return toast("Add Supabase URL and key first");
-  setSyncState("syncing","Signing in…");const {data,error}=await supabaseClient.auth.signInWithPassword({email:$("emailInput").value.trim(),password:$("passwordInput").value});if(error){setSyncState("error",error.message);return toast(error.message)}currentUser=data.user;updateCloudUI();startRealtime();await pullCloud(false);handlePushLaunchIntent();toast("Signed in")
+  settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();localStorage.setItem(K.settings,JSON.stringify(settings));
+  // Login should authenticate first. Do not make the user wait for a public-storefront
+  // fetch before Supabase can even check their email/password.
+  await setupSupabase({skipPublicFallback:true});
+  if(!supabaseClient)return toast("Add Supabase URL and key first");
+  setSyncState("syncing","Signing in…");
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email:$("emailInput").value.trim(),password:$("passwordInput").value});
+  if(error){setSyncState("error",error.message);return toast(error.message)}
+  currentUser=data.user;deactivatePublicVisitorMode();customerMode=false;updateCloudUI();startRealtime();
+  setSyncState("syncing","Signed in · syncing data…");toast("Signed in");handlePushLaunchIntent();
+  // The auth-state listener schedules the cloud refresh. Keep login responsive and
+  // avoid a second blocking pullCloud() here.
 }
 async function signUp(){
   settings.supabaseUrl=$("supabaseUrlInput").value.trim();settings.supabaseKey=$("supabaseKeyInput").value.trim();localStorage.setItem(K.settings,JSON.stringify(settings));await setupSupabase();if(!supabaseClient)return toast("Add Supabase URL and key first");
