@@ -1775,7 +1775,12 @@ async function sendTestPush(){
     if(data.sent>0){
       localStorage.setItem("printbook:lastPushTest",new Date().toISOString());
       toast(`Test push: ${data.sent} sent · ${data.failed||0} failed · ${data.expired||0} expired`);
-    }else toast(`No push delivered · ${data.failed||0} failed · ${data.expired||0} expired`);
+    }else{
+      const firstFailure=Array.isArray(data.failures)&&data.failures.length?data.failures[0]:null;
+      const detail=firstFailure?.message||data.message||"No registered device accepted the push";
+      lastServiceWorkerError=`Push backend: ${detail}`;
+      toast(`No push delivered · ${data.failed||0} failed · ${data.expired||0} expired`);
+    }
     await refreshPushDiagnostics();
   }catch(err){console.error(err);toast(err?.message||"Couldn't send test push");await refreshPushDiagnostics().catch(()=>{})}
 }

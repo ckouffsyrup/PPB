@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.2.4-bright-task-push-url";
+const CACHE="printbook-v5.2.5-push-backend-fix";
 const CORE_ASSETS=["./","./index.html","./styles.css","./app.js"];
 
 self.addEventListener("install",event=>{
