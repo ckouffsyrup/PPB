@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.7.0";
+window.PRINTBOOK_BUILD="5.7.1";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -829,7 +829,7 @@ async function advanceOrderStatus(id,event){
   else toast(`Order moved to ${next[0]}`);
   if(next[0]==="Approved")setTimeout(()=>pullCloud(false),150);
 }
-window.advanceOrderStatus=advanceOrderStatus;window.sendQuoteEmailForOrder=sendQuoteEmailForOrder;
+window.advanceOrderStatus=advanceOrderStatus;window.sendQuoteEmailForOrder=sendQuoteEmailForOrder;window.sendReadyEmailForOrder=sendReadyEmailForOrder;
 function renderOrders(){
   const count=s=>orders.filter(o=>o.status===s).length;
   if($("orderRequestedCount"))$("orderRequestedCount").textContent=count("Requested");
@@ -841,7 +841,7 @@ function renderOrders(){
   $("orderList").innerHTML=list.map(o=>{
     const next=orderNextStep(o.status),notes=splitOrderPaymentInstructions(o.notes).cleanNotes.split("\n").filter(Boolean).slice(0,3).join(" · ");
     const quoteState=o.status==="Quoted"?`<p class="muted">Waiting for customer acceptance${o.quote_email_sent_at?" · quote emailed":""}</p>`:o.status==="Accepted"?`<p class="muted">Customer accepted ${o.customer_accepted_price!=null?money(o.customer_accepted_price):"the quote"}</p>`:"";
-    return `<article class="order-card order-card-v2" onclick="openOrder('${o.id}')"><div class="order-main"><h4>${o.order_number?`<span class="muted">${safe(o.order_number)} · </span>`:""}${safe(o.item||"Custom order")}</h4><p>${safe(o.customer||"Customer")} · Qty ${o.quantity||1}${o.due_date?` · Due ${safe(o.due_date)}`:""}</p>${quoteState}${notes?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span><span class="status">${safe(orderPaymentLabel(o))}</span><strong>${money(o.quoted_price)}</strong>${Number(o.payment_amount||0)>0?`<p class="muted">Paid ${money(o.payment_amount)}</p>`:""}${o.status==="Quoted"?`<div class="order-card-actions"><button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendQuoteEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend quote</button></div>`:""}${next?`<div class="order-card-actions"><button class="primary order-advance-btn" type="button" onclick="advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button></div>`:""}</div></article>`;
+    return `<article class="order-card order-card-v2" onclick="openOrder('${o.id}')"><div class="order-main"><h4>${o.order_number?`<span class="muted">${safe(o.order_number)} · </span>`:""}${safe(o.item||"Custom order")}</h4><p>${safe(o.customer||"Customer")} · Qty ${o.quantity||1}${o.due_date?` · Due ${safe(o.due_date)}`:""}</p>${quoteState}${notes?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span><span class="status">${safe(orderPaymentLabel(o))}</span><strong>${money(o.quoted_price)}</strong>${Number(o.payment_amount||0)>0?`<p class="muted">Paid ${money(o.payment_amount)}</p>`:""}${o.status==="Quoted"?`<div class="order-card-actions"><button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendQuoteEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend quote</button></div>`:""}${o.status==="Ready"?`<div class="order-card-actions"><button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendReadyEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend ready email</button></div>`:""}${next?`<div class="order-card-actions"><button class="primary order-advance-btn" type="button" onclick="advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button></div>`:""}</div></article>`;
   }).join("");
   $("orderEmpty").classList.toggle("hidden",!!list.length)
 }

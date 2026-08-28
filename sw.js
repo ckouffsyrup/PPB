@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.7.0-customer-quote-flow";
+const CACHE="printbook-v5.7.1-fast-accept-email-resend";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
