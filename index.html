@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.7.3" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.8.0" />
 </head>
 <body>
 <div class="app-shell">
@@ -104,23 +104,42 @@
 
         <div class="storefront-brand customer-only" id="storefrontBrand">
           <div class="storefront-brand-overlay"></div>
+
+          <div class="storefront-topnav">
+            <button class="storefront-logo storefront-logo-button" id="storefrontLogoWrap" type="button" aria-label="Karcen's Prints">
+              <img id="storefrontLogo" class="hidden" alt="Store logo" />
+              <span id="storefrontMonogram">KP</span>
+            </button>
+            <strong class="storefront-mini-name">KARCEN'S PRINTS</strong>
+            <nav class="storefront-nav-links" aria-label="Store navigation">
+              <button type="button" id="storefrontShopNavBtn">Shop Prints</button>
+              <button type="button" id="storefrontOrdersNavBtn">My Order</button>
+              <button type="button" id="customerShareStoreHeroBtn">Share</button>
+            </nav>
+          </div>
+
           <div class="storefront-brand-content">
-            <div class="storefront-brand-lockup">
-              <div class="storefront-logo" id="storefrontLogoWrap">
-                <img id="storefrontLogo" class="hidden" alt="Store logo" />
-                <span id="storefrontMonogram">KP</span>
+            <div class="storefront-copy">
+              <p class="storefront-kicker">3D PRINTS · MADE TO ORDER</p>
+              <h2 class="storefront-display">Small prints.<br>Cool stuff.<br><span>Made by Karcen.</span></h2>
+              <p class="storefront-tagline" id="storefrontTagline">Made layer by layer.</p>
+              <p class="storefront-about" id="storefrontAbout">Custom prints, useful parts, desk stuff, gifts, and whatever else looks fun to make.</p>
+
+              <div class="storefront-hero-actions">
+                <button class="primary" id="storefrontShopHeroBtn" type="button">Shop Prints</button>
+                <button class="secondary" id="storefrontOrderHeroBtn" type="button">Find My Order</button>
               </div>
-              <div>
-                <p class="storefront-kicker">CUSTOM 3D PRINTS</p>
-                <h2 id="storefrontName">Karcen's Prints</h2>
-                <p class="storefront-tagline" id="storefrontTagline">Made layer by layer.</p>
+
+              <div class="storefront-status-row">
+                <span class="storefront-status-pill" id="storefrontStatusPill"><i></i><span id="storefrontStatusText">Accepting orders</span></span>
+                <span class="storefront-turnaround" id="storefrontTurnaround">Typical turnaround: 3–5 days</span>
               </div>
+
+              <h2 id="storefrontName" class="storefront-a11y-name">Karcen's Prints</h2>
             </div>
-            <p class="storefront-about" id="storefrontAbout">Custom prints, useful parts, desk stuff, gifts, and whatever else looks fun to make.</p>
-            <div class="storefront-status-row">
-              <span class="storefront-status-pill" id="storefrontStatusPill"><i></i><span id="storefrontStatusText">Accepting orders</span></span>
-              <span class="storefront-turnaround" id="storefrontTurnaround">Typical turnaround: 3–5 days</span>
-              <button class="secondary customer-share-inline" id="customerShareStoreHeroBtn" type="button">▦ Share store QR</button>
+            <div class="storefront-hero-art" aria-hidden="true">
+              <div class="storefront-hero-orb"></div>
+              <div class="storefront-hero-mark">KP</div>
             </div>
           </div>
         </div>
@@ -132,8 +151,20 @@
         <div><span>✦</span><strong>Custom requests</strong><small>Need something different? Ask.</small></div>
       </div>
 
+      <section class="customer-featured customer-only" id="customerFeaturedSection">
+        <div class="storefront-section-heading">
+          <div><p>FEATURED</p><h2>Featured Prints</h2></div>
+          <button class="text-btn" id="storefrontViewAllBtn" type="button">View all</button>
+        </div>
+        <div class="customer-featured-grid" id="customerFeaturedGrid"></div>
+      </section>
+
+      <div class="storefront-section-heading customer-only storefront-browse-heading" id="storefrontBrowseHeading">
+        <div><p>SHOP</p><h2>Browse All Prints</h2></div>
+      </div>
+
       <section class="shop-controls">
-        <div class="search-wrap"><span>⌕</span><input id="shopSearch" type="search" placeholder="Search your products..." /></div>
+        <div class="search-wrap"><span>⌕</span><input id="shopSearch" type="search" placeholder="Search prints..." /></div>
         <select id="shopCategoryFilter"><option value="">All categories</option></select>
       </section>
 
@@ -157,6 +188,17 @@
       </div>
       <div id="shopGrid" class="shop-grid"></div>
       <div id="customerFilamentGrid" class="customer-filament-grid hidden"></div>
+
+      <section class="storefront-custom-cta customer-only">
+        <div class="storefront-custom-icon">◇</div>
+        <div>
+          <p>CAN'T FIND WHAT YOU'RE LOOKING FOR?</p>
+          <h2>Need something a little different?</h2>
+          <span>Open a print you like and use the notes field to ask about different colors, sizing, or other changes.</span>
+        </div>
+        <button class="primary" id="storefrontCustomBrowseBtn" type="button">Browse Prints</button>
+      </section>
+
       <div id="shopEmpty" class="empty-state hidden">
         <h3>No products yet</h3>
         <p>Add your first print and it'll show up here.</p>
@@ -599,16 +641,31 @@
 
 <!-- CUSTOMER PRODUCT VIEW -->
 <dialog id="customerProductDialog">
-  <div class="sheet customer-product-sheet">
+  <div class="sheet customer-product-sheet storefront-product-detail">
     <div class="sheet-grabber"></div>
-    <div class="sheet-header"><div><p class="eyebrow">PRODUCT</p><h2 id="customerProductName"></h2></div><button class="icon-btn" id="closeCustomerProduct" type="button">✕</button></div>
-    <img id="customerProductPhoto" class="customer-product-photo hidden" alt="" />
-    <div id="customerProductPrice" class="customer-big-price"></div>
-    <div id="customerProductDeal" class="deal-banner hidden"></div>
-    <p id="customerProductNotes" class="muted"></p>
-    <div id="customerVariantList" class="customer-variant-list"></div>
-    <div id="customerAvailability" class="availability-banner"></div>
-    <button class="primary full-width customer-request-button" id="requestPrintBtn" type="button">Request This Print</button>
+    <button class="icon-btn storefront-product-close" id="closeCustomerProduct" type="button" aria-label="Close">✕</button>
+    <div class="storefront-product-layout">
+      <div class="storefront-product-media">
+        <img id="customerProductPhoto" class="customer-product-photo hidden" alt="" />
+        <div class="storefront-product-photo-fallback" id="customerProductPhotoFallback">KP</div>
+      </div>
+      <div class="storefront-product-info">
+        <p class="eyebrow">KARCEN'S PRINTS</p>
+        <h2 id="customerProductName"></h2>
+        <div class="storefront-product-price-row">
+          <div id="customerProductPrice" class="customer-big-price"></div>
+          <div id="customerAvailability" class="availability-banner"></div>
+        </div>
+        <div id="customerProductDeal" class="deal-banner hidden"></div>
+        <p id="customerProductNotes" class="storefront-product-description"></p>
+        <div class="storefront-product-options">
+          <span>Available versions</span>
+          <div id="customerVariantList" class="customer-variant-list"></div>
+        </div>
+        <button class="primary full-width customer-request-button" id="requestPrintBtn" type="button">Request This Print</button>
+        <small class="storefront-product-footnote">You'll review quantity, color, and other details before submitting.</small>
+      </div>
+    </div>
   </div>
 </dialog>
 
@@ -997,6 +1054,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.7.3"></script>
+<script src="app.js?v=5.8.0"></script>
 </body>
 </html>

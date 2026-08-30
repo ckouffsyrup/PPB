@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.7.3-centered-menus";
+const CACHE="printbook-v5.8.0-storefront-v2";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{

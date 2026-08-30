@@ -656,6 +656,32 @@ function renderStoreAvailability(){
   renderStoreBranding();
 }
 
+
+function storefrontProductCardHTML(i,{featured=false}={}){
+  const stock=itemStock(i),madeToOrder=isMadeToOrder(i),isOut=!madeToOrder&&stock<=0;
+  const deal=Number(i.deal_qty)>1&&Number(i.deal_price)>0?`<div class="shop-deal">${i.deal_qty} for ${money(i.deal_price)}</div>`:"";
+  return `<article class="shop-card${featured?" storefront-featured-card":""}" data-product-id="${i.id}">
+    <div class="shop-card-photo">
+      ${i.photo_url?`<img data-product-image="${safe(i.id)}" src="${safe(i.photo_url)}" alt="${safe(i.name)}">`:`<div class="photo-fallback">KP</div>`}
+      ${i.favorite&&!customerMode?`<div class="fav-chip">★</div>`:""}
+      ${madeToOrder?`<div class="out-badge">MADE TO ORDER</div>`:isOut?`<div class="out-badge">OUT OF STOCK</div>`:""}
+      <div class="price-chip">${money(i.price)}</div>
+    </div>
+    <div class="shop-card-body">
+      <h3>${safe(i.name)}</h3>
+      <p>${safe(i.category||"3D Print")}${!customerMode&&i.hours?` · ${safe(i.hours)} hr print`:""}</p>
+      ${deal}
+      <div class="shop-card-footer">
+        <div><div class="shop-price">${customerMode?"From ":""}${money(i.price)}</div>${customerMode?"":`<small>${money(Math.max(0,Number(i.price||0)-itemMaterialCost(i)))} est. profit</small>`}</div>
+        <div class="shop-stock">${madeToOrder?`<strong>Made</strong><br>to order`:`<strong>${stock}</strong><br>${isOut?"out of stock":"in stock"}`}</div>
+      </div>
+    </div>
+  </article>`;
+}
+function wireStorefrontProductCards(root=document){
+  root.querySelectorAll(".shop-card[data-product-id]").forEach(card=>card.onclick=()=>customerMode?openCustomerProduct(card.dataset.productId):openEditor(card.dataset.productId));
+}
+
 function renderShop(){
   if(publicVisitorMode&&!publicStoreLoaded){
     document.body.classList.toggle("customer-mode",true);
@@ -678,28 +704,16 @@ function renderShop(){
     const hay=[i.name,i.category,i.notes,i.model_source].join(" ").toLowerCase();
     return hay.includes(q)&&(!cat||i.category===cat);
   });
-  $("shopGrid").innerHTML=list.map(i=>{
-    const stock=itemStock(i),mat=itemMaterialCost(i),madeToOrder=isMadeToOrder(i),isOut=!madeToOrder&&stock<=0;
-    const deal=Number(i.deal_qty)>1&&Number(i.deal_price)>0?`<div class="shop-deal">${i.deal_qty} for ${money(i.deal_price)}</div>`:"";
-    return `<article class="shop-card" data-product-id="${i.id}">
-      <div class="shop-card-photo">
-        ${i.photo_url?`<img data-product-image="${safe(i.id)}" src="${safe(i.photo_url)}" alt="${safe(i.name)}">`:`<div class="photo-fallback">◌</div>`}
-        ${i.favorite&&!customerMode?`<div class="fav-chip">★</div>`:""}
-        ${madeToOrder?`<div class="out-badge">MADE TO ORDER</div>`:isOut?`<div class="out-badge">OUT OF STOCK</div>`:""}
-        <div class="price-chip">${money(i.price)}</div>
-      </div>
-      <div class="shop-card-body">
-        <h3>${safe(i.name)}</h3>
-        <p>${safe(i.category||"Uncategorized")}${!customerMode&&i.hours?` · ${safe(i.hours)} hr print`:""}</p>
-        ${deal}
-        <div class="shop-card-footer">
-          <div><div class="shop-price">${money(i.price)}</div>${customerMode?"":`<small>${money(Math.max(0,Number(i.price||0)-mat))} est. profit</small>`}</div>
-          <div class="shop-stock">${madeToOrder?`<strong>Made</strong><br>to order`:`<strong>${stock}</strong><br>${isOut?"out of stock":"in stock"}`}</div>
-        </div>
-      </div>
-    </article>`
-  }).join("");
-  document.querySelectorAll(".shop-card").forEach(card=>card.onclick=()=>customerMode?openCustomerProduct(card.dataset.productId):openEditor(card.dataset.productId));
+  $("shopGrid").innerHTML=list.map(i=>storefrontProductCardHTML(i)).join("");
+  if($("customerFeaturedGrid")){
+    const featuredSource=list.filter(i=>i.favorite).concat(list.filter(i=>!i.favorite));
+    const featured=[...new Map(featuredSource.map(i=>[i.id,i])).values()].slice(0,4);
+    $("customerFeaturedGrid").innerHTML=featured.map(i=>storefrontProductCardHTML(i,{featured:true})).join("");
+    $("customerFeaturedSection")?.classList.toggle("hidden",!customerMode||customerStoreTab!=="products"||!featured.length);
+    wireStorefrontProductCards($("customerFeaturedGrid"));
+    wireProductImageFallbacks($("customerFeaturedGrid"));
+  }
+  wireStorefrontProductCards($("shopGrid"));
   wireProductImageFallbacks($("shopGrid"));
   $("shopEmpty").classList.toggle("hidden",!!list.length);
   $("shopProductCount").textContent=list.length;$("shopStockCount").textContent=list.reduce((a,i)=>a+itemStock(i),0);$("shopFavCount").textContent=items.filter(i=>i.favorite).length;
@@ -1230,7 +1244,7 @@ function helperToPrint(){const mat=usageCost(collectUsage("hpFilamentRows"))+Num
 function openCustomerProduct(id){
   const i=items.find(x=>x.id===id);if(!i)return;
   currentRequestPrintId=id;$("customerProductName").textContent=i.name;$("customerProductPrice").textContent=money(i.price);$("customerProductNotes").textContent=i.notes||i.category||"";
-  if(i.photo_url){$("customerProductPhoto").src=i.photo_url;$("customerProductPhoto").alt=i.name;$("customerProductPhoto").classList.remove("hidden")}else $("customerProductPhoto").classList.add("hidden");
+  if(i.photo_url){$("customerProductPhoto").src=i.photo_url;$("customerProductPhoto").alt=i.name;$("customerProductPhoto").classList.remove("hidden");$("customerProductPhotoFallback")?.classList.add("hidden")}else{$("customerProductPhoto").classList.add("hidden");$("customerProductPhotoFallback")?.classList.remove("hidden")}
   const deal=Number(i.deal_qty)>1&&Number(i.deal_price)>0;$("customerProductDeal").classList.toggle("hidden",!deal);$("customerProductDeal").textContent=deal?`Deal: ${i.deal_qty} for ${money(i.deal_price)}`:"";
   $("customerVariantList").innerHTML=(i.variants||[]).map(v=>`<div class="customer-variant"><span>${safe(v.name)}</span><strong>${money(variantPrice(i,v.id))} · ${isMadeToOrder(i)?"made to order":`${v.stock||0} available`}</strong></div>`).join("");
   const stock=itemStock(i),madeToOrder=isMadeToOrder(i);$("customerAvailability").textContent=madeToOrder?"Made to order — request one anytime":stock>0?`${stock} available right now`:"Currently out of stock";$("customerAvailability").classList.toggle("out",!madeToOrder&&stock<=0);$("customerProductDialog").showModal()
@@ -2634,6 +2648,19 @@ safeUiInit("startup-25",()=>{$("submitPrintRequestBtn").onclick=submitPrintReque
 safeUiInit("startup-25a",()=>{$("findMyOrderBtn").onclick=openFindCustomerOrder;$('closeFindCustomerOrder').onclick=()=>$("findCustomerOrderDialog").close();$("sendCustomerOrderRecoveryBtn").onclick=recoverCustomerOrders;});
 safeUiInit("startup-25b",()=>{$("closeCustomerOrderConfirmation").onclick=()=>$("customerOrderConfirmationDialog").close();$("copyCustomerOrderNumberBtn").onclick=async()=>{const n=$("customerOrderConfirmationDialog").dataset.orderNumber||"";try{await navigator.clipboard.writeText(n);toast("Order number copied")}catch{toast(n)}};$("viewCustomerOrderBtn").onclick=()=>{const d=$("customerOrderConfirmationDialog");const n=d.dataset.orderNumber,t=d.dataset.token;d.close();openCustomerOrderPortal(n,t)};});
 safeUiInit("startup-25c",()=>{$("closeCustomerOrderPortal").onclick=()=>{$("customerOrderPortalDialog").close();clearCustomerPortalUrl()};$("refreshCustomerOrderBtn").onclick=()=>activeCustomerPortalAccess&&openCustomerOrderPortal(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);$("copyCustomerOrderLinkBtn").onclick=async()=>{if(!activeCustomerPortalAccess)return;const link=customerOrderPrivateUrl(activeCustomerPortalAccess.order_number,activeCustomerPortalAccess.token);try{await navigator.clipboard.writeText(link);toast("Private order link copied")}catch{toast("Couldn't copy the link")}};$("customerPortalPayBtn").onclick=()=>{if(activeCustomerPortalPaymentLink)location.href=activeCustomerPortalPaymentLink};if($("acceptCustomerQuoteBtn"))$("acceptCustomerQuoteBtn").onclick=acceptCustomerQuote;});
+
+safeUiInit("startup-storefront-v2",()=>{
+  const scrollToShop=()=>{
+    $("storefrontBrowseHeading")?.scrollIntoView({behavior:"smooth",block:"start"});
+    setTimeout(()=>$("shopSearch")?.focus({preventScroll:true}),350);
+  };
+  $("storefrontShopNavBtn")?.addEventListener("click",scrollToShop);
+  $("storefrontShopHeroBtn")?.addEventListener("click",scrollToShop);
+  $("storefrontViewAllBtn")?.addEventListener("click",scrollToShop);
+  $("storefrontCustomBrowseBtn")?.addEventListener("click",scrollToShop);
+  $("storefrontOrdersNavBtn")?.addEventListener("click",openFindCustomerOrder);
+  $("storefrontOrderHeroBtn")?.addEventListener("click",openFindCustomerOrder);
+});
 safeUiInit("startup-25d",()=>{if($("customerShareStoreBtn"))$("customerShareStoreBtn").onclick=openCustomerStoreShare;if($("customerShareStoreHeroBtn"))$("customerShareStoreHeroBtn").onclick=openCustomerStoreShare;if($("closeCustomerStoreShare"))$("closeCustomerStoreShare").onclick=()=>$("customerStoreShareDialog").close();if($("shareCustomerStoreBtn"))$("shareCustomerStoreBtn").onclick=shareCustomerStore;if($("copyCustomerStoreLinkBtn"))$("copyCustomerStoreLinkBtn").onclick=async()=>{try{await navigator.clipboard.writeText("https://madebykarcen.com/");toast("Store link copied")}catch{toast("Couldn't copy store link")}};});
 safeUiInit("startup-26",()=>{if($("refreshRequestsBtn"))$("refreshRequestsBtn").onclick=()=>refreshOrdersFromCloud({showToast:true});});
 safeUiInit("startup-27",()=>{document.querySelectorAll("[data-customer-tab]").forEach(b=>b.onclick=()=>setCustomerStoreTab(b.dataset.customerTab));});
