@@ -255,10 +255,12 @@ function renderCustomerFilaments(){
 }
 function setCustomerStoreTab(tab){
   customerStoreTab=tab==="filaments"?"filaments":"products";
+  const filamentView=customerMode&&customerStoreTab==="filaments";
   document.querySelectorAll("[data-customer-tab]").forEach(b=>b.classList.toggle("active",b.dataset.customerTab===customerStoreTab));
-  $("shopGrid").classList.toggle("hidden",customerMode&&customerStoreTab==="filaments");
-  $("shopEmpty").classList.toggle("customer-tab-hidden",customerMode&&customerStoreTab==="filaments");
-  $("customerFilamentGrid").classList.toggle("hidden",!customerMode||customerStoreTab!=="filaments");
+  document.body.classList.toggle("storefront-filament-view",filamentView);
+  $("shopGrid").classList.toggle("hidden",filamentView);
+  $("shopEmpty").classList.toggle("customer-tab-hidden",filamentView);
+  $("customerFilamentGrid").classList.toggle("hidden",!filamentView);
   renderCustomerFilaments();
 }
 
@@ -664,7 +666,7 @@ function storefrontProductCardHTML(i,{featured=false}={}){
     <div class="shop-card-photo">
       ${i.photo_url?`<img data-product-image="${safe(i.id)}" src="${safe(i.photo_url)}" alt="${safe(i.name)}">`:`<div class="photo-fallback">KP</div>`}
       ${i.favorite&&!customerMode?`<div class="fav-chip">★</div>`:""}
-      ${madeToOrder?`<div class="out-badge">MADE TO ORDER</div>`:isOut?`<div class="out-badge">OUT OF STOCK</div>`:""}
+      ${madeToOrder?`<div class="out-badge made-to-order-badge">MADE TO ORDER</div>`:isOut?`<div class="out-badge">OUT OF STOCK</div>`:""}
       <div class="price-chip">${money(i.price)}</div>
     </div>
     <div class="shop-card-body">
@@ -673,7 +675,7 @@ function storefrontProductCardHTML(i,{featured=false}={}){
       ${deal}
       <div class="shop-card-footer">
         <div><div class="shop-price">${customerMode?"From ":""}${money(i.price)}</div>${customerMode?"":`<small>${money(Math.max(0,Number(i.price||0)-itemMaterialCost(i)))} est. profit</small>`}</div>
-        <div class="shop-stock">${madeToOrder?`<strong>Made</strong><br>to order`:`<strong>${stock}</strong><br>${isOut?"out of stock":"in stock"}`}</div>
+        <div class="shop-stock${madeToOrder?" made-to-order":""}">${madeToOrder?`<strong>Made to order</strong>`:`<strong>${stock}</strong><br>${isOut?"out of stock":"in stock"}`}</div>
       </div>
     </div>
   </article>`;

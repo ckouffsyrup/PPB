@@ -1010,3 +1010,142 @@ body.customer-mode .request-product-summary{
   body.customer-mode .storefront-section-heading h2{font-size:22px}
   body.customer-mode .shop-grid{gap:8px!important}
 }
+
+
+/* ==========================================================
+   PrintBook v5.8.1 — Storefront polish
+   ========================================================== */
+
+/* Available Filaments is its own view: no product shopping UI underneath. */
+body.customer-mode.storefront-filament-view #customerFeaturedSection,
+body.customer-mode.storefront-filament-view #storefrontBrowseHeading,
+body.customer-mode.storefront-filament-view .shop-controls,
+body.customer-mode.storefront-filament-view .shop-summary,
+body.customer-mode.storefront-filament-view #shopGrid,
+body.customer-mode.storefront-filament-view #shopEmpty,
+body.customer-mode.storefront-filament-view #storefrontCustomCta {
+  display:none !important;
+}
+body.customer-mode.storefront-filament-view #customerFilamentGrid {
+  display:grid !important;
+}
+
+/* Pull the hero back so the storefront content appears sooner. */
+body.customer-mode .storefront-brand {
+  min-height:400px;
+}
+body.customer-mode .storefront-brand-content {
+  min-height:400px;
+  padding:88px clamp(30px,5vw,66px) 42px;
+  grid-template-columns:minmax(0,560px) 1fr;
+  gap:34px;
+}
+body.customer-mode .storefront-display {
+  font-size:clamp(40px,5vw,66px);
+  line-height:.96;
+}
+body.customer-mode .storefront-tagline {
+  font-size:15px;
+}
+body.customer-mode .storefront-about {
+  max-width:500px;
+  font-size:13px;
+}
+body.customer-mode .storefront-hero-art {
+  min-height:235px;
+}
+body.customer-mode .storefront-hero-orb {
+  width:min(25vw,300px);
+}
+body.customer-mode .storefront-hero-mark {
+  font-size:clamp(66px,8vw,112px);
+}
+
+/* Made-to-order should read as one green availability state. */
+body.customer-mode .shop-stock.made-to-order,
+body.customer-mode .shop-stock.made-to-order strong {
+  color:#55d889 !important;
+}
+body.customer-mode .shop-stock.made-to-order strong {
+  font-size:10px;
+  line-height:1.2;
+}
+body.customer-mode .shop-card .out-badge {
+  color:#55d889;
+}
+body.customer-mode .shop-card .out-badge:has(+ .price-chip) {
+  /* Maintains compatibility where the same badge is used for availability. */
+}
+
+/* Product versions should be compact choices, not giant panels. */
+body.customer-mode .customer-variant-list {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+  margin:0 0 18px;
+}
+body.customer-mode .customer-variant {
+  flex:none !important;
+  min-height:0 !important;
+  height:auto !important;
+  padding:9px 11px !important;
+  border-radius:10px !important;
+}
+body.customer-mode .customer-variant span {
+  font-size:12px;
+  line-height:1.15;
+}
+body.customer-mode .customer-variant strong {
+  margin-top:3px;
+  font-size:9px;
+  line-height:1.2;
+}
+
+@media(max-width:760px){
+  body.customer-mode .storefront-brand {
+    min-height:auto;
+  }
+  body.customer-mode .storefront-brand-content {
+    min-height:auto;
+    padding:28px 20px 24px;
+  }
+  body.customer-mode .storefront-display {
+    font-size:clamp(36px,10.5vw,50px);
+  }
+  body.customer-mode .storefront-hero-art {
+    min-height:150px;
+  }
+  body.customer-mode .storefront-hero-orb {
+    width:180px;
+  }
+  body.customer-mode .storefront-hero-mark {
+    font-size:72px;
+  }
+  body.customer-mode .customer-variant-list {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:430px){
+  body.customer-mode .storefront-brand-content {
+    padding:24px 16px 20px;
+  }
+  body.customer-mode .storefront-display {
+    font-size:36px;
+  }
+  body.customer-mode .storefront-hero-art {
+    min-height:125px;
+  }
+  body.customer-mode .storefront-hero-orb {
+    width:150px;
+  }
+  body.customer-mode .storefront-hero-mark {
+    font-size:58px;
+  }
+}
+
+body.customer-mode .shop-card .made-to-order-badge{
+  color:#55d889 !important;
+  border-color:rgba(85,216,137,.30) !important;
+  background:rgba(85,216,137,.10) !important;
+}
