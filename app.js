@@ -659,6 +659,47 @@ function renderStoreAvailability(){
 }
 
 
+
+const FEATURED_PRODUCTS_KEY="printbook_featured_products_v1";
+function getFeaturedProductIds(){
+  try{
+    const ids=JSON.parse(localStorage.getItem(FEATURED_PRODUCTS_KEY)||"[]");
+    return Array.isArray(ids)?ids.filter(Boolean).slice(0,4):[];
+  }catch{return []}
+}
+function setFeaturedProductIds(ids){
+  localStorage.setItem(FEATURED_PRODUCTS_KEY,JSON.stringify([...new Set(ids)].slice(0,4)));
+}
+function getFeaturedProducts(source){
+  const ids=getFeaturedProductIds();
+  if(ids.length){
+    const selected=ids.map(id=>source.find(p=>p.id===id)).filter(Boolean);
+    if(selected.length)return selected.slice(0,4);
+  }
+  const fallback=source.filter(i=>i.favorite).concat(source.filter(i=>!i.favorite));
+  return [...new Map(fallback.map(i=>[i.id,i])).values()].slice(0,4);
+}
+function openFeaturedPrintsDialog(){
+  const wrap=$("featuredPrintChoices");
+  if(!wrap)return;
+  const selected=new Set(getFeaturedProductIds());
+  wrap.innerHTML=prints.map(p=>`
+    <label class="featured-print-choice">
+      <input type="checkbox" value="${safe(p.id)}" ${selected.has(p.id)?"checked":""}>
+      <div class="featured-print-choice-photo">${p.photo_url?`<img src="${safe(p.photo_url)}" alt="">`:`<div class="photo-fallback">KP</div>`}</div>
+      <div><strong>${safe(p.name)}</strong><small>${money(p.price)}</small></div>
+    </label>`).join("");
+  $("featuredPrintsDialog").showModal();
+}
+function saveFeaturedPrints(){
+  const checked=[...document.querySelectorAll('#featuredPrintChoices input[type="checkbox"]:checked')].map(i=>i.value);
+  if(checked.length>4){toast("Choose up to 4 featured prints");return}
+  setFeaturedProductIds(checked);
+  $("featuredPrintsDialog").close();
+  renderShop();
+  toast("Featured prints updated");
+}
+
 function storefrontProductCardHTML(i,{featured=false}={}){
   const stock=itemStock(i),madeToOrder=isMadeToOrder(i),isOut=!madeToOrder&&stock<=0;
   const deal=Number(i.deal_qty)>1&&Number(i.deal_price)>0?`<div class="shop-deal">${i.deal_qty} for ${money(i.deal_price)}</div>`:"";
@@ -708,8 +749,7 @@ function renderShop(){
   });
   $("shopGrid").innerHTML=list.map(i=>storefrontProductCardHTML(i)).join("");
   if($("customerFeaturedGrid")){
-    const featuredSource=list.filter(i=>i.favorite).concat(list.filter(i=>!i.favorite));
-    const featured=[...new Map(featuredSource.map(i=>[i.id,i])).values()].slice(0,4);
+    const featured=getFeaturedProducts(list);
     $("customerFeaturedGrid").innerHTML=featured.map(i=>storefrontProductCardHTML(i,{featured:true})).join("");
     $("customerFeaturedSection")?.classList.toggle("hidden",!customerMode||customerStoreTab!=="products"||!featured.length);
     wireStorefrontProductCards($("customerFeaturedGrid"));
@@ -2661,7 +2701,11 @@ safeUiInit("startup-storefront-v2",()=>{
   $("storefrontViewAllBtn")?.addEventListener("click",scrollToShop);
   $("storefrontCustomBrowseBtn")?.addEventListener("click",scrollToShop);
   $("storefrontOrdersNavBtn")?.addEventListener("click",openFindCustomerOrder);
-  $("storefrontOrderHeroBtn")?.addEventListener("click",openFindCustomerOrder);
+  $("storefrontCustomHeroBtn")?.addEventListener("click",scrollToShop);
+  $("storefrontEditFeaturedBtn")?.addEventListener("click",openFeaturedPrintsDialog);
+  $("closeFeaturedPrintsDialog")?.addEventListener("click",()=>$("featuredPrintsDialog").close());
+  $("cancelFeaturedPrintsBtn")?.addEventListener("click",()=>$("featuredPrintsDialog").close());
+  $("saveFeaturedPrintsBtn")?.addEventListener("click",saveFeaturedPrints);
 });
 safeUiInit("startup-25d",()=>{if($("customerShareStoreBtn"))$("customerShareStoreBtn").onclick=openCustomerStoreShare;if($("customerShareStoreHeroBtn"))$("customerShareStoreHeroBtn").onclick=openCustomerStoreShare;if($("closeCustomerStoreShare"))$("closeCustomerStoreShare").onclick=()=>$("customerStoreShareDialog").close();if($("shareCustomerStoreBtn"))$("shareCustomerStoreBtn").onclick=shareCustomerStore;if($("copyCustomerStoreLinkBtn"))$("copyCustomerStoreLinkBtn").onclick=async()=>{try{await navigator.clipboard.writeText("https://madebykarcen.com/");toast("Store link copied")}catch{toast("Couldn't copy store link")}};});
 safeUiInit("startup-26",()=>{if($("refreshRequestsBtn"))$("refreshRequestsBtn").onclick=()=>refreshOrdersFromCloud({showToast:true});});

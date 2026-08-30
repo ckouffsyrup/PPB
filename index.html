@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.8.1" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.8.2" />
 </head>
 <body>
 <div class="app-shell">
@@ -106,11 +106,13 @@
           <div class="storefront-brand-overlay"></div>
 
           <div class="storefront-topnav">
-            <button class="storefront-logo storefront-logo-button" id="storefrontLogoWrap" type="button" aria-label="Karcen's Prints">
-              <img id="storefrontLogo" class="hidden" alt="Store logo" />
-              <span id="storefrontMonogram">KP</span>
-            </button>
-            <strong class="storefront-mini-name">KARCEN'S PRINTS</strong>
+            <div class="storefront-topnav-left">
+              <button class="storefront-logo storefront-logo-button" id="storefrontLogoWrap" type="button" aria-label="Karcen's Prints">
+                <img id="storefrontLogo" class="hidden" alt="Store logo" />
+                <span id="storefrontMonogram">KP</span>
+              </button>
+              <strong class="storefront-mini-name">KARCEN'S PRINTS</strong>
+            </div>
             <nav class="storefront-nav-links" aria-label="Store navigation">
               <button type="button" id="storefrontShopNavBtn">Shop Prints</button>
               <button type="button" id="storefrontOrdersNavBtn">My Order</button>
@@ -127,7 +129,7 @@
 
               <div class="storefront-hero-actions">
                 <button class="primary" id="storefrontShopHeroBtn" type="button">Shop Prints</button>
-                <button class="secondary" id="storefrontOrderHeroBtn" type="button">Find My Order</button>
+                <button class="secondary" id="storefrontCustomHeroBtn" type="button">Request Custom</button>
               </div>
 
               <div class="storefront-status-row">
@@ -154,7 +156,10 @@
       <section class="customer-featured customer-only" id="customerFeaturedSection">
         <div class="storefront-section-heading">
           <div><p>FEATURED</p><h2>Featured Prints</h2></div>
-          <button class="text-btn" id="storefrontViewAllBtn" type="button">View all</button>
+          <div class="storefront-featured-actions">
+            <button class="text-btn owner-only" id="storefrontEditFeaturedBtn" type="button">Edit featured</button>
+            <button class="text-btn" id="storefrontViewAllBtn" type="button">View all</button>
+          </div>
         </div>
         <div class="customer-featured-grid" id="customerFeaturedGrid"></div>
       </section>
@@ -640,6 +645,21 @@
 </dialog>
 
 <!-- CUSTOMER PRODUCT VIEW -->
+
+<dialog id="featuredPrintsDialog">
+  <div class="sheet featured-prints-sheet">
+    <div class="sheet-header">
+      <div><p class="eyebrow">STOREFRONT</p><h2>Featured Prints</h2><p class="muted">Choose up to 4 products to show first.</p></div>
+      <button class="icon-btn" id="closeFeaturedPrintsDialog" type="button">✕</button>
+    </div>
+    <div id="featuredPrintChoices" class="featured-print-choices"></div>
+    <div class="dialog-actions">
+      <button class="secondary" id="cancelFeaturedPrintsBtn" type="button">Cancel</button>
+      <button class="primary" id="saveFeaturedPrintsBtn" type="button">Save Featured</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="customerProductDialog">
   <div class="sheet customer-product-sheet storefront-product-detail">
     <div class="sheet-grabber"></div>
@@ -1054,6 +1074,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.8.1"></script>
+<script src="app.js?v=5.8.2"></script>
 </body>
 </html>
