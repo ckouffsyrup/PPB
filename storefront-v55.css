@@ -1779,3 +1779,35 @@ body.customer-mode .storefront-hero-actions #storefrontShopHeroBtn{
     width:100%!important;
   }
 }
+
+
+/* PrintBook v5.8.7 — Featured is now a per-listing flag */
+.listing-flags-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.listing-flags{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.featured-toggle.active{
+  border-color:#8b5cf6!important;
+  background:rgba(139,92,246,.14)!important;
+  color:#c4a7ff!important;
+}
+@media(max-width:520px){
+  .listing-flags-row{
+    align-items:flex-start;
+  }
+  .listing-flags{
+    width:100%;
+  }
+  .listing-flags .favorite-toggle{
+    flex:1 1 0;
+  }
+}
