@@ -447,8 +447,22 @@ async function loadPublicStorefront(showError=true){
   }
 }
 
+function closeAdminDialogsForPublicVisitor(){
+  [
+    "orderDialog","editorDialog","filamentDialog","colorwayDialog",
+    "saleDialog","makeDialog","settingsDialog","salesHistoryDialog"
+  ].forEach(id=>{
+    const d=$(id);
+    if(d?.open){try{d.close()}catch{}}
+    // Some mobile browsers can restore the open attribute from page state.
+    // Remove it explicitly so CSS/native dialog state cannot leave an admin sheet visible.
+    d?.removeAttribute("open");
+  });
+}
+
 async function activatePublicVisitorMode(){
   publicVisitorMode=true;customerMode=true;customerStoreTab="products";currentView="shop";
+  closeAdminDialogsForPublicVisitor();
   document.body.classList.add("public-visitor");
   document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.dataset.view==="shop"));
   $("customerModeBarTitle").textContent="Live Customer Store";
@@ -1413,7 +1427,13 @@ function updateOrderEditorSummary(){
   }
 }
 function updateOrderPaymentButtons(){const quote=Math.max(0,Number($("orderPrice")?.value||0)),paid=Math.max(0,Number($("orderPaymentAmount")?.value||0)),deposit=Math.max(0,Number($("orderDepositAmount")?.value||0)),remaining=Math.max(0,quote-paid),createBtn=$("createPaymentLinkBtn"),copyBtn=$("copyPaymentLinkBtn");if(createBtn){const needsDeposit=deposit>paid;createBtn.textContent=needsDeposit?`Create deposit link (${money(Math.max(0,Math.min(quote,deposit)-paid))})`:`Create payment link (${money(remaining)})`;createBtn.disabled=!editingOrderId||remaining<=0}if(copyBtn)copyBtn.disabled=!$("orderPaymentLink")?.value;if($("markOrderPaidBtn"))$("markOrderPaidBtn").disabled=!editingOrderId||quote<=0||paid>=quote}
-window.openOrder=id=>{resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;const paymentParts=splitOrderPaymentInstructions(o.notes);editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderCustomerEmail").value=o.customer_email||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";{const linked=items.find(i=>i.id===o.print_id),inferred=orderVariantForReservation(o,linked);populateOrderVariants(o.variant_id||inferred?.id||"")}$("orderNotes").value=paymentParts.cleanNotes;$("orderPaymentInstructions").value=o.payment_instructions||paymentParts.instructions||"";$("orderPaymentStatus").value=o.payment_status||"unpaid";$("orderPaymentAmount").value=Number(o.payment_amount||0);$("orderDepositAmount").value=Number(o.deposit_amount||0);$("orderPaymentMethod").value=o.payment_method==="Stripe"?"":(o.payment_method||"");$("orderPaymentLink").value=o.payment_link||"";$("deleteOrderBtn").style.visibility="visible";updateOrderPaymentButtons();updateOrderEditorSummary();renderCustomerHistory()}else{$("orderTitle").textContent="New order";renderCustomerHistory()}$("orderDialog").showModal()}
+window.openOrder=id=>{
+  if(publicVisitorMode||customerMode||!currentUser){
+    const d=$("orderDialog");
+    if(d?.open){try{d.close()}catch{}}
+    return;
+  }
+  resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;const paymentParts=splitOrderPaymentInstructions(o.notes);editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderCustomerEmail").value=o.customer_email||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";{const linked=items.find(i=>i.id===o.print_id),inferred=orderVariantForReservation(o,linked);populateOrderVariants(o.variant_id||inferred?.id||"")}$("orderNotes").value=paymentParts.cleanNotes;$("orderPaymentInstructions").value=o.payment_instructions||paymentParts.instructions||"";$("orderPaymentStatus").value=o.payment_status||"unpaid";$("orderPaymentAmount").value=Number(o.payment_amount||0);$("orderDepositAmount").value=Number(o.deposit_amount||0);$("orderPaymentMethod").value=o.payment_method==="Stripe"?"":(o.payment_method||"");$("orderPaymentLink").value=o.payment_link||"";$("deleteOrderBtn").style.visibility="visible";updateOrderPaymentButtons();updateOrderEditorSummary();renderCustomerHistory()}else{$("orderTitle").textContent="New order";renderCustomerHistory()}$("orderDialog").showModal()}
 async function saveOrder(){if(!requireOnlineAdminSave())return;
   const item=$("orderItem").value.trim();if(!item)return toast("Describe the order");
   const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount").value||0)),o={id,...(prev.order_number?{order_number:prev.order_number}:{}),customer:$("orderCustomer").value.trim(),customer_email:$("orderCustomerEmail").value.trim().toLowerCase()||null,status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",variant_id:$("orderVariant")?.value||null,notes:joinOrderPaymentInstructions($("orderNotes").value,$("orderPaymentInstructions").value),payment_status:paymentStatus,payment_amount:paymentAmount,deposit_amount:Math.max(0,Number($("orderDepositAmount").value||0)),payment_method:$("orderPaymentMethod").value||null,payment_instructions:$("orderPaymentInstructions").value.trim()||null,payment_provider:prev.payment_provider||null,payment_reference:prev.payment_reference||null,paid_at:paymentStatus==="paid"?(prev.paid_at||nowISO()):null,payment_link:prev.payment_link||null,stripe_checkout_session_id:prev.stripe_checkout_session_id||null,stripe_payment_intent_id:prev.stripe_payment_intent_id||null,quote_email_sent_at:prev.quote_email_sent_at||null,customer_accepted_at:prev.customer_accepted_at||null,customer_accepted_price:prev.customer_accepted_price??null,ready_email_sent_at:prev.ready_email_sent_at||null,created_at:prev.created_at||nowISO(),updated_at:nowISO()};
@@ -2966,6 +2986,13 @@ document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="visible"){
     refreshPushStatus().catch(()=>{});
     refreshOrdersFromCloud().catch(()=>{});
+  }
+});
+window.addEventListener("pageshow",()=>{
+  if(publicVisitorMode||customerMode||!currentUser){
+    const d=$("orderDialog");
+    if(d?.open){try{d.close()}catch{}}
+    d?.removeAttribute("open");
   }
 });
 window.addEventListener("load",()=>{if("serviceWorker" in navigator)setTimeout(()=>{refreshPushStatus().catch(()=>{});refreshPushDiagnostics().catch(()=>{})},300)});

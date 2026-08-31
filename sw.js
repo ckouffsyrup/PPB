@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.9.9-featured-refresh-hydration";
+const CACHE="printbook-v5.10.0-mobile-public-order-fix";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
