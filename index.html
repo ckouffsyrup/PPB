@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.8.8" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.9.0" />
 </head>
 <body>
 <div class="app-shell">
@@ -213,45 +213,21 @@
 
     <!-- DASHBOARD -->
     <section class="view" data-view="dashboard">
-      <section class="hero compact">
-        <div>
-          <p class="hero-kicker">YOUR SHOP AT A GLANCE</p>
-          <h2>Make it.<br><span>Price it. Sell it.</span></h2>
-          <p>Track stock, filament, sales, orders, and what each print actually earns.</p>
-        </div>
-        <div class="hero-actions">
-          <button class="primary big" id="dashboardAddBtn">+ Add print</button>
-          <button class="secondary big" id="dashboardPriceBtn">✦ Help me price</button>
-        </div>
+      <div class="dashboard-v2-head">
+        <div><p class="eyebrow">WORKSPACE</p><h2>Dashboard</h2><p class="muted">What needs your attention right now.</p></div>
+        <div class="dashboard-v2-actions"><button class="secondary" id="dashboardPriceBtn">✦ Price helper</button><button class="primary" id="dashboardAddBtn">+ Add print</button></div>
+      </div>
+      <section class="dashboard-kpis">
+        <button class="dashboard-kpi attention" type="button" data-go="orders"><span>Needs attention</span><strong id="dashAttention">0</strong><small id="dashAttentionText">Nothing waiting</small></button>
+        <div class="dashboard-kpi"><span>Revenue</span><strong id="dashRevenue">$0</strong><small id="dashSalesCount">0 paid sales</small></div>
+        <div class="dashboard-kpi"><span>Est. profit</span><strong id="dashProfit">$0</strong><small>after material cost</small></div>
+        <button class="dashboard-kpi" type="button" data-go="orders"><span>Open orders</span><strong id="dashOrders">0</strong><small id="dashOrderValue">$0 quoted</small></button>
       </section>
-
-      <section class="stats-grid dashboard-stats">
-        <div class="stat-card"><span>Revenue</span><strong id="dashRevenue">$0</strong><small id="dashSalesCount">0 sales</small></div>
-        <div class="stat-card"><span>Est. profit</span><strong id="dashProfit">$0</strong><small>after material cost</small></div>
-        <div class="stat-card"><span>Items in stock</span><strong id="dashStock">0</strong><small id="dashPrintTypes">0 print types</small></div>
-        <div class="stat-card"><span>Open orders</span><strong id="dashOrders">0</strong><small id="dashOrderValue">$0 quoted</small></div>
-      </section>
-
-      <section class="dashboard-grid">
-        <div class="panel">
-          <div class="section-heading"><h3>Favorites</h3><button class="text-btn" data-go="prints">View all</button></div>
-          <div id="favoriteList" class="mini-list"></div>
-        </div>
-
-        <div class="panel">
-          <div class="section-heading"><h3>Recent sales</h3><button class="text-btn" id="openSalesBtn">Sales history</button></div>
-          <div id="recentSales" class="mini-list"></div>
-        </div>
-
-        <div class="panel">
-          <div class="section-heading"><h3>Restock suggestions</h3><button class="text-btn" data-go="filaments">Filaments</button></div>
-          <div id="lowFilamentList" class="mini-list"></div>
-        </div>
-
-        <div class="panel">
-          <div class="section-heading"><h3>Active orders</h3><button class="text-btn" data-go="orders">Orders</button></div>
-          <div id="activeOrderList" class="mini-list"></div>
-        </div>
+      <section class="dashboard-workspace-grid">
+        <div class="panel dashboard-focus-panel"><div class="section-heading"><div><p class="eyebrow">RIGHT NOW</p><h3>Order queue</h3></div><button class="text-btn" data-go="orders">Open orders →</button></div><div id="dashboardQueue" class="dashboard-queue"></div></div>
+        <div class="panel"><div class="section-heading"><div><p class="eyebrow">INVENTORY</p><h3>Low filament</h3></div><button class="text-btn" data-go="filaments">View all</button></div><div id="lowFilamentList" class="mini-list"></div></div>
+        <div class="panel"><div class="section-heading"><div><p class="eyebrow">MONEY</p><h3>Recent payments</h3></div><button class="text-btn" id="openSalesBtn">History</button></div><div id="recentSales" class="mini-list"></div></div>
+        <div class="panel"><div class="section-heading"><div><p class="eyebrow">CATALOG</p><h3>Shop inventory</h3></div><button class="text-btn" data-go="prints">Prints</button></div><div class="dashboard-inventory-summary"><div><strong id="dashStock">0</strong><span>finished items</span></div><div><strong id="dashPrintTypes">0</strong><span>print types</span></div></div></div>
       </section>
     </section>
 
@@ -325,6 +301,10 @@
         <div class="stat-card"><span>Ready</span><strong id="orderReadyCount">0</strong><small>waiting pickup/delivery</small></div>
       </div>
 
+      <div class="orders-toolbar">
+        <div class="search-wrap orders-search"><span>⌕</span><input id="orderSearch" type="search" placeholder="Search customer, order #, item, email..." /></div>
+        <div class="orders-view-toggle"><button class="active" id="ordersListViewBtn" type="button">☷ List</button><button id="ordersBoardViewBtn" type="button">▦ Board</button></div>
+      </div>
       <div class="segmented order-status-filter" id="orderFilter">
         <button class="active" data-status="">All</button>
         <button data-status="Requested">Requested</button>
@@ -337,6 +317,7 @@
         <button data-status="Cancelled">Cancelled</button>
       </div>
       <div id="orderList" class="order-list"></div>
+      <div id="orderBoard" class="order-board hidden"></div>
       <div id="orderEmpty" class="empty-state hidden"><h3>No orders here</h3><p>Customer requests and custom work will show up here.</p></div>
     </section>
   </main>
@@ -550,7 +531,10 @@
     <div class="sheet-header"><div><p class="eyebrow">CUSTOM ORDER</p><h2 id="orderTitle">New order</h2></div><button class="icon-btn" id="closeOrder" type="button">✕</button></div>
     <div class="form-grid">
       <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
-      <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label>
+      <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label><section class="customer-history-card hidden" id="customerHistoryCard">
+        <div class="customer-history-head"><div><span>RETURNING CUSTOMER</span><strong id="customerHistoryName">Customer history</strong></div><span class="customer-history-pill" id="customerHistoryOrders">0 orders</span></div>
+        <div class="customer-history-stats"><div><strong id="customerHistorySpent">$0</strong><span>paid total</span></div><div><strong id="customerHistoryCompleted">0</strong><span>completed</span></div><div><strong id="customerHistoryLast">—</strong><span>last order</span></div></div>
+      </section>
       <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Accepted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
       <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
       <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
@@ -1080,6 +1064,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.8.8"></script>
+<script src="app.js?v=5.9.0"></script>
 </body>
 </html>
