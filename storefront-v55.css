@@ -1609,3 +1609,155 @@ body.customer-mode .customer-mode-bar{
     padding-top:14px!important;
   }
 }
+
+
+/* ==========================================================
+   PrintBook v5.8.5 — Dedicated mobile storefront header
+   The logo/name/actions now live in normal document flow directly
+   ABOVE "3D PRINTS" instead of competing with the desktop hero layout.
+   ========================================================== */
+
+body.customer-mode .storefront-mobile-header{
+  display:none;
+}
+
+@media(max-width:1000px){
+  /* Kill the desktop nav entirely on tablet/mobile. */
+  body.customer-mode .storefront-topnav{
+    display:none!important;
+  }
+
+  body.customer-mode .storefront-mobile-header{
+    display:flex!important;
+    position:static!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    box-sizing:border-box!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:12px!important;
+    margin:0 0 28px!important;
+    padding:0 0 18px!important;
+    border-bottom:1px solid rgba(255,255,255,.07);
+    transform:none!important;
+  }
+
+  body.customer-mode .storefront-mobile-brand{
+    display:flex!important;
+    align-items:center!important;
+    gap:10px!important;
+    min-width:0!important;
+  }
+
+  body.customer-mode .storefront-mobile-brand .storefront-logo{
+    width:46px!important;
+    height:46px!important;
+    margin:0!important;
+    flex:0 0 auto!important;
+    border-radius:13px!important;
+  }
+
+  body.customer-mode .storefront-mobile-monogram{
+    display:grid;
+    place-items:center;
+    width:100%;
+    height:100%;
+    color:#fff;
+    font-size:18px;
+    font-weight:950;
+  }
+
+  body.customer-mode .storefront-mobile-brand strong{
+    min-width:0!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+    font-size:13px!important;
+    letter-spacing:.045em!important;
+    color:#fff!important;
+  }
+
+  body.customer-mode .storefront-mobile-actions{
+    display:flex!important;
+    align-items:center!important;
+    gap:6px!important;
+    margin:0!important;
+    flex:0 0 auto!important;
+  }
+
+  body.customer-mode .storefront-mobile-actions button{
+    appearance:none!important;
+    width:42px!important;
+    height:42px!important;
+    padding:0!important;
+    display:grid!important;
+    place-items:center!important;
+    border:1px solid rgba(255,255,255,.08)!important;
+    border-radius:12px!important;
+    background:#111016!important;
+    color:rgba(255,255,255,.82)!important;
+    font:inherit!important;
+    font-size:16px!important;
+    cursor:pointer!important;
+  }
+
+  /* Normal flow, full width. No hero grid on tablet/mobile. */
+  body.customer-mode .storefront-brand-content{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    min-height:0!important;
+    height:auto!important;
+    padding:24px!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+    grid-template-columns:none!important;
+  }
+
+  body.customer-mode .storefront-copy{
+    display:block!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:0!important;
+    position:static!important;
+    transform:none!important;
+  }
+
+  body.customer-mode .storefront-kicker{
+    margin-top:0!important;
+  }
+
+  body.customer-mode .storefront-hero-art{
+    display:none!important;
+  }
+}
+
+@media(max-width:760px){
+  body.customer-mode .storefront-brand{
+    margin:0!important;
+    border-radius:0!important;
+  }
+
+  body.customer-mode .storefront-brand-content{
+    padding:20px 0 26px!important;
+  }
+
+  body.customer-mode .storefront-mobile-header{
+    margin-bottom:24px!important;
+  }
+}
+
+@media(max-width:430px){
+  body.customer-mode .storefront-mobile-brand strong{
+    font-size:12px!important;
+  }
+
+  body.customer-mode .storefront-mobile-actions button{
+    width:39px!important;
+    height:39px!important;
+  }
+}

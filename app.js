@@ -2714,6 +2714,10 @@ safeUiInit("startup-storefront-v2",()=>{
   $("storefrontCustomBrowseBtn")?.addEventListener("click",scrollToShop);
   $("storefrontOrdersNavBtn")?.addEventListener("click",openFindCustomerOrder);
   $("storefrontCustomHeroBtn")?.addEventListener("click",scrollToShop);
+  $("storefrontMobileSearchBtn")?.addEventListener("click",scrollToShop);
+  $("storefrontMobileOrdersBtn")?.addEventListener("click",openFindCustomerOrder);
+  $("storefrontMobileShareBtn")?.addEventListener("click",()=>$("customerShareStoreHeroBtn")?.click());
+  $("storefrontMobileLogoWrap")?.addEventListener("click",()=>$("storefrontLogoWrap")?.click());
   $("storefrontEditFeaturedBtn")?.addEventListener("click",openFeaturedPrintsDialog);
   $("closeFeaturedPrintsDialog")?.addEventListener("click",()=>$("featuredPrintsDialog").close());
   $("cancelFeaturedPrintsBtn")?.addEventListener("click",()=>$("featuredPrintsDialog").close());

@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.8.4" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.8.5" />
 </head>
 <body>
 <div class="app-shell">
@@ -122,6 +122,19 @@
 
           <div class="storefront-brand-content">
             <div class="storefront-copy">
+              <div class="storefront-mobile-header">
+                <div class="storefront-mobile-brand">
+                  <button class="storefront-logo storefront-logo-button" id="storefrontMobileLogoWrap" type="button" aria-label="Karcen's Prints">
+                    <span class="storefront-mobile-monogram">KP</span>
+                  </button>
+                  <strong>KARCEN'S PRINTS</strong>
+                </div>
+                <nav class="storefront-mobile-actions" aria-label="Store shortcuts">
+                  <button type="button" id="storefrontMobileSearchBtn" aria-label="Shop prints">⌕</button>
+                  <button type="button" id="storefrontMobileOrdersBtn" aria-label="Find my order">▣</button>
+                  <button type="button" id="storefrontMobileShareBtn" aria-label="Share store">↗</button>
+                </nav>
+              </div>
               <p class="storefront-kicker">3D PRINTS</p>
               <h2 class="storefront-display">Small prints.<br>Cool stuff.<br><span>Made by Karcen.</span></h2>
               <p class="storefront-tagline" id="storefrontTagline">Made layer by layer.</p>
@@ -1083,6 +1096,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.8.4"></script>
+<script src="app.js?v=5.8.5"></script>
 </body>
 </html>
