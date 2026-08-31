@@ -1970,3 +1970,83 @@ body.customer-mode .storefront-brand-content{animation:pbStoreIntro .38s ease-ou
  .order-money{justify-content:flex-start}.order-card-actions{justify-content:flex-start}
 }
 @media(max-width:420px){.order-card-actions{display:grid;grid-template-columns:1fr;width:100%}.order-card-actions .order-advance-btn{width:100%!important}}
+
+
+/* ==========================================================
+   PrintBook v5.9.2 — Returning customer stats beside order
+   ========================================================== */
+
+@media(min-width:1051px){
+  #orderDialog{
+    width:min(1120px,calc(100vw - 48px))!important;
+    max-width:min(1120px,calc(100vw - 48px))!important;
+    overflow:auto!important;
+  }
+
+  #orderDialog .order-editor-layout{
+    position:static!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 280px;
+    grid-template-areas:"main history";
+    align-items:start;
+    gap:20px;
+  }
+
+  #orderDialog .order-editor-main{
+    grid-area:main;
+    min-width:0;
+  }
+
+  #orderDialog .order-history-rail{
+    grid-area:history;
+    position:static!important;
+    top:auto!important;
+    right:auto!important;
+    left:auto!important;
+    width:auto!important;
+    min-width:0;
+    align-self:start;
+  }
+
+  #orderDialog .order-history-rail .customer-history-card{
+    position:sticky;
+    top:8px;
+    margin:0!important;
+    width:100%!important;
+    box-sizing:border-box;
+  }
+
+  #orderDialog .customer-history-stats{
+    grid-template-columns:1fr!important;
+  }
+
+  #orderDialog .customer-history-stats>div{
+    display:flex!important;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  #orderDialog .customer-history-stats span{
+    text-align:right!important;
+  }
+}
+
+/* Keep the original compact fallback on tablet/mobile. */
+@media(max-width:1050px){
+  #orderDialog{
+    width:min(760px,calc(100vw - 24px))!important;
+    max-width:min(760px,calc(100vw - 24px))!important;
+  }
+
+  #orderDialog .order-editor-layout{
+    display:flex!important;
+    flex-direction:column!important;
+  }
+
+  #orderDialog .order-history-rail{
+    position:static!important;
+    width:100%!important;
+    margin-bottom:12px;
+  }
+}
