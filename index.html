@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.9.6" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.9.7" />
 </head>
 <body>
 <div class="app-shell">
@@ -218,10 +218,17 @@
         <div class="dashboard-v2-actions"><button class="secondary" id="dashboardPriceBtn">✦ Price helper</button><button class="primary" id="dashboardAddBtn">+ Add print</button></div>
       </div>
       <section class="dashboard-kpis">
-        <button class="dashboard-kpi attention" type="button" data-go="orders"><span>Needs attention</span><strong id="dashAttention">0</strong><small id="dashAttentionText">Nothing waiting</small></button>
+        <div class="dashboard-kpi attention dashboard-attention-kpi"><span>Needs attention</span><strong id="dashAttention">0</strong><small id="dashAttentionText">Nothing waiting</small></div>
         <div class="dashboard-kpi"><span>Revenue</span><strong id="dashRevenue">$0</strong><small id="dashSalesCount">0 paid sales</small></div>
         <div class="dashboard-kpi"><span>Est. profit</span><strong id="dashProfit">$0</strong><small>after material cost</small></div>
         <button class="dashboard-kpi" type="button" data-go="orders"><span>Open orders</span><strong id="dashOrders">0</strong><small id="dashOrderValue">$0 quoted</small></button>
+      </section>
+      <section class="dashboard-attention-panel" id="dashboardAttentionPanel">
+        <div class="section-heading">
+          <div><p class="eyebrow">NEEDS ATTENTION</p><h3>What to do next</h3></div>
+          <button class="text-btn" data-go="orders">View orders →</button>
+        </div>
+        <div id="dashboardAttentionList" class="dashboard-attention-list"></div>
       </section>
       <section class="dashboard-workspace-grid">
         <div class="panel dashboard-focus-panel"><div class="section-heading"><div><p class="eyebrow">RIGHT NOW</p><h3>Order queue</h3></div><button class="text-btn" data-go="orders">Open orders →</button></div><div id="dashboardQueue" class="dashboard-queue"></div></div>
@@ -303,6 +310,7 @@
 
       <div class="orders-toolbar">
         <div class="search-wrap orders-search"><span>⌕</span><input id="orderSearch" type="search" placeholder="Search customer, order #, item, email..." /></div>
+        <div class="orders-bulk-toggle-wrap"><button class="secondary compact" id="ordersBulkToggleBtn" type="button">Select</button></div>
         <div class="orders-view-toggle"><button class="active" id="ordersListViewBtn" type="button">☷ List</button><button id="ordersBoardViewBtn" type="button">▦ Board</button></div>
       </div>
       <div class="segmented order-status-filter" id="orderFilter">
@@ -315,6 +323,16 @@
         <button data-status="Ready">Ready</button>
         <button data-status="Completed">Completed</button>
         <button data-status="Cancelled">Cancelled</button>
+      </div>
+      <div class="orders-bulk-bar hidden" id="ordersBulkBar">
+        <div><strong id="ordersBulkCount">0 selected</strong><small>Apply a status to selected orders</small></div>
+        <div class="orders-bulk-actions">
+          <button class="secondary" type="button" data-bulk-status="Approved">Approve</button>
+          <button class="secondary" type="button" data-bulk-status="Printing">Printing</button>
+          <button class="secondary" type="button" data-bulk-status="Ready">Ready</button>
+          <button class="secondary" type="button" data-bulk-status="Completed">Complete</button>
+          <button class="ghost" type="button" id="ordersBulkCancelBtn">Cancel</button>
+        </div>
       </div>
       <div id="orderList" class="order-list"></div>
       <div id="orderBoard" class="order-board hidden"></div>
@@ -1096,6 +1114,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.9.6"></script>
+<script src="app.js?v=5.9.7"></script>
 </body>
 </html>

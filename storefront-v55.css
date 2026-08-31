@@ -2506,3 +2506,110 @@ body.customer-mode .storefront-brand-content{animation:pbStoreIntro .38s ease-ou
   .order-editor-fold summary{min-height:52px}
   .order-fold-body{padding:11px}
 }
+
+
+/* ==========================================================
+   PrintBook v5.9.7 — Actionable dashboard, bulk orders,
+   consistent order status language
+   ========================================================== */
+
+.dashboard-attention-panel{
+  margin-bottom:14px;
+  padding:15px;
+  border:1px solid rgba(139,92,246,.16);
+  border-radius:17px;
+  background:linear-gradient(145deg,rgba(139,92,246,.055),rgba(255,255,255,.012));
+}
+.dashboard-attention-list{display:flex;flex-direction:column;gap:7px}
+.dashboard-attention-row{
+  width:100%;
+  display:grid;
+  grid-template-columns:9px minmax(0,1fr) auto;
+  align-items:center;
+  gap:11px;
+  padding:10px 11px;
+  border:1px solid rgba(255,255,255,.055);
+  border-left-width:3px;
+  border-radius:12px;
+  background:rgba(0,0,0,.09);
+  color:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+.dashboard-attention-row:hover{background:rgba(255,255,255,.025)}
+.dashboard-attention-row strong,.dashboard-attention-row small{display:block}
+.dashboard-attention-row small{margin-top:2px;color:rgba(255,255,255,.4);font-size:10px}
+.dashboard-attention-row>span:last-child{font-size:10px;font-weight:800;color:rgba(255,255,255,.5);white-space:nowrap}
+.dashboard-all-clear{padding:13px;border-radius:12px;background:rgba(52,211,153,.055)}
+.dashboard-all-clear strong,.dashboard-all-clear span{display:block}.dashboard-all-clear strong{color:#86efac}.dashboard-all-clear span{font-size:10px;color:rgba(255,255,255,.4);margin-top:3px}
+
+.order-status-dot{width:8px;height:8px;border-radius:999px;display:inline-block}
+.tone-blue{background:#60a5fa}.tone-violet{background:#8b5cf6}.tone-purple{background:#a78bfa}.tone-green{background:#34d399}.tone-amber{background:#f59e0b}.tone-cyan{background:#22d3ee}.tone-slate{background:#94a3b8}.tone-red{background:#f87171}
+.tone-border-blue{border-left-color:#60a5fa!important}.tone-border-violet{border-left-color:#8b5cf6!important}.tone-border-purple{border-left-color:#a78bfa!important}.tone-border-green{border-left-color:#34d399!important}.tone-border-amber{border-left-color:#f59e0b!important}.tone-border-cyan{border-left-color:#22d3ee!important}.tone-border-slate{border-left-color:#94a3b8!important}.tone-border-red{border-left-color:#f87171!important}
+
+/* Make status chips use the same palette everywhere in admin. */
+.status.status-requested{color:#93c5fd!important;background:rgba(96,165,250,.10)!important;border-color:rgba(96,165,250,.18)!important}
+.status.status-quoted{color:#c4b5fd!important;background:rgba(139,92,246,.10)!important;border-color:rgba(139,92,246,.18)!important}
+.status.status-accepted{color:#d8b4fe!important;background:rgba(167,139,250,.10)!important;border-color:rgba(167,139,250,.18)!important}
+.status.status-approved{color:#86efac!important;background:rgba(52,211,153,.10)!important;border-color:rgba(52,211,153,.18)!important}
+.status.status-printing{color:#fcd34d!important;background:rgba(245,158,11,.10)!important;border-color:rgba(245,158,11,.18)!important}
+.status.status-ready{color:#67e8f9!important;background:rgba(34,211,238,.10)!important;border-color:rgba(34,211,238,.18)!important}
+.status.status-completed{color:#cbd5e1!important;background:rgba(148,163,184,.10)!important;border-color:rgba(148,163,184,.18)!important}
+.status.status-cancelled{color:#fca5a5!important;background:rgba(248,113,113,.10)!important;border-color:rgba(248,113,113,.18)!important}
+
+.orders-bulk-toggle-wrap{display:flex}
+#ordersBulkToggleBtn.active{border-color:rgba(139,92,246,.35);background:rgba(139,92,246,.13);color:#ddd6fe}
+.orders-bulk-bar{
+  position:sticky;
+  top:8px;
+  z-index:8;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin:8px 0 12px;
+  padding:10px 12px;
+  border:1px solid rgba(139,92,246,.24);
+  border-radius:14px;
+  background:rgba(20,16,31,.94);
+  backdrop-filter:blur(16px);
+  box-shadow:0 10px 30px rgba(0,0,0,.22);
+}
+.orders-bulk-bar.hidden{display:none!important}
+.orders-bulk-bar strong,.orders-bulk-bar small{display:block}
+.orders-bulk-bar small{margin-top:2px;color:rgba(255,255,255,.38);font-size:9px}
+.orders-bulk-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.orders-bulk-actions button{padding:7px 10px;min-height:32px;font-size:10px}
+.order-card-v3{position:relative;border-left-width:3px!important}
+.order-bulk-check{
+  flex:0 0 22px;
+  width:22px;height:22px;
+  border-radius:7px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.025);
+  color:#fff;
+  font-weight:900;
+  cursor:pointer;
+  align-self:center;
+  margin-right:3px;
+}
+.order-bulk-check.checked{background:rgba(139,92,246,.7);border-color:#a78bfa}
+.order-card-v3.bulk-selected{background:rgba(139,92,246,.055)!important;border-color:rgba(139,92,246,.28)!important}
+
+/* Customer-facing order portal status colors, using the same semantic palette. */
+.customer-order-status[data-status="Requested"],.portal-status.status-requested{color:#93c5fd!important}
+.customer-order-status[data-status="Quoted"],.portal-status.status-quoted{color:#c4b5fd!important}
+.customer-order-status[data-status="Accepted"],.portal-status.status-accepted{color:#d8b4fe!important}
+.customer-order-status[data-status="Approved"],.portal-status.status-approved{color:#86efac!important}
+.customer-order-status[data-status="Printing"],.portal-status.status-printing{color:#fcd34d!important}
+.customer-order-status[data-status="Ready"],.portal-status.status-ready{color:#67e8f9!important}
+.customer-order-status[data-status="Completed"],.portal-status.status-completed{color:#cbd5e1!important}
+.customer-order-status[data-status="Cancelled"],.portal-status.status-cancelled{color:#fca5a5!important}
+
+@media(max-width:720px){
+  .dashboard-attention-row{grid-template-columns:8px minmax(0,1fr)}
+  .dashboard-attention-row>span:last-child{grid-column:2}
+  .orders-bulk-bar{align-items:flex-start;flex-direction:column}
+  .orders-bulk-actions{justify-content:flex-start;width:100%}
+  .orders-bulk-actions button{flex:1}
+}

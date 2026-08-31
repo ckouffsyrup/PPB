@@ -785,6 +785,21 @@ function renderDashboard(){
   const attention=orders.filter(o=>["Requested","Accepted","Ready"].includes(o.status));
   $("dashRevenue").textContent=money(revenue);$("dashSalesCount").textContent=`${tx.length} paid sale${tx.length===1?"":"s"}`;$("dashProfit").textContent=money(profit);$("dashStock").textContent=stock;$("dashPrintTypes").textContent=items.length;$("dashOrders").textContent=open.length;$("dashOrderValue").textContent=`${money(open.reduce((a,o)=>a+Number(o.quoted_price||0),0))} quoted`;
   $("dashAttention").textContent=attention.length;$("dashAttentionText").textContent=attention.length?`${orders.filter(o=>o.status==="Requested").length} new · ${orders.filter(o=>o.status==="Accepted").length} accepted · ${orders.filter(o=>o.status==="Ready").length} ready`:"You're caught up";
+  const attentionGroups=[
+    {status:"Requested",label:"New requests need a quote",action:"Review requests"},
+    {status:"Accepted",label:"Accepted quotes need approval",action:"Approve orders"},
+    {status:"Ready",label:"Ready orders need pickup / completion",action:"Review ready"},
+    {status:"Quoted",label:"Quotes are waiting on customers",action:"Check quotes"}
+  ];
+  const attentionRows=attentionGroups.map(g=>{
+    const group=orders.filter(o=>o.status===g.status);
+    if(!group.length)return "";
+    const oldest=[...group].sort((a,b)=>Date.parse(a.created_at||0)-Date.parse(b.created_at||0))[0];
+    const age=oldest?.created_at?Math.max(0,Math.floor((Date.now()-Date.parse(oldest.created_at))/86400000)):0;
+    return `<button class="dashboard-attention-row tone-border-${orderStatusTone(g.status)}" type="button" onclick="goToOrdersStatus('${g.status}')">${orderStatusDot(g.status)}<div><strong>${group.length} ${safe(g.label)}</strong><small>${age>0?`Oldest waiting ${age}d · `:""}${safe(oldest?.customer||"Customer")} · ${safe(oldest?.item||"Order")}</small></div><span>${safe(g.action)} →</span></button>`;
+  }).filter(Boolean);
+  $("dashboardAttentionList").innerHTML=attentionRows.join("")||`<div class="dashboard-all-clear"><strong>✓ You're caught up</strong><span>No orders need action right now.</span></div>`;
+
   const rank={Printing:0,Accepted:1,Requested:2,Approved:3,Ready:4,Quoted:5},queue=[...open].sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9)||String(a.due_date||"9999").localeCompare(String(b.due_date||"9999"))).slice(0,6);
   $("dashboardQueue").innerHTML=queue.map(o=>`<button class="dashboard-queue-row" type="button" onclick="openOrder('${o.id}')"><span class="queue-status ${orderStatusClass(o.status)}"></span><div><strong>${safe(o.item||"Custom order")}</strong><small>${safe(o.customer||"Customer")} · ${safe(o.status)}${o.due_date?` · due ${safe(o.due_date)}`:""}</small></div><b>${money(o.quoted_price)}</b></button>`).join("")||emptyMini("No active orders");
   const rs=tx.slice(0,5);$("recentSales").innerHTML=rs.length?rs.map(t=>miniRow(t.title,`${t.detail}${t.date?` · ${String(t.date).slice(0,10)}`:""}`,money(t.amount))).join(""):emptyMini("No paid sales recorded");
@@ -858,6 +873,20 @@ async function advanceOrderStatus(id,event){
   if(next[0]==="Approved")setTimeout(()=>pullCloud(false),150);
 }
 window.advanceOrderStatus=advanceOrderStatus;window.sendQuoteEmailForOrder=sendQuoteEmailForOrder;window.sendReadyEmailForOrder=sendReadyEmailForOrder;
+const ORDER_STATUS_META={
+  Requested:{label:"Requested",tone:"blue"},
+  Quoted:{label:"Quoted",tone:"violet"},
+  Accepted:{label:"Accepted",tone:"purple"},
+  Approved:{label:"Approved",tone:"green"},
+  Printing:{label:"Printing",tone:"amber"},
+  Ready:{label:"Ready",tone:"cyan"},
+  Completed:{label:"Completed",tone:"slate"},
+  Cancelled:{label:"Cancelled",tone:"red"}
+};
+function orderStatusTone(status){return ORDER_STATUS_META[status]?.tone||"slate"}
+function orderStatusDot(status){return `<span class="order-status-dot tone-${orderStatusTone(status)}"></span>`}
+let ordersBulkMode=false;
+const ordersBulkSelected=new Set();
 let ordersDisplayMode="list";
 function orderSearchMatches(o,q){return !q||[o.order_number,o.customer,o.customer_email,o.item,o.status,o.notes].join(" ").toLowerCase().includes(q)}
 function orderCustomerHistory(email,currentId=""){
@@ -873,7 +902,63 @@ function renderCustomerHistory(){
 function orderCardHTML(o,{board=false}={}){
   const next=orderNextStep(o.status),notes=splitOrderPaymentInstructions(o.notes).cleanNotes.split("\n").filter(Boolean).slice(0,2).join(" · "),history=orderCustomerHistory(o.customer_email,o.id);
   const quoteState=o.status==="Quoted"?`<p class="muted">Waiting for acceptance${o.quote_email_sent_at?" · emailed":""}</p>`:o.status==="Accepted"?`<p class="order-accepted-note">✓ Customer accepted ${o.customer_accepted_price!=null?money(o.customer_accepted_price):"the quote"}</p>`:"";
-  return `<article class="order-card order-card-v3 ${board?"board-order-card":""}" onclick="openOrder('${o.id}')"><div class="order-main"><div class="order-card-topline"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span>${o.order_number?`<span class="order-number">${safe(o.order_number)}</span>`:""}</div><h4>${safe(o.item||"Custom order")}</h4><p class="order-customer-line">${safe(o.customer||"Customer")}${history?` <span class="returning-customer">↻ Returning</span>`:""} · Qty ${o.quantity||1}</p>${o.due_date?`<p class="order-due">Due ${safe(o.due_date)}</p>`:""}${quoteState}${notes&&!board?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><div class="order-money"><strong>${money(o.quoted_price)}</strong><span class="payment-mini">${safe(orderPaymentLabel(o))}</span></div><div class="order-card-actions">${next?`<button class="primary order-advance-btn" type="button" onclick="event.stopPropagation();advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button>`:""}${!board&&o.status==="Quoted"?`<button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendQuoteEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend quote</button>`:""}${!board&&o.status==="Ready"?`<button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendReadyEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend ready email</button>`:""}</div></div></article>`;
+  return `<article class="order-card order-card-v3 tone-border-${orderStatusTone(o.status)} ${board?"board-order-card":""} ${ordersBulkSelected.has(o.id)?"bulk-selected":""}" onclick="${board?"openOrder('"+o.id+"')":"handleOrderCardClick('"+o.id+"',event)"}">${!board&&ordersBulkMode?`<button class="order-bulk-check ${ordersBulkSelected.has(o.id)?"checked":""}" type="button" onclick="event.stopPropagation();toggleOrderBulkSelection('${o.id}')">${ordersBulkSelected.has(o.id)?"✓":""}</button>`:""}<div class="order-main"><div class="order-card-topline"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span>${o.order_number?`<span class="order-number">${safe(o.order_number)}</span>`:""}</div><h4>${safe(o.item||"Custom order")}</h4><p class="order-customer-line">${safe(o.customer||"Customer")}${history?` <span class="returning-customer">↻ Returning</span>`:""} · Qty ${o.quantity||1}</p>${o.due_date?`<p class="order-due">Due ${safe(o.due_date)}</p>`:""}${quoteState}${notes&&!board?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><div class="order-money"><strong>${money(o.quoted_price)}</strong><span class="payment-mini">${safe(orderPaymentLabel(o))}</span></div><div class="order-card-actions">${next?`<button class="primary order-advance-btn" type="button" onclick="event.stopPropagation();advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button>`:""}${!board&&o.status==="Quoted"?`<button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendQuoteEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend quote</button>`:""}${!board&&o.status==="Ready"?`<button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendReadyEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend ready email</button>`:""}</div></div></article>`;
+}
+
+function handleOrderCardClick(id,event){
+  if(ordersBulkMode){toggleOrderBulkSelection(id);return}
+  openOrder(id);
+}
+function toggleOrderBulkSelection(id){
+  if(ordersBulkSelected.has(id))ordersBulkSelected.delete(id);else ordersBulkSelected.add(id);
+  renderOrders();updateOrdersBulkBar();
+}
+function setOrdersBulkMode(enabled){
+  ordersBulkMode=!!enabled;
+  if(!ordersBulkMode)ordersBulkSelected.clear();
+  $("ordersBulkToggleBtn").textContent=ordersBulkMode?"Done":"Select";
+  $("ordersBulkToggleBtn").classList.toggle("active",ordersBulkMode);
+  updateOrdersBulkBar();renderOrders();
+}
+function updateOrdersBulkBar(){
+  const bar=$("ordersBulkBar");if(!bar)return;
+  bar.classList.toggle("hidden",!ordersBulkMode);
+  $("ordersBulkCount").textContent=`${ordersBulkSelected.size} selected`;
+  bar.querySelectorAll("[data-bulk-status]").forEach(b=>b.disabled=!ordersBulkSelected.size);
+}
+async function bulkSetOrderStatus(status){
+  const ids=[...ordersBulkSelected];if(!ids.length)return;
+  const eligible=ids.map(id=>orders.find(o=>o.id===id)).filter(Boolean);
+  if(!eligible.length)return;
+  if(!confirm(`Move ${eligible.length} selected order${eligible.length===1?"":"s"} to ${status}?`))return;
+  const button=document.querySelector(`[data-bulk-status="${status}"]`);
+  if(button)button.disabled=true;
+  try{
+    for(const o of eligible){
+      if(o.status===status)continue;
+      const previous=o.status;
+      o.status=status;
+      if(cloudSession&&isCloudConfigured()){
+        const result=await cloudUpsertOrder(o);
+        if(!result?.ok){o.status=previous;throw new Error(result?.error||`Could not update ${o.order_number||o.item}`)}
+      }else saveLocal();
+    }
+    ordersBulkSelected.clear();
+    await pullOrdersCloud?.();
+    renderAll();
+    updateOrdersBulkBar();
+  }catch(err){
+    alert(`Bulk update stopped: ${err.message||err}`);
+    renderAll();
+  }finally{
+    if(button)button.disabled=false;
+  }
+}
+function goToOrdersStatus(status){
+  document.querySelector('[data-go="orders"]')?.click();
+  orderStatusFilter=status;
+  document.querySelectorAll("#orderFilter button").forEach(b=>b.classList.toggle("active",b.dataset.status===status));
+  renderOrders();
 }
 function renderOrders(){
   const count=s=>orders.filter(o=>o.status===s).length;if($("orderRequestedCount"))$("orderRequestedCount").textContent=count("Requested");if($("orderQuotedCount"))$("orderQuotedCount").textContent=count("Quoted");if($("orderAcceptedCount"))$("orderAcceptedCount").textContent=count("Accepted");if($("orderProductionCount"))$("orderProductionCount").textContent=count("Approved")+count("Printing");if($("orderReadyCount"))$("orderReadyCount").textContent=count("Ready");
@@ -2775,7 +2860,11 @@ safeUiInit("startup-34",()=>{$("closeOwnerLogin").onclick=()=>$("ownerLoginDialo
 safeUiInit("startup-35",()=>{$("ownerLoginBtn").onclick=ownerLogin;});
 safeUiInit("startup-36",()=>{$("ownerLoginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")ownerLogin()});});
 
-safeUiInit("startup-orders-v2",()=>{$("orderSearch")?.addEventListener("input",renderOrders);$("ordersListViewBtn")?.addEventListener("click",()=>setOrdersDisplayMode("list"));$("ordersBoardViewBtn")?.addEventListener("click",()=>setOrdersDisplayMode("board"));$("orderCustomerEmail")?.addEventListener("input",renderCustomerHistory);$("orderCustomer")?.addEventListener("input",renderCustomerHistory);try{ordersDisplayMode=localStorage.getItem("printbook_orders_view")==="board"?"board":"list"}catch{ordersDisplayMode="list"}});
+safeUiInit("startup-orders-v2",()=>{
+  $("ordersBulkToggleBtn")?.addEventListener("click",()=>setOrdersBulkMode(!ordersBulkMode));
+  $("ordersBulkCancelBtn")?.addEventListener("click",()=>setOrdersBulkMode(false));
+  document.querySelectorAll("[data-bulk-status]").forEach(b=>b.addEventListener("click",()=>bulkSetOrderStatus(b.dataset.bulkStatus)));
+$("orderSearch")?.addEventListener("input",renderOrders);$("ordersListViewBtn")?.addEventListener("click",()=>setOrdersDisplayMode("list"));$("ordersBoardViewBtn")?.addEventListener("click",()=>setOrdersDisplayMode("board"));$("orderCustomerEmail")?.addEventListener("input",renderCustomerHistory);$("orderCustomer")?.addEventListener("input",renderCustomerHistory);try{ordersDisplayMode=localStorage.getItem("printbook_orders_view")==="board"?"board":"list"}catch{ordersDisplayMode="list"}});
 function setSettingsTab(tab){
   const valid=["general","storefront","sync","notifications","app"];
   const next=valid.includes(tab)?tab:"general";
