@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.8.7-featured-per-listing";
+const CACHE="printbook-v5.8.8-settings-tabs";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{

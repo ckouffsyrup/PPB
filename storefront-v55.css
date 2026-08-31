@@ -1811,3 +1811,116 @@ body.customer-mode .storefront-hero-actions #storefrontShopHeroBtn{
     flex:1 1 0;
   }
 }
+
+
+/* ==========================================================
+   PrintBook v5.8.8 — Tabbed Settings
+   ========================================================== */
+
+.settings-sheet{
+  width:min(94vw,920px)!important;
+  max-width:min(94vw,920px)!important;
+  max-height:90dvh!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+}
+
+.settings-sheet > .sheet-header{
+  flex:0 0 auto;
+}
+
+.settings-tabs{
+  flex:0 0 auto;
+  display:flex;
+  gap:7px;
+  padding:2px 0 14px;
+  overflow-x:auto;
+  scrollbar-width:none;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.settings-tabs::-webkit-scrollbar{display:none}
+
+.settings-tab{
+  appearance:none;
+  border:1px solid rgba(255,255,255,.08);
+  background:#111016;
+  color:rgba(255,255,255,.56);
+  min-height:38px;
+  padding:0 14px;
+  border-radius:11px;
+  font:inherit;
+  font-size:12px;
+  font-weight:800;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:.15s ease;
+}
+
+.settings-tab:hover{
+  color:#fff;
+  border-color:rgba(255,255,255,.15);
+}
+
+.settings-tab.active{
+  color:#fff;
+  border-color:color-mix(in srgb,var(--accent,#8b5cf6) 55%,rgba(255,255,255,.08));
+  background:color-mix(in srgb,var(--accent,#8b5cf6) 18%,#111016);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--accent,#8b5cf6) 8%,transparent);
+}
+
+.settings-tab-panels{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:hidden;
+}
+
+.settings-tab-panel{
+  display:none;
+  height:100%;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:16px 4px 12px 0;
+}
+
+.settings-tab-panel.active{
+  display:block;
+}
+
+.settings-tab-panel .settings-section{
+  margin:0 0 18px!important;
+}
+
+.settings-tab-panel .settings-section:last-child{
+  margin-bottom:4px!important;
+}
+
+.settings-sheet > #saveSettingsBtn{
+  flex:0 0 auto;
+  margin-top:12px;
+}
+
+@media(max-width:720px){
+  .settings-sheet{
+    width:min(94vw,760px)!important;
+    max-width:min(94vw,760px)!important;
+    max-height:88dvh!important;
+  }
+
+  .settings-tabs{
+    margin-left:-2px;
+    margin-right:-2px;
+    padding-bottom:11px;
+  }
+
+  .settings-tab{
+    min-height:40px;
+    padding:0 13px;
+    font-size:11px;
+  }
+
+  .settings-tab-panel{
+    padding-top:13px;
+    padding-right:1px;
+  }
+}

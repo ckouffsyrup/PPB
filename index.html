@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.8.7" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.8.8" />
 </head>
 <body>
 <div class="app-shell">
@@ -886,11 +886,20 @@
     <div class="sheet-grabber"></div>
     <div class="sheet-header"><div><p class="eyebrow">SETTINGS</p><h2>PrintBook setup</h2></div><button class="icon-btn" type="submit" value="cancel" id="closeSettings" aria-label="Close settings">✕</button></div>
 
+    <div class="settings-tabs" role="tablist" aria-label="Settings categories">
+      <button type="button" class="settings-tab active" data-settings-tab="general" role="tab" aria-selected="true">General</button>
+      <button type="button" class="settings-tab" data-settings-tab="storefront" role="tab" aria-selected="false">Storefront</button>
+      <button type="button" class="settings-tab" data-settings-tab="sync" role="tab" aria-selected="false">Cloud</button>
+      <button type="button" class="settings-tab" data-settings-tab="notifications" role="tab" aria-selected="false">Notifications</button>
+      <button type="button" class="settings-tab" data-settings-tab="app" role="tab" aria-selected="false">App & Data</button>
+    </div>
+
+    <div class="settings-tab-panels">
+      <div class="settings-tab-panel active" data-settings-panel="general">
     <section class="settings-section">
       <div class="section-heading"><div><h3>Pricing presets</h3><p class="muted">Normal, friend, event, wholesale — whatever you use.</p></div><button class="secondary small" id="addPresetBtn" type="button">+ Preset</button></div>
       <div id="presetList" class="preset-list"></div>
     </section>
-
     <section class="settings-section">
       <div class="section-heading">
         <div>
@@ -903,7 +912,9 @@
       </label>
       <p class="muted tiny-note">Set this before handing the phone to someone. Five taps on the PrintBook title opens the owner unlock screen.</p>
     </section>
+      </div>
 
+      <div class="settings-tab-panel" data-settings-panel="storefront">
     <section class="settings-section">
       <div class="section-heading">
         <div><h3>Storefront Branding</h3><p class="muted">This is what customers see. PrintBook stays the admin app behind it.</p></div>
@@ -924,7 +935,6 @@
       <div class="row"><button class="primary" id="saveStoreBrandingBtn" type="button">Save Storefront Branding</button></div>
       <p class="muted tiny-note" id="storeBrandingHelp">Logo and hero image are optional. Leaving them blank keeps the clean built-in Karcen's Prints look.</p>
     </section>
-
     <section class="settings-section">
       <div class="section-heading">
         <div><h3>Share your store</h3><p class="muted">Customers can scan this instead of typing the GitHub Pages address.</p></div>
@@ -940,7 +950,6 @@
         </div>
       </div>
     </section>
-
     <section class="settings-section">
       <div class="section-heading">
         <div><h3>Store Availability</h3><p class="muted">Control whether customers can place new requests and show your current turnaround time.</p></div>
@@ -957,7 +966,9 @@
       <div class="row"><button class="primary" id="saveStoreAvailabilityBtn" type="button">Save Store Availability</button></div>
       <p class="muted tiny-note" id="storeAvailabilityHelp">These settings sync to the public storefront immediately.</p>
     </section>
+      </div>
 
+      <div class="settings-tab-panel" data-settings-panel="sync">
     <section class="settings-section">
       <div class="section-heading"><h3>Cloud sync</h3><span id="cloudStatus" class="badge">Not connected</span></div><p class="muted tiny-note"><strong>Cloud-first sync:</strong> Supabase is the source of truth. Local data is only a cache, so your phone and PC no longer compete over which copy is newer.</p>
       <p class="muted">Optional. Connect Supabase to see the same data on phone and PC.</p>
@@ -974,8 +985,9 @@
         <div class="row"><button class="secondary" type="button" id="pushLocalBtn">Upload local data</button><button class="secondary" type="button" id="signOutBtn">Sign out</button></div>
       </div>
     </section>
+      </div>
 
-
+      <div class="settings-tab-panel" data-settings-panel="notifications">
     <section class="settings-section">
       <div class="section-heading">
         <div>
@@ -1022,7 +1034,9 @@
       </div>
       <p class="muted tiny-note">The in-app notification center still works too. Mobile push requires the new Supabase push backend included with this update.</p>
     </section>
+      </div>
 
+      <div class="settings-tab-panel" data-settings-panel="app">
     <section class="settings-section">
       <div class="section-heading">
         <div>
@@ -1037,11 +1051,12 @@
       </div>
       <p class="muted tiny-note" id="appUpdateStatusText">PrintBook checks automatically when it opens.</p>
     </section>
-
     <section class="settings-section">
       <h3>Backup</h3>
       <div class="row"><button class="secondary" type="button" id="exportBtn">Export JSON</button><label class="button-like">Import JSON<input id="importInput" type="file" accept=".json,application/json" hidden /></label></div>
     </section>
+      </div>
+    </div>
 
     <button class="primary full-width" id="saveSettingsBtn" type="submit" value="save">Save settings</button>
   </form>
@@ -1065,6 +1080,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.8.7"></script>
+<script src="app.js?v=5.8.8"></script>
 </body>
 </html>

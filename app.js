@@ -2745,6 +2745,28 @@ safeUiInit("startup-33",()=>{$("brandOwnerTrigger").addEventListener("selectstar
 safeUiInit("startup-34",()=>{$("closeOwnerLogin").onclick=()=>$("ownerLoginDialog").close();});
 safeUiInit("startup-35",()=>{$("ownerLoginBtn").onclick=ownerLogin;});
 safeUiInit("startup-36",()=>{$("ownerLoginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")ownerLogin()});});
+
+function setSettingsTab(tab){
+  const valid=["general","storefront","sync","notifications","app"];
+  const next=valid.includes(tab)?tab:"general";
+  document.querySelectorAll("[data-settings-tab]").forEach(btn=>{
+    const active=btn.dataset.settingsTab===next;
+    btn.classList.toggle("active",active);
+    btn.setAttribute("aria-selected",active?"true":"false");
+  });
+  document.querySelectorAll("[data-settings-panel]").forEach(panel=>{
+    panel.classList.toggle("active",panel.dataset.settingsPanel===next);
+  });
+  try{localStorage.setItem("printbook_settings_tab",next)}catch{}
+}
+safeUiInit("startup-settings-tabs",()=>{
+  document.querySelectorAll("[data-settings-tab]").forEach(btn=>{
+    btn.addEventListener("click",()=>setSettingsTab(btn.dataset.settingsTab));
+  });
+  let saved="general";
+  try{saved=localStorage.getItem("printbook_settings_tab")||"general"}catch{}
+  setSettingsTab(saved);
+});
 safeUiInit("startup-37",()=>{$("closeEditor").onclick=()=>{savePrintInFlight=false;$("savePrintBtn").disabled=false;$("savePrintBtn").textContent="Save print";$("editorDialog").close()};$("savePrintBtn").onclick=savePrint;$("deleteBtn").onclick=deletePrint;$("favoriteToggle").onclick=()=>{editorFavorite=!editorFavorite;updateFavoriteButton()};$("featuredToggle").onclick=toggleEditorFeatured;$("modelSourceInput").oninput=updateModelLink;$("addPrintFilamentBtn").onclick=()=>addUsageRow("printFilamentRows");$("addVariantBtn").onclick=()=>addVariantRow();});
 safeUiInit("startup-38",()=>{["hoursInput","extraCostInput","priceInput","madeInput","soldInput","presetInput","dealQtyInput","dealPriceInput"].forEach(id=>$(id).oninput=updatePricingPreviews);});
 safeUiInit("startup-39",()=>{$("recordSaleFromPrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openSale(id)};$("makePrintBtn").onclick=()=>{const id=editingId;$("editorDialog").close();openMake(id)};});
