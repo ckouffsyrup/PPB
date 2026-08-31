@@ -237,6 +237,13 @@ body.public-visitor #orderDialog{display:none!important}
           <button class="today-focus-card" id="todayLowStock" type="button" data-go="filaments"><small>INVENTORY WATCH</small><strong>Stock looks good</strong><span>No low filament.</span></button>
         </div>
       </section>
+      <section class="panel dashboard-trending-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">MOMENTUM</p><h3>Trending Products</h3><p class="muted">Recent 14 days compared with the 14 days before.</p></div>
+          <button class="text-btn" data-go="prints">Catalog →</button>
+        </div>
+        <div id="dashboardTrendingProducts" class="trending-product-list"></div>
+      </section>
       <section class="dashboard-kpis">
         <div class="dashboard-kpi attention dashboard-attention-kpi"><span>Needs attention</span><strong id="dashAttention">0</strong><small id="dashAttentionText">Nothing waiting</small></div>
         <div class="dashboard-kpi"><span>Revenue</span><strong id="dashRevenue">$0</strong><small id="dashSalesCount">0 paid sales</small></div>

@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.11.1";
+window.PRINTBOOK_BUILD="5.12.0";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -237,7 +237,7 @@ function showView(name){
 }
 
 function renderAll(){
-  renderShop();renderDashboard();renderPrints();renderFilaments();renderColorways();renderOrders();renderPresets();
+  renderShop();renderDashboard();renderTrendingProducts();renderPrints();renderFilaments();renderColorways();renderOrders();renderPresets();
   populatePrintSelects();populatePresetSelects();renderNotificationsBadge();updateCloudUI();
 }
 function miniRow(title,sub,right){return `<div class="mini-row"><div class="left"><strong>${safe(title)}</strong><small>${safe(sub)}</small></div><div class="mini-price">${safe(right)}</div></div>`}
@@ -689,6 +689,61 @@ function getFeaturedProducts(source){
   const ids=normalizeFeaturedProductIds(featuredProductIds);
   return ids.map(id=>source.find(p=>p.id===id)).filter(Boolean).slice(0,4);
 }
+
+function productTrendStats(item,windowDays=14){
+  if(!item)return {recentUnits:0,previousUnits:0,recentRevenue:0,delta:0,score:0,trending:false};
+  const now=Date.now(),windowMs=windowDays*86400000,recentStart=now-windowMs,previousStart=now-windowMs*2;
+  let recentUnits=0,previousUnits=0,recentRevenue=0;
+  for(const s of sales){
+    if(String(s?.print_id||"")!==String(item.id))continue;
+    const t=Date.parse(s.date||s.created_at||s.updated_at||"");
+    if(!Number.isFinite(t))continue;
+    const qty=Math.max(1,Number(s.quantity||1));
+    if(t>=recentStart){
+      recentUnits+=qty;
+      recentRevenue+=Number(s.total ?? Number(s.unit_price||0)*qty);
+    }else if(t>=previousStart){previousUnits+=qty}
+  }
+  for(const o of orders){
+    if(String(o?.print_id||"")!==String(item.id))continue;
+    if(!["paid","deposit_paid"].includes(String(o.payment_status||"")))continue;
+    const t=Date.parse(o.paid_at||o.updated_at||o.created_at||"");
+    if(!Number.isFinite(t))continue;
+    const qty=Math.max(1,Number(o.quantity||1));
+    if(t>=recentStart){recentUnits+=qty;recentRevenue+=orderCollectedAmount(o)}
+    else if(t>=previousStart)previousUnits+=qty;
+  }
+  const delta=recentUnits-previousUnits;
+  const trending=recentUnits>=2&&(delta>=1||recentUnits>=3);
+  const score=recentUnits*3+Math.max(0,delta)*2+Math.min(5,recentRevenue/20);
+  return {recentUnits,previousUnits,recentRevenue,delta,score,trending};
+}
+function isTrendingProduct(item){return productTrendStats(item).trending}
+function getTrendingProducts(limit=5){
+  return items.map(item=>({item,stats:productTrendStats(item)}))
+    .filter(x=>x.stats.recentUnits>0)
+    .sort((a,b)=>Number(b.stats.trending)-Number(a.stats.trending)||b.stats.score-a.stats.score||b.stats.recentUnits-a.stats.recentUnits)
+    .slice(0,limit);
+}
+function renderTrendingProducts(){
+  const root=$("dashboardTrendingProducts");
+  if(!root)return;
+  const list=getTrendingProducts(4);
+  if(!list.length){
+    root.innerHTML='<div class="trending-empty"><strong>No trend yet</strong><span>Record a few sales and PrintBook will spot what is heating up.</span></div>';
+    return;
+  }
+  root.innerHTML=list.map(({item,stats},index)=>{
+    const movement=stats.delta>0?`+${stats.delta} vs prior 14d`:stats.delta<0?`${stats.delta} vs prior 14d`:'steady vs prior 14d';
+    return `<button class="trending-product-row${stats.trending?' is-trending':''}" type="button" data-trending-id="${safe(item.id)}">
+      <span class="trending-rank">${index+1}</span>
+      <span class="trending-copy"><strong>${safe(item.name)}</strong><small>${stats.recentUnits} sold in 14d · ${safe(movement)}</small></span>
+      <span class="trending-right"><strong>${money(stats.recentRevenue)}</strong><small>${stats.trending?'🔥 Trending':'Watching'}</small></span>
+    </button>`;
+  }).join('');
+  root.querySelectorAll('[data-trending-id]').forEach(btn=>btn.onclick=()=>openEditor(btn.dataset.trendingId));
+}
+
 function storefrontProductBadges(i){
   if(!customerMode)return "";
   const badges=[];
@@ -697,7 +752,7 @@ function storefrontProductBadges(i){
   const sold=Math.max(0,Number(i?.sold_qty||0));
   const stock=itemStock(i);
   if(ageDays<=14)badges.push('<span class="store-product-badge badge-new">NEW</span>');
-  if(sold>=3)badges.push('<span class="store-product-badge badge-popular">POPULAR</span>');
+  if(isTrendingProduct(i)||(publicVisitorMode&&sold>=3))badges.push('<span class="store-product-badge badge-popular">POPULAR</span>');
   if(!isMadeToOrder(i)&&stock>0&&stock<=2)badges.push('<span class="store-product-badge badge-limited">LIMITED</span>');
   return badges.length?`<div class="store-product-badges">${badges.join("")}</div>`:"";
 }
