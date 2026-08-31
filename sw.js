@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.10.3-favicon-refresh";
+const CACHE="printbook-v5.11.1-badge-overlap";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
