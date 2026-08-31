@@ -820,7 +820,7 @@ function renderDashboard(){
   $("dashboardAttentionList").innerHTML=attentionRows.join("")||`<div class="dashboard-all-clear"><strong>✓ You're caught up</strong><span>No orders need action right now.</span></div>`;
 
   const rank={Printing:0,Accepted:1,Requested:2,Approved:3,Ready:4,Quoted:5},queue=[...open].sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9)||String(a.due_date||"9999").localeCompare(String(b.due_date||"9999"))).slice(0,6);
-  $("dashboardQueue").innerHTML=queue.map(o=>`<button class="dashboard-queue-row" type="button" onclick="openOrder('${o.id}')"><span class="queue-status ${orderStatusClass(o.status)}"></span><div><strong>${safe(o.item||"Custom order")}</strong><small>${safe(o.customer||"Customer")} · ${safe(o.status)}${o.due_date?` · due ${safe(o.due_date)}`:""}</small></div><b>${money(o.quoted_price)}</b></button>`).join("")||emptyMini("No active orders");
+  $("dashboardQueue").innerHTML=queue.map(o=>`<button class="dashboard-queue-row" type="button" onclick="openOrder('${o.id}')"><span class="queue-status ${orderStatusClass(o.status)}"></span><div><strong>${safe(o.item||"Custom order")}</strong><small>${safe(o.customer||"Customer")} · ${safe(o.status)}${orderAgeBadge(o)}${o.due_date?` · due ${safe(o.due_date)}`:""}</small></div><b>${money(o.quoted_price)}</b></button>`).join("")||emptyMini("No active orders");
   const rs=tx.slice(0,5);$("recentSales").innerHTML=rs.length?rs.map(t=>miniRow(t.title,`${t.detail}${t.date?` · ${String(t.date).slice(0,10)}`:""}`,money(t.amount))).join(""):emptyMini("No paid sales recorded");
   const restock=restockSuggestions().slice(0,5);$("lowFilamentList").innerHTML=restock.length?restock.map(x=>miniRow(`${x.f.brand||""} ${x.f.color||x.f.material}`.trim(),`${Math.round(x.f.remaining||0)}g left${x.units!=null?` · ~${x.units} prints`:""}`,"LOW")).join(""):emptyMini("Filament levels look good");
 }
@@ -902,6 +902,33 @@ const ORDER_STATUS_META={
   Completed:{label:"Completed",tone:"slate"},
   Cancelled:{label:"Cancelled",tone:"red"}
 };
+function orderAgeDays(order){
+  const raw=order?.updated_at||order?.created_at;
+  if(!raw)return 0;
+  const t=new Date(raw).getTime();
+  if(!Number.isFinite(t))return 0;
+  return Math.max(0,Math.floor((Date.now()-t)/86400000));
+}
+function orderAgeLabel(order){
+  const days=orderAgeDays(order);
+  const status=String(order?.status||"Requested");
+  if(status==="Completed"||status==="Cancelled")return "";
+  if(status==="Requested")return days>0?`Waiting ${days}d`:"New today";
+  if(status==="Quoted")return days>0?`Quoted ${days}d ago`:"Quoted today";
+  if(status==="Accepted")return days>0?`Accepted ${days}d ago`:"Accepted today";
+  if(status==="Approved")return days>0?`Approved ${days}d ago`:"Approved today";
+  if(status==="Printing")return days>0?`Printing ${days}d`:"Printing today";
+  if(status==="Ready")return days>0?`Ready ${days}d`:"Ready today";
+  return days>0?`${days}d`:"Today";
+}
+function orderAgeBadge(order){
+  const label=orderAgeLabel(order);
+  if(!label)return "";
+  const days=orderAgeDays(order);
+  const urgency=days>=7?"age-overdue":days>=3?"age-warn":"age-fresh";
+  return `<span class="order-age-badge ${urgency}" title="${safe(label)}">${safe(label)}</span>`;
+}
+
 function orderStatusTone(status){return ORDER_STATUS_META[status]?.tone||"slate"}
 function orderStatusDot(status){return `<span class="order-status-dot tone-${orderStatusTone(status)}"></span>`}
 let ordersBulkMode=false;
@@ -921,7 +948,7 @@ function renderCustomerHistory(){
 function orderCardHTML(o,{board=false}={}){
   const next=orderNextStep(o.status),notes=splitOrderPaymentInstructions(o.notes).cleanNotes.split("\n").filter(Boolean).slice(0,2).join(" · "),history=orderCustomerHistory(o.customer_email,o.id);
   const quoteState=o.status==="Quoted"?`<p class="muted">Waiting for acceptance${o.quote_email_sent_at?" · emailed":""}</p>`:o.status==="Accepted"?`<p class="order-accepted-note">✓ Customer accepted ${o.customer_accepted_price!=null?money(o.customer_accepted_price):"the quote"}</p>`:"";
-  return `<article class="order-card order-card-v3 tone-border-${orderStatusTone(o.status)} ${board?"board-order-card":""} ${ordersBulkSelected.has(o.id)?"bulk-selected":""}" onclick="${board?"openOrder('"+o.id+"')":"handleOrderCardClick('"+o.id+"',event)"}">${!board&&ordersBulkMode?`<button class="order-bulk-check ${ordersBulkSelected.has(o.id)?"checked":""}" type="button" onclick="event.stopPropagation();toggleOrderBulkSelection('${o.id}')">${ordersBulkSelected.has(o.id)?"✓":""}</button>`:""}<div class="order-main"><div class="order-card-topline"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}</span>${o.order_number?`<span class="order-number">${safe(o.order_number)}</span>`:""}</div><h4>${safe(o.item||"Custom order")}</h4><p class="order-customer-line">${safe(o.customer||"Customer")}${history?` <span class="returning-customer">↻ Returning</span>`:""} · Qty ${o.quantity||1}</p>${o.due_date?`<p class="order-due">Due ${safe(o.due_date)}</p>`:""}${quoteState}${notes&&!board?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><div class="order-money"><strong>${money(o.quoted_price)}</strong><span class="payment-mini">${safe(orderPaymentLabel(o))}</span></div><div class="order-card-actions">${next?`<button class="primary order-advance-btn" type="button" onclick="event.stopPropagation();advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button>`:""}${!board&&o.status==="Quoted"?`<button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendQuoteEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend quote</button>`:""}${!board&&o.status==="Ready"?`<button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendReadyEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend ready email</button>`:""}</div></div></article>`;
+  return `<article class="order-card order-card-v3 tone-border-${orderStatusTone(o.status)} ${board?"board-order-card":""} ${ordersBulkSelected.has(o.id)?"bulk-selected":""}" onclick="${board?"openOrder('"+o.id+"')":"handleOrderCardClick('"+o.id+"',event)"}">${!board&&ordersBulkMode?`<button class="order-bulk-check ${ordersBulkSelected.has(o.id)?"checked":""}" type="button" onclick="event.stopPropagation();toggleOrderBulkSelection('${o.id}')">${ordersBulkSelected.has(o.id)?"✓":""}</button>`:""}<div class="order-main"><div class="order-card-topline"><span class="status ${orderStatusClass(o.status)}">${safe(o.status)}${orderAgeBadge(o)}</span>${o.order_number?`<span class="order-number">${safe(o.order_number)}</span>`:""}</div><h4>${safe(o.item||"Custom order")}</h4><p class="order-customer-line">${safe(o.customer||"Customer")}${history?` <span class="returning-customer">↻ Returning</span>`:""} · Qty ${o.quantity||1}</p>${o.due_date?`<p class="order-due">Due ${safe(o.due_date)}</p>`:""}${quoteState}${notes&&!board?`<p class="muted order-notes-preview">${safe(notes)}</p>`:""}</div><div class="order-side"><div class="order-money"><strong>${money(o.quoted_price)}</strong><span class="payment-mini">${safe(orderPaymentLabel(o))}</span></div><div class="order-card-actions">${next?`<button class="primary order-advance-btn" type="button" onclick="event.stopPropagation();advanceOrderStatus('${o.id}',event)">${safe(next[1])}</button>`:""}${!board&&o.status==="Quoted"?`<button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendQuoteEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend quote</button>`:""}${!board&&o.status==="Ready"?`<button class="secondary order-advance-btn" type="button" onclick="event.stopPropagation();sendReadyEmailForOrder('${o.id}',{force:true}).then(()=>pullOrdersCloud())">Resend ready email</button>`:""}</div></div></article>`;
 }
 
 function handleOrderCardClick(id,event){

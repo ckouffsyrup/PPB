@@ -2619,3 +2619,10 @@ body.customer-mode .storefront-brand-content{animation:pbStoreIntro .38s ease-ou
 #featuredToggle.active{
   box-shadow:inset 0 0 0 1px rgba(139,92,246,.18);
 }
+
+
+/* PrintBook order aging badges */
+.order-age-badge{display:inline-flex;align-items:center;min-height:22px;padding:3px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.035);color:rgba(255,255,255,.62);font-size:10px;font-weight:700;line-height:1;white-space:nowrap;vertical-align:middle}
+.order-age-badge.age-warn{border-color:rgba(245,158,11,.18);background:rgba(245,158,11,.07);color:rgba(253,186,116,.9)}
+.order-age-badge.age-overdue{border-color:rgba(248,113,113,.20);background:rgba(248,113,113,.07);color:rgba(252,165,165,.92)}
+@media(max-width:720px){.order-age-badge{font-size:9px;min-height:20px;padding:3px 6px}}
