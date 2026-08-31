@@ -1042,12 +1042,37 @@ function toggleEditorFeatured(){
 async function syncFeaturedSelection(ids){
   if(!supabaseClient||!currentUser)return false;
   const cleanIds=normalizeFeaturedProductIds(ids);
-  const {error}=await supabaseClient.from("store_settings").upsert({
-    user_id:currentUser.id,
-    featured_product_ids:cleanIds,
-    updated_at:nowISO()
-  });
+  const payload={featured_product_ids:cleanIds,updated_at:nowISO()};
+
+  // Update the owner's existing store_settings row first. This avoids relying
+  // on a broad upsert for a setting that needs to be durable immediately.
+  let {data,error}=await supabaseClient
+    .from("store_settings")
+    .update(payload)
+    .eq("user_id",currentUser.id)
+    .select("featured_product_ids")
+    .maybeSingle();
+
+  // Brand-new shops may not have a settings row yet.
+  if(!error&&!data){
+    const inserted=await supabaseClient
+      .from("store_settings")
+      .insert({user_id:currentUser.id,...payload})
+      .select("featured_product_ids")
+      .single();
+    data=inserted.data;
+    error=inserted.error;
+  }
+
   if(error)throw error;
+
+  const confirmed=normalizeFeaturedProductIds(data?.featured_product_ids);
+  if(JSON.stringify(confirmed)!==JSON.stringify(cleanIds)){
+    throw new Error("Featured prints did not save correctly");
+  }
+
+  featuredProductIds=confirmed;
+  storeAvailability={...storeAvailability,featured_product_ids:confirmed};
   return true;
 }
 window.openEditor=id=>{
@@ -1120,12 +1145,23 @@ async function savePrint(){if(!requireOnlineAdminSave())return;
     const old=editingId?items.find(i=>i.id===editingId):null;
     const id=editingId||uid();
 
-    let nextFeaturedIds=normalizeFeaturedProductIds(featuredProductIds).filter(x=>x!==id);
+    const previousFeaturedIds=normalizeFeaturedProductIds(featuredProductIds);
+    let nextFeaturedIds=previousFeaturedIds.filter(x=>x!==id);
     if(editorFeatured){
       if(nextFeaturedIds.length>=4)throw new Error("You can feature up to 4 prints");
       nextFeaturedIds.push(id);
     }
     nextFeaturedIds=normalizeFeaturedProductIds(nextFeaturedIds);
+    const featuredChanged=JSON.stringify(previousFeaturedIds)!==JSON.stringify(nextFeaturedIds);
+
+    // Featured is storefront state, so commit it before the editor closes.
+    // Previously this waited behind the background print/photo upload, which
+    // meant a refresh could cancel the request and make Featured appear lost.
+    if(featuredChanged&&currentUser&&supabaseClient){
+      saveBtn.textContent="Saving featured…";
+      await syncFeaturedSelection(nextFeaturedIds);
+      saveBtn.textContent="Saving…";
+    }
 
     const usage=collectUsage("printFilamentRows");
     const variants=collectVariants();
@@ -1244,7 +1280,6 @@ async function savePrint(){if(!requireOnlineAdminSave())return;
           };
           const ok=await syncUpsert("prints",dbPrint(cloudRecord));
           if(ok!==false){
-            await syncFeaturedSelection(nextFeaturedIds);
             pendingLocalProductIds.delete(id);
             setSyncState("synced","Synced",nowISO());
           }
@@ -1259,7 +1294,8 @@ async function savePrint(){if(!requireOnlineAdminSave())return;
   }catch(err){
     console.error("Save print failed",err);
     if(editingId)pendingLocalProductIds.delete(editingId);
-    toast("Couldn't save this print");
+    const featuredSaveError=String(err?.message||"").toLowerCase().includes("featured");
+    toast(featuredSaveError?"Couldn't save Featured status — try again":"Couldn't save this print");
     savePrintInFlight=false;
     saveBtn.disabled=false;
     saveBtn.textContent=oldLabel;
@@ -1274,7 +1310,12 @@ async function deletePrint(){
   if(normalizeFeaturedProductIds(featuredProductIds).includes(deletedId)){
     featuredProductIds=normalizeFeaturedProductIds(featuredProductIds).filter(id=>id!==deletedId);
     storeAvailability={...storeAvailability,featured_product_ids:featuredProductIds};
-    try{await syncFeaturedSelection(featuredProductIds)}catch(err){console.error("Couldn't update featured prints after delete",err)}
+    try{
+      await syncFeaturedSelection(featuredProductIds);
+    }catch(err){
+      console.error("Couldn't update featured prints after delete",err);
+      toast("Print deleted, but Featured list could not sync");
+    }
   }
   persist();
   $("editorDialog").close();
