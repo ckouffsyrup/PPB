@@ -2050,3 +2050,128 @@ body.customer-mode .storefront-brand-content{animation:pbStoreIntro .38s ease-ou
     margin-bottom:12px;
   }
 }
+
+
+/* ==========================================================
+   PrintBook v5.9.3 — Returning customer info floats beside
+   the order editor instead of living in its own panel.
+   ========================================================== */
+
+@media(min-width:1051px){
+  /* Keep the order editor as the only large surfaced/card area. */
+  #orderDialog{
+    width:min(1120px,calc(100vw - 48px))!important;
+    max-width:min(1120px,calc(100vw - 48px))!important;
+  }
+
+  #orderDialog .order-editor-layout{
+    grid-template-columns:minmax(0,1fr) 255px!important;
+    gap:26px!important;
+  }
+
+  #orderDialog .order-history-rail{
+    padding-top:12px;
+    background:transparent!important;
+    border:0!important;
+    box-shadow:none!important;
+  }
+
+  /* Strip the "card" treatment completely. */
+  #orderDialog .order-history-rail .customer-history-card{
+    position:sticky;
+    top:10px;
+    padding:0!important;
+    margin:0!important;
+    background:transparent!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+  }
+
+  /* The only purple surface is the small returning-customer reminder. */
+  #orderDialog .customer-history-head{
+    display:block!important;
+    padding:12px 13px!important;
+    border:1px solid rgba(139,92,246,.28)!important;
+    border-radius:14px!important;
+    background:rgba(139,92,246,.10)!important;
+  }
+
+  #orderDialog .customer-history-head > div{
+    min-width:0;
+  }
+
+  #orderDialog .customer-history-head > div > span:first-child{
+    margin-bottom:4px;
+  }
+
+  #orderDialog .customer-history-head strong{
+    display:block;
+    font-size:13px;
+    line-height:1.3;
+  }
+
+  #orderDialog .customer-history-pill{
+    display:inline-flex!important;
+    margin-top:9px;
+    padding:4px 7px!important;
+    background:rgba(139,92,246,.16)!important;
+    border:1px solid rgba(139,92,246,.16);
+  }
+
+  /* Stats sit loose beneath the reminder, with no background behind them. */
+  #orderDialog .customer-history-stats{
+    display:flex!important;
+    flex-direction:column;
+    gap:0!important;
+    margin-top:12px!important;
+    padding:0 4px!important;
+  }
+
+  #orderDialog .customer-history-stats > div{
+    display:flex!important;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:12px;
+    padding:8px 0!important;
+    border-top:1px solid rgba(255,255,255,.055)!important;
+    background:transparent!important;
+  }
+
+  #orderDialog .customer-history-stats > div:first-child{
+    border-top:0!important;
+  }
+
+  #orderDialog .customer-history-stats strong{
+    font-size:14px;
+  }
+
+  #orderDialog .customer-history-stats span{
+    font-size:9px;
+    color:rgba(255,255,255,.38);
+    text-align:right!important;
+  }
+}
+
+/* On smaller layouts it remains a compact top reminder. */
+@media(max-width:1050px){
+  #orderDialog .order-history-rail .customer-history-card{
+    background:transparent!important;
+    border:0!important;
+    box-shadow:none!important;
+    padding:0!important;
+  }
+
+  #orderDialog .customer-history-head{
+    padding:11px 12px!important;
+    border:1px solid rgba(139,92,246,.25)!important;
+    border-radius:13px!important;
+    background:rgba(139,92,246,.09)!important;
+  }
+
+  #orderDialog .customer-history-stats{
+    margin-top:8px!important;
+    padding:0 4px;
+  }
+}
