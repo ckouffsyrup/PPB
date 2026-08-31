@@ -1,0 +1,98 @@
+from pathlib import Path
+
+app_p=Path('app.js'); idx_p=Path('index.html'); css_p=Path('storefront-v55.css'); sw_p=Path('sw.js')
+app=app_p.read_text(); idx=idx_p.read_text(); css=css_p.read_text(); sw=sw_p.read_text()
+
+trend_helpers=r'''
+function productTrendStats(item,windowDays=14){
+  if(!item)return {recentUnits:0,previousUnits:0,recentRevenue:0,delta:0,score:0,trending:false};
+  const now=Date.now(),windowMs=windowDays*86400000,recentStart=now-windowMs,previousStart=now-windowMs*2;
+  let recentUnits=0,previousUnits=0,recentRevenue=0;
+  for(const s of sales){
+    if(String(s?.print_id||"")!==String(item.id))continue;
+    const t=Date.parse(s.date||s.created_at||s.updated_at||"");
+    if(!Number.isFinite(t))continue;
+    const qty=Math.max(1,Number(s.quantity||1));
+    if(t>=recentStart){
+      recentUnits+=qty;
+      recentRevenue+=Number(s.total ?? Number(s.unit_price||0)*qty);
+    }else if(t>=previousStart){previousUnits+=qty}
+  }
+  for(const o of orders){
+    if(String(o?.print_id||"")!==String(item.id))continue;
+    if(!["paid","deposit_paid"].includes(String(o.payment_status||"")))continue;
+    const t=Date.parse(o.paid_at||o.updated_at||o.created_at||"");
+    if(!Number.isFinite(t))continue;
+    const qty=Math.max(1,Number(o.quantity||1));
+    if(t>=recentStart){recentUnits+=qty;recentRevenue+=orderCollectedAmount(o)}
+    else if(t>=previousStart)previousUnits+=qty;
+  }
+  const delta=recentUnits-previousUnits;
+  const trending=recentUnits>=2&&(delta>=1||recentUnits>=3);
+  const score=recentUnits*3+Math.max(0,delta)*2+Math.min(5,recentRevenue/20);
+  return {recentUnits,previousUnits,recentRevenue,delta,score,trending};
+}
+function isTrendingProduct(item){return productTrendStats(item).trending}
+function getTrendingProducts(limit=5){
+  return items.map(item=>({item,stats:productTrendStats(item)}))
+    .filter(x=>x.stats.recentUnits>0)
+    .sort((a,b)=>Number(b.stats.trending)-Number(a.stats.trending)||b.stats.score-a.stats.score||b.stats.recentUnits-a.stats.recentUnits)
+    .slice(0,limit);
+}
+function renderTrendingProducts(){
+  const root=$("dashboardTrendingProducts");
+  if(!root)return;
+  const list=getTrendingProducts(4);
+  if(!list.length){
+    root.innerHTML='<div class="trending-empty"><strong>No trend yet</strong><span>Record a few sales and PrintBook will spot what is heating up.</span></div>';
+    return;
+  }
+  root.innerHTML=list.map(({item,stats},index)=>{
+    const movement=stats.delta>0?`+${stats.delta} vs prior 14d`:stats.delta<0?`${stats.delta} vs prior 14d`:'steady vs prior 14d';
+    return `<button class="trending-product-row${stats.trending?' is-trending':''}" type="button" data-trending-id="${safe(item.id)}">
+      <span class="trending-rank">${index+1}</span>
+      <span class="trending-copy"><strong>${safe(item.name)}</strong><small>${stats.recentUnits} sold in 14d · ${safe(movement)}</small></span>
+      <span class="trending-right"><strong>${money(stats.recentRevenue)}</strong><small>${stats.trending?'🔥 Trending':'Watching'}</small></span>
+    </button>`;
+  }).join('');
+  root.querySelectorAll('[data-trending-id]').forEach(btn=>btn.onclick=()=>openEditor(btn.dataset.trendingId));
+}
+'''
+anchor='function storefrontProductBadges(i){'
+if 'function productTrendStats(' not in app:
+    if anchor not in app: raise SystemExit('storefront badge anchor missing')
+    app=app.replace(anchor,trend_helpers+'\n'+anchor,1)
+
+old='if(sold>=3)badges.push(\'<span class="store-product-badge badge-popular">POPULAR</span>\');'
+new='if(isTrendingProduct(i)||(publicVisitorMode&&sold>=3))badges.push(\'<span class="store-product-badge badge-popular">POPULAR</span>\');'
+if old in app: app=app.replace(old,new,1)
+
+old_render='renderShop();renderDashboard();renderPrints();'
+if old_render in app: app=app.replace(old_render,'renderShop();renderDashboard();renderTrendingProducts();renderPrints();',1)
+
+trend_panel='''      <section class="panel dashboard-trending-panel">\n        <div class="section-heading">\n          <div><p class="eyebrow">MOMENTUM</p><h3>Trending Products</h3><p class="muted">Recent 14 days compared with the 14 days before.</p></div>\n          <button class="text-btn" data-go="prints">Catalog →</button>\n        </div>\n        <div id="dashboardTrendingProducts" class="trending-product-list"></div>\n      </section>\n'''
+marker='      <section class="dashboard-kpis">'
+if 'id="dashboardTrendingProducts"' not in idx:
+    if marker not in idx: raise SystemExit('dashboard insertion marker missing')
+    idx=idx.replace(marker,trend_panel+marker,1)
+
+css_marker='/* PrintBook v5.12.0 — Trending Products */'
+if css_marker not in css:
+    css += r'''
+
+/* PrintBook v5.12.0 — Trending Products */
+.dashboard-trending-panel{margin:0 0 16px;padding:15px 16px;border:1px solid rgba(139,92,246,.14);border-radius:18px;background:linear-gradient(145deg,rgba(139,92,246,.035),rgba(255,255,255,.012))}
+.dashboard-trending-panel .section-heading{margin-bottom:10px}.dashboard-trending-panel .section-heading .muted{margin-top:3px;font-size:9px}
+.trending-product-list{display:flex;flex-direction:column;gap:6px}
+.trending-product-row{appearance:none;width:100%;display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 11px;border:1px solid rgba(255,255,255,.055);border-radius:12px;background:rgba(0,0,0,.09);color:inherit;text-align:left;cursor:pointer;transition:.16s ease}
+.trending-product-row:hover{background:rgba(255,255,255,.025);border-color:rgba(139,92,246,.18);transform:translateY(-1px)}
+.trending-product-row.is-trending{border-color:rgba(249,115,22,.16);background:linear-gradient(90deg,rgba(249,115,22,.045),rgba(0,0,0,.08))}
+.trending-rank{width:26px;height:26px;display:grid;place-items:center;border-radius:9px;background:rgba(139,92,246,.10);color:#c4b5fd;font-size:10px;font-weight:900}
+.trending-copy,.trending-right{min-width:0}.trending-copy strong,.trending-copy small,.trending-right strong,.trending-right small{display:block}.trending-copy strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.trending-copy small{margin-top:3px;font-size:9px;color:rgba(255,255,255,.4)}.trending-right{text-align:right}.trending-right strong{font-size:11px}.trending-right small{margin-top:3px;font-size:8px;color:rgba(255,255,255,.42)}.trending-product-row.is-trending .trending-right small{color:#fdba74}.trending-empty{padding:13px;border-radius:12px;background:rgba(255,255,255,.018)}.trending-empty strong,.trending-empty span{display:block}.trending-empty strong{font-size:12px}.trending-empty span{margin-top:4px;font-size:9px;color:rgba(255,255,255,.4)}
+@media(max-width:520px){.trending-product-row{grid-template-columns:25px minmax(0,1fr)}.trending-right{grid-column:2;text-align:left;display:flex;gap:8px;align-items:center}.trending-right strong,.trending-right small{display:inline;margin:0}}
+'''
+
+app=app.replace('window.PRINTBOOK_BUILD="5.11.1"','window.PRINTBOOK_BUILD="5.12.0"')
+sw=sw.replace('const CACHE="printbook-v5.11.1-badge-overlap";','const CACHE="printbook-v5.12.0-trending-products";')
+
+app_p.write_text(app); idx_p.write_text(idx); css_p.write_text(css); sw_p.write_text(sw)
