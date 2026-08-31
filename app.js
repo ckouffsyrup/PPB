@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.10.3";
+window.PRINTBOOK_BUILD="5.11.0";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -689,12 +689,25 @@ function getFeaturedProducts(source){
   const ids=normalizeFeaturedProductIds(featuredProductIds);
   return ids.map(id=>source.find(p=>p.id===id)).filter(Boolean).slice(0,4);
 }
+function storefrontProductBadges(i){
+  if(!customerMode)return "";
+  const badges=[];
+  const created=Date.parse(i?.created_at||"");
+  const ageDays=Number.isFinite(created)?Math.max(0,Math.floor((Date.now()-created)/86400000)):9999;
+  const sold=Math.max(0,Number(i?.sold_qty||0));
+  const stock=itemStock(i);
+  if(ageDays<=14)badges.push('<span class="store-product-badge badge-new">NEW</span>');
+  if(sold>=3)badges.push('<span class="store-product-badge badge-popular">POPULAR</span>');
+  if(!isMadeToOrder(i)&&stock>0&&stock<=2)badges.push('<span class="store-product-badge badge-limited">LIMITED</span>');
+  return badges.length?`<div class="store-product-badges">${badges.join("")}</div>`:"";
+}
 function storefrontProductCardHTML(i,{featured=false}={}){
   const stock=itemStock(i),madeToOrder=isMadeToOrder(i),isOut=!madeToOrder&&stock<=0;
   const deal=Number(i.deal_qty)>1&&Number(i.deal_price)>0?`<div class="shop-deal">${i.deal_qty} for ${money(i.deal_price)}</div>`:"";
   return `<article class="shop-card${featured?" storefront-featured-card":""}" data-product-id="${i.id}">
     <div class="shop-card-photo">
       ${i.photo_url?`<img data-product-image="${safe(i.id)}" src="${safe(i.photo_url)}" alt="${safe(i.name)}">`:`<div class="photo-fallback">KP</div>`}
+      ${storefrontProductBadges(i)}
       ${i.favorite&&!customerMode?`<div class="fav-chip">★</div>`:""}
       ${madeToOrder?`<div class="out-badge made-to-order-badge">MADE TO ORDER</div>`:isOut?`<div class="out-badge">OUT OF STOCK</div>`:""}
       <div class="price-chip">${money(i.price)}</div>
@@ -799,7 +812,29 @@ function dashboardTransactions(){
   }));
   return [...direct,...paidOrders].sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0));
 }
+function renderTodayWorkspace(){
+  if(!$("todayWorkspace"))return;
+  const now=new Date(),today=now.toISOString().slice(0,10),hour=now.getHours();
+  const greeting=hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
+  const active=orders.filter(o=>!["Completed","Cancelled"].includes(o.status));
+  const requested=active.filter(o=>o.status==="Requested"),printing=active.filter(o=>o.status==="Printing"),ready=active.filter(o=>o.status==="Ready");
+  const completedToday=orders.filter(o=>o.status==="Completed"&&String(o.updated_at||"").slice(0,10)===today);
+  const todayTx=dashboardTransactions().filter(t=>String(t.date||"").slice(0,10)===today);
+  const revenue=todayTx.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  $("todayGreeting").textContent=`${greeting}. Here's the shop.`;
+  $("todayDate").textContent=now.toLocaleDateString([], {weekday:"short",month:"short",day:"numeric"});
+  $("todayActiveOrders").textContent=active.length;$("todayNeedQuotes").textContent=requested.length;$("todayPrinting").textContent=printing.length;$("todayReady").textContent=ready.length;$("todayRevenue").textContent=money(revenue);$("todayCompleted").textContent=completedToday.length;
+  const bits=[];if(requested.length)bits.push(`${requested.length} need${requested.length===1?"s":""} a quote`);if(printing.length)bits.push(`${printing.length} printing`);if(ready.length)bits.push(`${ready.length} ready`);
+  $("todaySummary").textContent=bits.length?bits.join(" · "):active.length?`${active.length} active order${active.length===1?"":"s"} · nothing urgent`:"Everything is caught up.";
+  const production=active.filter(o=>["Approved","Printing"].includes(o.status)).sort((a,b)=>(a.status==="Printing"?-1:0)-(b.status==="Printing"?-1:0)||String(a.due_date||"9999").localeCompare(String(b.due_date||"9999"))||Date.parse(a.created_at||0)-Date.parse(b.created_at||0));
+  const next=production[0],nextCard=$("todayNextPrint");
+  if(next){nextCard.querySelector("strong").textContent=`${next.item||"Custom order"} ×${Math.max(1,Number(next.quantity||1))}`;nextCard.querySelector("span").textContent=`${next.customer||"Customer"} · ${next.status}${next.due_date?` · due ${next.due_date}`:""}`;nextCard.onclick=()=>openOrder(next.id)}else{nextCard.querySelector("strong").textContent="Queue is clear";nextCard.querySelector("span").textContent="No approved or printing jobs waiting.";nextCard.onclick=()=>showView("orders")}
+  const waiting=[...active].sort((a,b)=>Date.parse(a.created_at||0)-Date.parse(b.created_at||0))[0],waitCard=$("todayLongestWait");
+  if(waiting){const days=Math.max(0,Math.floor((Date.now()-Date.parse(waiting.created_at||Date.now()))/86400000));waitCard.querySelector("strong").textContent=waiting.item||"Custom order";waitCard.querySelector("span").textContent=`${waiting.customer||"Customer"} · ${waiting.status}${days?` · ${days}d waiting`:""}`;waitCard.onclick=()=>openOrder(waiting.id)}else{waitCard.querySelector("strong").textContent="Nobody waiting";waitCard.querySelector("span").textContent="You're caught up.";waitCard.onclick=()=>showView("orders")}
+  const low=restockSuggestions()[0],lowCard=$("todayLowStock");if(low){lowCard.querySelector("strong").textContent=`${low.f.color||low.f.material||"Filament"} is low`;lowCard.querySelector("span").textContent=`${Math.round(low.f.remaining||0)}g left${low.units!=null?` · ~${low.units} prints`:""}`}else{lowCard.querySelector("strong").textContent="Stock looks good";lowCard.querySelector("span").textContent="No low filament right now."}
+}
 function renderDashboard(){
+  renderTodayWorkspace();
   const tx=dashboardTransactions(),revenue=tx.reduce((a,t)=>a+Number(t.amount||0),0),profit=tx.reduce((a,t)=>a+Number(t.profit||0),0),stock=items.reduce((a,i)=>a+itemStock(i),0),open=orders.filter(o=>!["Completed","Cancelled"].includes(o.status));
   const attention=orders.filter(o=>["Requested","Accepted","Ready"].includes(o.status));
   $("dashRevenue").textContent=money(revenue);$("dashSalesCount").textContent=`${tx.length} paid sale${tx.length===1?"":"s"}`;$("dashProfit").textContent=money(profit);$("dashStock").textContent=stock;$("dashPrintTypes").textContent=items.length;$("dashOrders").textContent=open.length;$("dashOrderValue").textContent=`${money(open.reduce((a,o)=>a+Number(o.quoted_price||0),0))} quoted`;

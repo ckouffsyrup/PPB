@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg?v=3" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon.svg?v=3" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.10.0" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.11.0" />
 <style id="mobilePublicOrderSafety">
 #orderDialog:not([open]){display:none!important}
 body.public-visitor #orderDialog{display:none!important}
@@ -221,6 +221,22 @@ body.public-visitor #orderDialog{display:none!important}
         <div><p class="eyebrow">WORKSPACE</p><h2>Dashboard</h2><p class="muted">What needs your attention right now.</p></div>
         <div class="dashboard-v2-actions"><button class="secondary" id="dashboardPriceBtn">✦ Price helper</button><button class="primary" id="dashboardAddBtn">+ Add print</button></div>
       </div>
+      <section class="today-workspace" id="todayWorkspace">
+        <div class="today-head"><div><p class="eyebrow">TODAY</p><h3 id="todayGreeting">Your shop today</h3><p id="todaySummary" class="muted">Loading your day…</p></div><span class="today-date" id="todayDate"></span></div>
+        <div class="today-stat-grid">
+          <button type="button" data-go="orders"><strong id="todayActiveOrders">0</strong><span>Active orders</span></button>
+          <button type="button" onclick="goToOrdersStatus('Requested')"><strong id="todayNeedQuotes">0</strong><span>Need quotes</span></button>
+          <button type="button" onclick="goToOrdersStatus('Printing')"><strong id="todayPrinting">0</strong><span>Printing</span></button>
+          <button type="button" onclick="goToOrdersStatus('Ready')"><strong id="todayReady">0</strong><span>Ready</span></button>
+          <div><strong id="todayRevenue">$0</strong><span>Revenue today</span></div>
+          <div><strong id="todayCompleted">0</strong><span>Completed today</span></div>
+        </div>
+        <div class="today-focus-grid">
+          <button class="today-focus-card" id="todayNextPrint" type="button"><small>PRINT NEXT</small><strong>Queue is clear</strong><span>No production waiting.</span></button>
+          <button class="today-focus-card" id="todayLongestWait" type="button"><small>WAITING LONGEST</small><strong>Nobody waiting</strong><span>You're caught up.</span></button>
+          <button class="today-focus-card" id="todayLowStock" type="button" data-go="filaments"><small>INVENTORY WATCH</small><strong>Stock looks good</strong><span>No low filament.</span></button>
+        </div>
+      </section>
       <section class="dashboard-kpis">
         <div class="dashboard-kpi attention dashboard-attention-kpi"><span>Needs attention</span><strong id="dashAttention">0</strong><small id="dashAttentionText">Nothing waiting</small></div>
         <div class="dashboard-kpi"><span>Revenue</span><strong id="dashRevenue">$0</strong><small id="dashSalesCount">0 paid sales</small></div>
