@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.8.5" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.8.6" />
 </head>
 <body>
 <div class="app-shell">
@@ -142,7 +142,6 @@
 
               <div class="storefront-hero-actions">
                 <button class="primary" id="storefrontShopHeroBtn" type="button">Shop Prints</button>
-                <button class="secondary" id="storefrontCustomHeroBtn" type="button">Request Custom</button>
               </div>
 
               <div class="storefront-status-row">
@@ -205,16 +204,6 @@
       </div>
       <div id="shopGrid" class="shop-grid"></div>
       <div id="customerFilamentGrid" class="customer-filament-grid hidden"></div>
-
-      <section class="storefront-custom-cta customer-only" id="storefrontCustomCta">
-        <div class="storefront-custom-icon">◇</div>
-        <div>
-          <p>CAN'T FIND WHAT YOU'RE LOOKING FOR?</p>
-          <h2>Need something a little different?</h2>
-          <span>Open a print you like and use the notes field to ask about different colors, sizing, or other changes.</span>
-        </div>
-        <button class="primary" id="storefrontCustomBrowseBtn" type="button">Browse Prints</button>
-      </section>
 
       <div id="shopEmpty" class="empty-state hidden">
         <h3>No products yet</h3>
@@ -1096,6 +1085,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.8.5"></script>
+<script src="app.js?v=5.8.6"></script>
 </body>
 </html>

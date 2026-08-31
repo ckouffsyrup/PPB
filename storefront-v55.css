@@ -1761,3 +1761,21 @@ body.customer-mode .storefront-mobile-header{
     height:39px!important;
   }
 }
+
+
+/* PrintBook v5.8.6 — Request Custom temporarily removed */
+body.customer-mode .storefront-hero-actions{
+  display:flex!important;
+}
+body.customer-mode .storefront-hero-actions #storefrontShopHeroBtn{
+  width:auto!important;
+  min-width:150px;
+}
+@media(max-width:760px){
+  body.customer-mode .storefront-hero-actions{
+    display:block!important;
+  }
+  body.customer-mode .storefront-hero-actions #storefrontShopHeroBtn{
+    width:100%!important;
+  }
+}

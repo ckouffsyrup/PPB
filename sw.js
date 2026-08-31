@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.8.5-mobile-header-fix";
+const CACHE="printbook-v5.8.6-no-request-custom";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
