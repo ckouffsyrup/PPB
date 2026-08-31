@@ -413,7 +413,12 @@ async function loadPublicStorefront(showError=true){
 
     items=(data.products||[]).map(normalizePublicPrint);
     filaments=(data.filaments||[]).map(normalizePublicFilament);
-    if(data.store){storeAvailability={...storeAvailability,...data.store};featuredProductIds=normalizeFeaturedProductIds(data.store.featured_product_ids)}
+    if(data.store){
+      storeAvailability={...storeAvailability,...data.store};
+      if(Object.prototype.hasOwnProperty.call(data.store,"featured_product_ids")){
+        featuredProductIds=normalizeFeaturedProductIds(data.store.featured_product_ids);
+      }
+    }
     await loadPublicStoreBranding();
     publicStoreLoaded=true;
     setPublicStoreState("",false,false);
@@ -2642,19 +2647,37 @@ function mergeCloudCollection(localRows,remoteRows,{normalize=x=>x,preferLocalId
   return [...merged.values()].sort((a,b)=>rowTime(b)-rowTime(a));
 }
 
+async function pullFeaturedSettings(){
+  if(!currentUser||!supabaseClient)return false;
+  const {data,error}=await supabaseClient
+    .from("store_settings")
+    .select("featured_product_ids")
+    .eq("user_id",currentUser.id)
+    .maybeSingle();
+  if(error)throw error;
+  const ids=normalizeFeaturedProductIds(data?.featured_product_ids);
+  featuredProductIds=ids;
+  storeAvailability={...storeAvailability,featured_product_ids:ids};
+  return true;
+}
+
 async function pullCloud(showToast=true){
   if(!currentUser||!supabaseClient)return false;
   if(!navigator.onLine){setSyncState("offline","Offline — viewing cached data");if(showToast)toast("Offline — showing cached data");return false}
   setSyncState("syncing","Loading cloud data…");
   try{
-    const [pr,fi,sa,or,cw]=await Promise.all([
+    const [pr,fi,sa,or,cw,ss]=await Promise.all([
       supabaseClient.from("prints").select("*").eq("user_id",currentUser.id),
       supabaseClient.from("filaments").select("*").eq("user_id",currentUser.id),
       supabaseClient.from("sales").select("*").eq("user_id",currentUser.id),
       supabaseClient.from("orders").select("*").eq("user_id",currentUser.id),
-      supabaseClient.from("colorways").select("*").eq("user_id",currentUser.id)
+      supabaseClient.from("colorways").select("*").eq("user_id",currentUser.id),
+      supabaseClient.from("store_settings").select("featured_product_ids").eq("user_id",currentUser.id).maybeSingle()
     ]);
-    const errs=[pr,fi,sa,or,cw].map(x=>x.error).filter(Boolean);if(errs.length)throw errs[0];
+    const errs=[pr,fi,sa,or,cw,ss].map(x=>x.error).filter(Boolean);if(errs.length)throw errs[0];
+    const cloudFeaturedIds=normalizeFeaturedProductIds(ss.data?.featured_product_ids);
+    featuredProductIds=cloudFeaturedIds;
+    storeAvailability={...storeAvailability,featured_product_ids:cloudFeaturedIds};
     const remoteHasData=[pr,fi,sa,or,cw].some(x=>(x.data||[]).length);
     const localHasData=[items,filaments,sales,orders,colorways].some(a=>(a||[]).length);
     if(!remoteHasData&&localHasData){setSyncState("error","Cloud is empty — use Upload local data once");if(showToast)toast("Cloud is empty — upload this device's old data once");return false}
