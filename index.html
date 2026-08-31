@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.9.0" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.9.1" />
 </head>
 <body>
 <div class="app-shell">
@@ -529,12 +529,15 @@
   <div class="sheet">
     <div class="sheet-grabber"></div>
     <div class="sheet-header"><div><p class="eyebrow">CUSTOM ORDER</p><h2 id="orderTitle">New order</h2></div><button class="icon-btn" id="closeOrder" type="button">✕</button></div>
-    <div class="form-grid">
-      <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
-      <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label><section class="customer-history-card hidden" id="customerHistoryCard">
+    <div class="order-editor-layout">
+      <aside class="order-history-rail"><section class="customer-history-card hidden" id="customerHistoryCard">
         <div class="customer-history-head"><div><span>RETURNING CUSTOMER</span><strong id="customerHistoryName">Customer history</strong></div><span class="customer-history-pill" id="customerHistoryOrders">0 orders</span></div>
         <div class="customer-history-stats"><div><strong id="customerHistorySpent">$0</strong><span>paid total</span></div><div><strong id="customerHistoryCompleted">0</strong><span>completed</span></div><div><strong id="customerHistoryLast">—</strong><span>last order</span></div></div>
-      </section>
+      </section></aside>
+      <div class="order-editor-main">
+    <div class="form-grid">
+      <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
+      <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label>
       <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Accepted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
       <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
       <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
@@ -553,6 +556,9 @@
         <button type="button" class="secondary" id="markOrderPaidBtn">Mark paid</button>
       </div>
       <label class="full">Notes<textarea id="orderNotes" placeholder="Colors, size, delivery details..."></textarea></label>
+    </div>
+
+      </div>
     </div>
     <div class="sheet-actions">
       <button type="button" class="danger secondary" id="deleteOrderBtn">Delete</button>
@@ -1064,6 +1070,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.9.0"></script>
+<script src="app.js?v=5.9.1"></script>
 </body>
 </html>

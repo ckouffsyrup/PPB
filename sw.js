@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.9.0-admin-workspace";
+const CACHE="printbook-v5.9.1-order-ui-fix";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
