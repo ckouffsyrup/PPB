@@ -2441,3 +2441,68 @@ body.customer-mode .storefront-brand-content{animation:pbStoreIntro .38s ease-ou
     text-align:left!important;
   }
 }
+
+
+/* ==========================================================
+   PrintBook v5.9.6 — Simplified order editor
+   ========================================================== */
+.order-editor-simplified{display:flex;flex-direction:column;gap:10px}
+.order-editor-main-fields>.form-grid{margin:0!important}
+.order-editor-fold{
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:14px;
+  background:rgba(255,255,255,.012);
+  overflow:hidden;
+}
+.order-editor-fold summary{
+  list-style:none;
+  min-height:54px;
+  padding:10px 13px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  cursor:pointer;
+  user-select:none;
+}
+.order-editor-fold summary::-webkit-details-marker{display:none}
+.order-fold-copy{min-width:0}
+.order-fold-copy strong,.order-fold-copy small{display:block}
+.order-fold-copy strong{font-size:13px}
+.order-fold-copy small{
+  margin-top:3px;
+  max-width:420px;
+  color:rgba(255,255,255,.38);
+  font-size:9px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.order-fold-chevron{font-size:17px;color:rgba(255,255,255,.4);transition:transform .16s ease}
+.order-editor-fold[open] .order-fold-chevron{transform:rotate(180deg)}
+.order-fold-body{
+  margin:0!important;
+  padding:12px 13px 13px;
+  border-top:1px solid rgba(255,255,255,.05);
+}
+.order-fold-body.form-grid{margin:0!important}
+.order-payment-actions{
+  display:flex;
+  justify-content:flex-start;
+  padding-top:2px;
+}
+#orderDialog>.sheet>.sheet-actions{margin-top:14px}
+
+/* Make the always-visible part feel lighter and faster to scan. */
+#orderDialog .order-editor-main-fields label{
+  margin-bottom:0;
+}
+#orderDialog .order-editor-main-fields .form-grid{
+  gap:11px 13px;
+}
+
+@media(max-width:720px){
+  .order-fold-copy small{max-width:68vw}
+  .order-editor-fold summary{min-height:52px}
+  .order-fold-body{padding:11px}
+}

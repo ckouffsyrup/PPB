@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.9.5" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.9.6" />
 </head>
 <body>
 <div class="app-shell">
@@ -529,27 +529,55 @@
   <div class="sheet">
     <div class="sheet-grabber"></div>
     <div class="sheet-header"><div><p class="eyebrow">CUSTOM ORDER</p><h2 id="orderTitle">New order</h2></div><button class="icon-btn" id="closeOrder" type="button">✕</button></div>
-    <div class="form-grid">
-      <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
-      <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label>
-      <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Accepted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
-      <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
-      <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
-      <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
-      <label>Due date<input id="orderDue" type="date" /></label>
-      <label>Linked print<select id="orderPrint"><option value="">None / custom</option></select></label>
-      <label>Variant<select id="orderVariant"><option value="">Standard / no variant</option></select></label>
-      <label>Payment status<select id="orderPaymentStatus"><option value="unpaid">Unpaid</option><option value="deposit_paid">Deposit paid</option><option value="paid">Paid</option><option value="refunded">Refunded</option></select></label>
-      <label>Amount paid<div class="money-input"><span>$</span><input id="orderPaymentAmount" type="number" min="0" step="0.01" value="0" /></div></label>
-      <label>Deposit required<div class="money-input"><span>$</span><input id="orderDepositAmount" type="number" min="0" step="0.01" value="0" /></div></label>
-      <label>Payment method<select id="orderPaymentMethod"><option value="">Not set</option><option>Cash</option><option>Cash App</option><option>Venmo</option><option>Zelle</option><option>Other</option></select></label>
-      <label class="full">How should they pay?<textarea id="orderPaymentInstructions" placeholder="Example: Cash App — $YourCashtag"></textarea></label>
-      <p class="full muted tiny-note">The customer portal will show the order total, these payment instructions, and remind them to include their KP order number in the payment note.</p>
-      <input id="orderPaymentLink" type="hidden" />
-      <div class="full sheet-actions" style="justify-content:flex-start;flex-wrap:wrap">
-        <button type="button" class="secondary" id="markOrderPaidBtn">Mark paid</button>
-      </div>
-      <label class="full">Notes<textarea id="orderNotes" placeholder="Colors, size, delivery details..."></textarea></label>
+    <div class="order-editor-simplified">
+      <section class="order-editor-main-fields">
+        <div class="form-grid">
+          <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
+          <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label>
+          <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Accepted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
+          <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
+          <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
+          <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
+          <label>Due date<input id="orderDue" type="date" /></label>
+          <label>Linked print<select id="orderPrint"><option value="">None / custom</option></select></label>
+          <label>Variant<select id="orderVariant"><option value="">Standard / no variant</option></select></label>
+        </div>
+      </section>
+
+      <details class="order-editor-fold" id="orderPaymentSection">
+        <summary>
+          <span class="order-fold-copy">
+            <strong>Payment</strong>
+            <small id="orderPaymentSummary">Unpaid</small>
+          </span>
+          <span class="order-fold-chevron">⌄</span>
+        </summary>
+        <div class="form-grid order-fold-body">
+          <label>Payment status<select id="orderPaymentStatus"><option value="unpaid">Unpaid</option><option value="deposit_paid">Deposit paid</option><option value="paid">Paid</option><option value="refunded">Refunded</option></select></label>
+          <label>Amount paid<div class="money-input"><span>$</span><input id="orderPaymentAmount" type="number" min="0" step="0.01" value="0" /></div></label>
+          <label>Payment method<select id="orderPaymentMethod"><option value="">Not set</option><option>Cash</option><option>Cash App</option><option>Venmo</option><option>Zelle</option><option>Other</option></select></label>
+          <label>Deposit required<div class="money-input"><span>$</span><input id="orderDepositAmount" type="number" min="0" step="0.01" value="0" /></div></label>
+          <label class="full">How should they pay?<textarea id="orderPaymentInstructions" placeholder="Example: Cash App — $YourCashtag"></textarea></label>
+          <p class="full muted tiny-note">Shown in the customer portal with their order total and KP order number reminder.</p>
+          <input id="orderPaymentLink" type="hidden" />
+          <div class="full order-payment-actions">
+            <button type="button" class="secondary" id="markOrderPaidBtn">Mark paid</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="order-editor-fold" id="orderNotesSection">
+        <summary>
+          <span class="order-fold-copy">
+            <strong>Notes</strong>
+            <small id="orderNotesSummary">Colors, delivery details, anything extra</small>
+          </span>
+          <span class="order-fold-chevron">⌄</span>
+        </summary>
+        <div class="order-fold-body">
+          <label class="full">Order notes<textarea id="orderNotes" placeholder="Colors, size, delivery details..."></textarea></label>
+        </div>
+      </details>
     </div>
 
     <div class="sheet-actions">
@@ -1068,6 +1096,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.9.5"></script>
+<script src="app.js?v=5.9.6"></script>
 </body>
 </html>
