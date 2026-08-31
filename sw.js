@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.9.4-true-floating-customer-stats";
+const CACHE="printbook-v5.9.5-customer-bubble-full-stats";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
