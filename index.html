@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon-180.png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.8.2" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.8.3" />
 </head>
 <body>
 <div class="app-shell">
@@ -157,7 +157,6 @@
         <div class="storefront-section-heading">
           <div><p>FEATURED</p><h2>Featured Prints</h2></div>
           <div class="storefront-featured-actions">
-            <button class="text-btn owner-only" id="storefrontEditFeaturedBtn" type="button">Edit featured</button>
             <button class="text-btn" id="storefrontViewAllBtn" type="button">View all</button>
           </div>
         </div>
@@ -936,6 +935,16 @@
 
     <section class="settings-section">
       <div class="section-heading">
+        <div><h3>Featured Prints</h3><p class="muted">Choose up to 4 products to feature at the top of the customer storefront.</p></div>
+        <span class="badge">STORE</span>
+      </div>
+      <div id="featuredPrintSettingsPreview" class="featured-settings-preview"></div>
+      <div class="row"><button class="primary" id="storefrontEditFeaturedBtn" type="button">Choose Featured Prints</button></div>
+      <p class="muted tiny-note" id="featuredPrintSettingsHelp">Saved to the live storefront, so the same featured products appear for every customer.</p>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading">
         <div><h3>Share your store</h3><p class="muted">Customers can scan this instead of typing the GitHub Pages address.</p></div>
         <span class="badge">QR</span>
       </div>
@@ -1074,6 +1083,6 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.8.2"></script>
+<script src="app.js?v=5.8.3"></script>
 </body>
 </html>

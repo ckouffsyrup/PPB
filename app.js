@@ -413,7 +413,7 @@ async function loadPublicStorefront(showError=true){
 
     items=(data.products||[]).map(normalizePublicPrint);
     filaments=(data.filaments||[]).map(normalizePublicFilament);
-    if(data.store)storeAvailability={...storeAvailability,...data.store};
+    if(data.store){storeAvailability={...storeAvailability,...data.store};featuredProductIds=normalizeFeaturedProductIds(data.store.featured_product_ids)}
     await loadPublicStoreBranding();
     publicStoreLoaded=true;
     setPublicStoreState("",false,false);
@@ -660,18 +660,13 @@ function renderStoreAvailability(){
 
 
 
-const FEATURED_PRODUCTS_KEY="printbook_featured_products_v1";
-function getFeaturedProductIds(){
-  try{
-    const ids=JSON.parse(localStorage.getItem(FEATURED_PRODUCTS_KEY)||"[]");
-    return Array.isArray(ids)?ids.filter(Boolean).slice(0,4):[];
-  }catch{return []}
-}
-function setFeaturedProductIds(ids){
-  localStorage.setItem(FEATURED_PRODUCTS_KEY,JSON.stringify([...new Set(ids)].slice(0,4)));
+let featuredProductIds=[];
+function normalizeFeaturedProductIds(value){
+  const ids=Array.isArray(value)?value:[];
+  return [...new Set(ids.map(x=>String(x||"").trim()).filter(Boolean))].slice(0,4);
 }
 function getFeaturedProducts(source){
-  const ids=getFeaturedProductIds();
+  const ids=normalizeFeaturedProductIds(featuredProductIds);
   if(ids.length){
     const selected=ids.map(id=>source.find(p=>p.id===id)).filter(Boolean);
     if(selected.length)return selected.slice(0,4);
@@ -679,10 +674,15 @@ function getFeaturedProducts(source){
   const fallback=source.filter(i=>i.favorite).concat(source.filter(i=>!i.favorite));
   return [...new Map(fallback.map(i=>[i.id,i])).values()].slice(0,4);
 }
+function renderFeaturedSettingsPreview(){
+  const wrap=$("featuredPrintSettingsPreview");if(!wrap)return;
+  const selected=getFeaturedProducts(prints);
+  wrap.innerHTML=selected.length?selected.map(p=>`<div class="featured-settings-chip">${p.photo_url?`<img src="${safe(p.photo_url)}" alt="">`:`<span>KP</span>`}<strong>${safe(p.name)}</strong></div>`).join(""):`<p class="muted">No featured prints selected yet.</p>`;
+}
 function openFeaturedPrintsDialog(){
   const wrap=$("featuredPrintChoices");
   if(!wrap)return;
-  const selected=new Set(getFeaturedProductIds());
+  const selected=new Set(normalizeFeaturedProductIds(featuredProductIds));
   wrap.innerHTML=prints.map(p=>`
     <label class="featured-print-choice">
       <input type="checkbox" value="${safe(p.id)}" ${selected.has(p.id)?"checked":""}>
@@ -691,15 +691,25 @@ function openFeaturedPrintsDialog(){
     </label>`).join("");
   $("featuredPrintsDialog").showModal();
 }
-function saveFeaturedPrints(){
+async function saveFeaturedPrints(){
   const checked=[...document.querySelectorAll('#featuredPrintChoices input[type="checkbox"]:checked')].map(i=>i.value);
-  if(checked.length>4){toast("Choose up to 4 featured prints");return}
-  setFeaturedProductIds(checked);
-  $("featuredPrintsDialog").close();
-  renderShop();
-  toast("Featured prints updated");
+  if(checked.length>4)return toast("Choose up to 4 featured prints");
+  if(!supabaseClient||!currentUser)return toast("Sign in to change featured prints");
+  const btn=$("saveFeaturedPrintsBtn"),old=btn?.textContent||"Save Featured";
+  if(btn){btn.disabled=true;btn.textContent="Saving…"}
+  try{
+    const ids=normalizeFeaturedProductIds(checked);
+    const {error}=await supabaseClient.from("store_settings").upsert({user_id:currentUser.id,featured_product_ids:ids,updated_at:nowISO()});
+    if(error)throw error;
+    featuredProductIds=ids;
+    storeAvailability={...storeAvailability,featured_product_ids:ids};
+    $("featuredPrintsDialog").close();
+    renderFeaturedSettingsPreview();
+    renderShop();
+    toast("Featured prints updated");
+  }catch(err){console.error(err);toast(err?.message||"Couldn't save featured prints")}
+  finally{if(btn){btn.disabled=false;btn.textContent=old}}
 }
-
 function storefrontProductCardHTML(i,{featured=false}={}){
   const stock=itemStock(i),madeToOrder=isMadeToOrder(i),isOut=!madeToOrder&&stock<=0;
   const deal=Number(i.deal_qty)>1&&Number(i.deal_price)>0?`<div class="shop-deal">${i.deal_qty} for ${money(i.deal_price)}</div>`:"";
@@ -2192,7 +2202,7 @@ async function sendTestPush(){
 
 async function loadStoreAvailabilitySettings(){
   if(!supabaseClient||!currentUser)return;
-  const {data,error}=await supabaseClient.from("store_settings").select("availability_status,turnaround_text,storefront_notice,reopen_date,capacity_limit,auto_pause_at_capacity,store_name,storefront_tagline,storefront_about,storefront_accent,storefront_logo_url,storefront_hero_url").eq("user_id",currentUser.id).maybeSingle();
+  const {data,error}=await supabaseClient.from("store_settings").select("availability_status,turnaround_text,storefront_notice,reopen_date,capacity_limit,auto_pause_at_capacity,store_name,storefront_tagline,storefront_about,storefront_accent,storefront_logo_url,storefront_hero_url,featured_product_ids").eq("user_id",currentUser.id).maybeSingle();
   if(error){console.error(error);return}
   const d=data||{};
   $("storeAvailabilityStatus").value=d.availability_status||"open";
@@ -2202,7 +2212,8 @@ async function loadStoreAvailabilitySettings(){
   $("storeCapacityInput").value=d.capacity_limit||"";
   $("storeAutoPauseInput").checked=!!d.auto_pause_at_capacity;
   $("storeAvailabilityBadge").textContent=(d.availability_status||"open").toUpperCase();
-  storeAvailability={...storeAvailability,status:d.availability_status||"open",turnaround:d.turnaround_text||"3–5 days",notice:d.storefront_notice||"",reopen_date:d.reopen_date||null,capacity_limit:d.capacity_limit||null,auto_pause_at_capacity:!!d.auto_pause_at_capacity,store_name:d.store_name||"Karcen's Prints",tagline:d.storefront_tagline||"Made layer by layer.",about:d.storefront_about||"",accent_color:normalizeStoreAccent(d.storefront_accent),logo_url:d.storefront_logo_url||"",hero_url:d.storefront_hero_url||""};
+  storeAvailability={...storeAvailability,status:d.availability_status||"open",turnaround:d.turnaround_text||"3–5 days",notice:d.storefront_notice||"",reopen_date:d.reopen_date||null,capacity_limit:d.capacity_limit||null,auto_pause_at_capacity:!!d.auto_pause_at_capacity,store_name:d.store_name||"Karcen's Prints",tagline:d.storefront_tagline||"Made layer by layer.",about:d.storefront_about||"",accent_color:normalizeStoreAccent(d.storefront_accent),logo_url:d.storefront_logo_url||"",hero_url:d.storefront_hero_url||"",featured_product_ids:normalizeFeaturedProductIds(d.featured_product_ids)};
+  featuredProductIds=normalizeFeaturedProductIds(d.featured_product_ids);
   if($("storeNameInput"))$("storeNameInput").value=storeAvailability.store_name;
   if($("storeTaglineInput"))$("storeTaglineInput").value=storeAvailability.tagline;
   if($("storeAboutInput"))$("storeAboutInput").value=storeAvailability.about;
@@ -2211,6 +2222,7 @@ async function loadStoreAvailabilitySettings(){
   if($("storeHeroUrlInput"))$("storeHeroUrlInput").value=storeAvailability.hero_url;
   updateStoreBrandPreview();
   renderStoreBranding();
+  renderFeaturedSettingsPreview();
 }
 async function saveStoreBranding(){
   if(!supabaseClient||!currentUser)return toast("Sign in to change storefront branding");

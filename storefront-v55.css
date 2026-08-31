@@ -1424,3 +1424,10 @@ body.customer-mode .customer-mode-bar{
     flex-basis:72vw!important;
   }
 }
+
+
+/* PrintBook v5.8.3 — Featured Prints admin settings */
+.featured-settings-preview{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.featured-settings-chip{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid rgba(255,255,255,.08);background:#111016;border-radius:12px}
+.featured-settings-chip img,.featured-settings-chip>span{width:42px;height:42px;border-radius:9px;object-fit:cover;display:grid;place-items:center;background:#18151f;color:var(--accent);font-weight:900}
+.featured-settings-chip strong{font-size:12px}
