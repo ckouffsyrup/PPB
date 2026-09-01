@@ -1,9 +1,6 @@
 from pathlib import Path
 import re
-
-app=Path('app.js')
-s=app.read_text()
-
+app=Path('app.js'); s=app.read_text()
 old='''function renderOrderLineItemsPanel(o){
   const panel=$("orderLineItemsPanel"),list=$("orderLineItemsList");if(!panel||!list)return;
   const rows=Array.isArray(o?.line_items)?o.line_items.filter(Boolean):[];
@@ -16,74 +13,23 @@ new='''function renderOrderLineItemsPanel(o){
   const rows=Array.isArray(o?.line_items)?o.line_items.filter(Boolean):[];
   panel.classList.toggle("hidden",!rows.length);
   if(!rows.length){list.innerHTML="";return}
-  list.innerHTML=rows.map((line,index)=>{
-    const qty=Math.max(1,Number(line.quantity||1)),unit=lineItemUnitPrice(line),total=lineItemTotal(line);
-    return `<div class="admin-order-line quote-line" data-order-line-index="${index}">
-      <span class="admin-order-line-num">${index+1}</span>
-      <div class="admin-order-line-copy"><strong>${safe(line.name||"Print")}</strong><small>${safe(line.variant_name||"Standard")}${line.color_label?` · ${safe(line.color_label)}`:""}${line.notes?` · ${safe(line.notes)}`:""}</small><small>Qty ${qty}${line.estimated_total!=null?` · original est. ${money(line.estimated_total)}`:""}</small></div>
-      <label class="order-line-unit-price"><small>Each</small><div class="money-input"><span>$</span><input type="number" min="0" step="0.01" value="${unit.toFixed(2)}" data-line-unit-price="${index}"></div></label>
-      <div class="order-line-total"><small>Line total</small><strong data-line-total="${index}">${money(total)}</strong></div>
-    </div>`;
-  }).join("");
-  list.querySelectorAll('[data-line-unit-price]').forEach(input=>input.oninput=()=>updateMultiItemQuoteFromEditor());
-  updateMultiItemQuoteFromEditor(false);
+  list.innerHTML=rows.map((line,index)=>{const qty=Math.max(1,Number(line.quantity||1)),unit=lineItemUnitPrice(line),total=lineItemTotal(line);return `<div class="admin-order-line quote-line" data-order-line-index="${index}"><span class="admin-order-line-num">${index+1}</span><div class="admin-order-line-copy"><strong>${safe(line.name||"Print")}</strong><small>${safe(line.variant_name||"Standard")}${line.color_label?` · ${safe(line.color_label)}`:""}${line.notes?` · ${safe(line.notes)}`:""}</small><small>Qty ${qty}${line.estimated_total!=null?` · original est. ${money(line.estimated_total)}`:""}</small></div><label class="order-line-unit-price"><small>Each</small><div class="money-input"><span>$</span><input type="number" min="0" step="0.01" value="${unit.toFixed(2)}" data-line-unit-price="${index}"></div></label><div class="order-line-total"><small>Line total</small><strong data-line-total="${index}">${money(total)}</strong></div></div>`}).join("");
+  list.querySelectorAll('[data-line-unit-price]').forEach(input=>input.oninput=()=>updateMultiItemQuoteFromEditor());updateMultiItemQuoteFromEditor(false);
 }
-function collectQuotedLineItems(){
-  const o=orders.find(x=>x.id===editingOrderId),rows=Array.isArray(o?.line_items)?o.line_items:[];
-  if(!rows.length)return [];
-  return rows.map((line,index)=>{
-    const input=document.querySelector(`[data-line-unit-price="${index}"]`),qty=Math.max(1,Number(line.quantity||1)),unit=Math.max(0,Number(input?.value??lineItemUnitPrice(line)||0));
-    return {...line,unit_price:unit,line_total:unit*qty,quoted_unit_price:unit,quoted_total:unit*qty};
-  });
-}
-function updateMultiItemQuoteFromEditor(writeTotal=true){
-  const rows=collectQuotedLineItems();if(!rows.length)return;
-  let total=0;rows.forEach((line,index)=>{const lineTotal=lineItemTotal(line);total+=lineTotal;const out=document.querySelector(`[data-line-total="${index}"]`);if(out)out.textContent=money(lineTotal)});
-  if(writeTotal&&$("orderPrice"))$("orderPrice").value=total.toFixed(2);
-  const sum=$("orderLineItemsQuoteTotal");if(sum)sum.textContent=money(total);
-  updateOrderPaymentButtons();
-}
-function resetLineItemPricesToEstimate(){
-  const o=orders.find(x=>x.id===editingOrderId);if(!Array.isArray(o?.line_items))return;
-  o.line_items.forEach((line,index)=>{const qty=Math.max(1,Number(line.quantity||1)),estimate=Number(line.estimated_total??line.line_total??0),input=document.querySelector(`[data-line-unit-price="${index}"]`);if(input)input.value=(estimate/qty).toFixed(2)});
-  updateMultiItemQuoteFromEditor();
-}'''
+function collectQuotedLineItems(){const o=orders.find(x=>x.id===editingOrderId),rows=Array.isArray(o?.line_items)?o.line_items:[];if(!rows.length)return [];return rows.map((line,index)=>{const input=document.querySelector(`[data-line-unit-price="${index}"]`),qty=Math.max(1,Number(line.quantity||1)),raw=input?.value??lineItemUnitPrice(line),unit=Math.max(0,Number(raw||0));return {...line,unit_price:unit,line_total:unit*qty,quoted_unit_price:unit,quoted_total:unit*qty}})}
+function updateMultiItemQuoteFromEditor(writeTotal=true){const rows=collectQuotedLineItems();if(!rows.length)return;let total=0;rows.forEach((line,index)=>{const lineTotal=lineItemTotal(line);total+=lineTotal;const out=document.querySelector(`[data-line-total="${index}"]`);if(out)out.textContent=money(lineTotal)});if(writeTotal&&$("orderPrice"))$("orderPrice").value=total.toFixed(2);const sum=$("orderLineItemsQuoteTotal");if(sum)sum.textContent=money(total);updateOrderPaymentButtons()}
+function resetLineItemPricesToEstimate(){const o=orders.find(x=>x.id===editingOrderId);if(!Array.isArray(o?.line_items))return;o.line_items.forEach((line,index)=>{const qty=Math.max(1,Number(line.quantity||1)),estimate=Number(line.estimated_total??line.line_total??0),input=document.querySelector(`[data-line-unit-price="${index}"]`);if(input)input.value=(estimate/qty).toFixed(2)});updateMultiItemQuoteFromEditor()}'''
 if old not in s: raise SystemExit('line panel block not found')
 s=s.replace(old,new,1)
-
-# Save edited line items and let their calculated sum become the quote.
 needle='''const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount").value||0)),o={'''
 replacement='''const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},editedLineItems=collectQuotedLineItems(),paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount")?.value||0)),o={'''
 if needle not in s: raise SystemExit('saveOrder header not found')
 s=s.replace(needle,replacement,1)
 s=s.replace('''line_items:Array.isArray(prev.line_items)?prev.line_items:[],created_at:''','''line_items:editedLineItems.length?editedLineItems:(Array.isArray(prev.line_items)?prev.line_items:[]),created_at:''',1)
-
-# Preserve manual whole-order adjustment: recalc only when line editor exists and matches quote, otherwise store adjustment.
-s=s.replace('''  recalcOrderFromLineItems(o);\n\n  if(o.status==="Approved"''','''  if(o.line_items.length){
-    const lineSum=o.line_items.reduce((a,line)=>a+lineItemTotal(line),0),manualTotal=Math.max(0,Number($("orderPrice")?.value||0));
-    o.quote_adjustment=manualTotal-lineSum;
-    o.quoted_price=manualTotal;
-  }
-
-  if(o.status==="Approved"''',1)
-
-# Ensure changing a line price updates quote immediately, while owner can still overwrite total after.
-s=s.replace('''function updateOrderPaymentButtons(){const quote=''','''function updateOrderPaymentButtons(){const quote=''',1)
-
-s=re.sub(r'window\.PRINTBOOK_BUILD="[^"]+";', 'window.PRINTBOOK_BUILD="5.15.0";', s, count=1)
-app.write_text(s)
-
-html=Path('index.html'); h=html.read_text()
-oldh='''<div class="full order-line-items-panel hidden" id="orderLineItemsPanel"><div class="order-line-items-head"><span>ORDER ITEMS</span><small>Submitted together by the customer</small></div><div id="orderLineItemsList" class="order-line-items-list"></div></div>'''
-newh='''<div class="full order-line-items-panel hidden" id="orderLineItemsPanel">
-            <div class="order-line-items-head"><div><span>ORDER ITEMS</span><small>Set each item's price. The quote total updates automatically.</small></div><button type="button" class="secondary small" id="resetLineItemPricesBtn" onclick="resetLineItemPricesToEstimate()">Reset estimates</button></div>
-            <div id="orderLineItemsList" class="order-line-items-list"></div>
-            <div class="order-line-items-quote-summary"><span>Items subtotal</span><strong id="orderLineItemsQuoteTotal">$0.00</strong></div>
-          </div>'''
-if oldh not in h: raise SystemExit('html line panel not found')
-h=h.replace(oldh,newh,1)
-html.write_text(h)
-
-css=Path('storefront-v55.css'); c=css.read_text(); c+='''\n/* v5.15 multi-item quoting */\n.order-line-items-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.order-line-items-head>div{display:flex;flex-direction:column;gap:3px}.admin-order-line.quote-line{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(105px,130px) minmax(82px,105px);align-items:center;gap:12px}.admin-order-line-copy{min-width:0;display:flex;flex-direction:column;gap:3px}.admin-order-line-copy small{overflow:hidden;text-overflow:ellipsis}.order-line-unit-price{margin:0}.order-line-unit-price>small,.order-line-total>small{display:block;margin-bottom:5px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.55}.order-line-unit-price .money-input input{min-width:0}.order-line-total{text-align:right}.order-line-total strong{font-size:15px}.order-line-items-quote-summary{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:12px 14px;border-top:1px solid rgba(139,92,246,.2);background:rgba(139,92,246,.055);border-radius:0 0 12px 12px}.order-line-items-quote-summary span{font-size:12px;font-weight:700;opacity:.7}.order-line-items-quote-summary strong{font-size:18px}@media(max-width:650px){.admin-order-line.quote-line{grid-template-columns:24px minmax(0,1fr) 100px}.order-line-total{grid-column:2/4;display:flex;justify-content:space-between;align-items:center;text-align:left;padding-top:4px}.order-line-total>small{margin:0}.order-line-items-head{align-items:flex-start;flex-direction:column}.order-line-items-head button{align-self:flex-start}}\n'''; css.write_text(c)
-
-sw=Path('sw.js'); w=sw.read_text(); w=re.sub(r'const CACHE="[^"]+";', 'const CACHE="printbook-v5.15.0-multi-quote";',w,count=1); sw.write_text(w)
+s=s.replace('''  recalcOrderFromLineItems(o);\n\n  if(o.status==="Approved"''','''  if(o.line_items.length){const lineSum=o.line_items.reduce((a,line)=>a+lineItemTotal(line),0),manualTotal=Math.max(0,Number($("orderPrice")?.value||0));o.quote_adjustment=manualTotal-lineSum;o.quoted_price=manualTotal}\n\n  if(o.status==="Approved"''',1)
+s=re.sub(r'window\.PRINTBOOK_BUILD="[^"]+";', 'window.PRINTBOOK_BUILD="5.15.0";', s, count=1);app.write_text(s)
+html=Path('index.html');h=html.read_text();oldh='''<div class="full order-line-items-panel hidden" id="orderLineItemsPanel"><div class="order-line-items-head"><span>ORDER ITEMS</span><small>Submitted together by the customer</small></div><div id="orderLineItemsList" class="order-line-items-list"></div></div>''';newh='''<div class="full order-line-items-panel hidden" id="orderLineItemsPanel"><div class="order-line-items-head"><div><span>ORDER ITEMS</span><small>Set each item's price. The quote total updates automatically.</small></div><button type="button" class="secondary small" id="resetLineItemPricesBtn" onclick="resetLineItemPricesToEstimate()">Reset estimates</button></div><div id="orderLineItemsList" class="order-line-items-list"></div><div class="order-line-items-quote-summary"><span>Items subtotal</span><strong id="orderLineItemsQuoteTotal">$0.00</strong></div></div>'''
+if oldh not in h:raise SystemExit('html line panel not found')
+html.write_text(h.replace(oldh,newh,1))
+css=Path('storefront-v55.css');c=css.read_text();c+='''\n/* v5.15 multi-item quoting */\n.order-line-items-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.order-line-items-head>div{display:flex;flex-direction:column;gap:3px}.admin-order-line.quote-line{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(105px,130px) minmax(82px,105px);align-items:center;gap:12px}.admin-order-line-copy{min-width:0;display:flex;flex-direction:column;gap:3px}.order-line-unit-price>small,.order-line-total>small{display:block;margin-bottom:5px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.55}.order-line-total{text-align:right}.order-line-items-quote-summary{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:12px 14px;border-top:1px solid rgba(139,92,246,.2);background:rgba(139,92,246,.055);border-radius:0 0 12px 12px}.order-line-items-quote-summary strong{font-size:18px}@media(max-width:650px){.admin-order-line.quote-line{grid-template-columns:24px minmax(0,1fr) 100px}.order-line-total{grid-column:2/4;display:flex;justify-content:space-between;text-align:left}.order-line-items-head{align-items:flex-start;flex-direction:column}}\n''';css.write_text(c)
+sw=Path('sw.js');w=sw.read_text();sw.write_text(re.sub(r'const CACHE="[^"]+";','const CACHE="printbook-v5.15.0-multi-quote";',w,count=1))
