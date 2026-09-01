@@ -1,0 +1,11 @@
+/* Settings modal scroll fix — v5.17.1 */
+#settingsDialog{overflow:hidden;max-height:100dvh}
+#settingsDialog[open]{display:grid;place-items:center}
+#settingsDialog .settings-sheet{display:flex;flex-direction:column;width:min(650px,calc(100vw - 24px));height:min(92dvh,900px);max-height:92dvh;overflow:hidden;padding-bottom:max(22px,env(safe-area-inset-bottom))}
+#settingsDialog .sheet-header,#settingsDialog .settings-tabs{flex:0 0 auto}
+#settingsDialog .settings-tabs{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+#settingsDialog .settings-tabs::-webkit-scrollbar{display:none}
+#settingsDialog .settings-tab-panels{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:3px;padding-bottom:18px;touch-action:pan-y}
+#settingsDialog .settings-tab-panel{min-height:min-content}
+#settingsDialog #saveSettingsBtn{flex:0 0 auto;margin-top:10px}
+@media(max-width:560px){#settingsDialog{margin:0;width:100vw;height:100dvh;max-height:100dvh}#settingsDialog[open]{align-items:end}#settingsDialog .settings-sheet{width:100vw;height:calc(100dvh - max(8px,env(safe-area-inset-top)));max-height:none;border-radius:24px 24px 0 0;padding:16px 14px max(14px,env(safe-area-inset-bottom))}#settingsDialog .settings-tab-panels{padding-bottom:28px}}
