@@ -607,8 +607,8 @@ body.public-visitor #orderDialog{display:none!important}
           <label>Amount paid<div class="money-input"><span>$</span><input id="orderPaymentAmount" type="number" min="0" step="0.01" value="0" /></div></label>
           <label>Payment method<select id="orderPaymentMethod"><option value="">Not set</option><option>Cash</option><option>Cash App</option><option>Venmo</option><option>Zelle</option><option>Other</option></select></label>
           <label>Deposit required<div class="money-input"><span>$</span><input id="orderDepositAmount" type="number" min="0" step="0.01" value="0" /></div></label>
-          <label class="full">How should they pay?<textarea id="orderPaymentInstructions" placeholder="Example: Cash App — $YourCashtag"></textarea></label>
-          <p class="full muted tiny-note">Shown in the customer portal with their order total and KP order number reminder.</p>
+          <div class="full order-payment-method-picker"><div class="order-payment-picker-head"><strong>Payment options for this quote</strong><small>Choose from the methods saved in Settings → Storefront.</small></div><div id="orderPaymentMethodChoices" class="quote-payment-choices"></div><div class="order-payment-preview"><small>CUSTOMER WILL SEE</small><span id="orderPaymentInstructionsPreview">No payment method selected</span></div><textarea id="orderPaymentInstructions" class="hidden" aria-hidden="true"></textarea></div>
+          <p class="full muted tiny-note">These instructions are included with the quote and shown in the customer's private order page.</p>
           <input id="orderPaymentLink" type="hidden" />
           <div class="full order-payment-actions">
             <button type="button" class="secondary" id="markOrderPaidBtn">Mark paid</button>
@@ -1042,6 +1042,17 @@ body.public-visitor #orderDialog{display:none!important}
           <p class="muted tiny-note">The QR always uses the full working address, including the trailing slash.</p>
         </div>
       </div>
+    </section>
+    <section class="settings-section payment-methods-settings">
+      <div class="section-heading"><div><h3>Payment Methods</h3><p class="muted">Enter these once, then choose which ones to include on each quote.</p></div></div>
+      <div class="payment-method-settings-list">
+        <div class="payment-method-setting"><label class="payment-method-enable"><input id="payment_cashapp_enabled" type="checkbox"><span>Cash App</span></label><input id="payment_cashapp_detail" placeholder="$YourCashtag"></div>
+        <div class="payment-method-setting"><label class="payment-method-enable"><input id="payment_venmo_enabled" type="checkbox"><span>Venmo</span></label><input id="payment_venmo_detail" placeholder="@YourVenmo"></div>
+        <div class="payment-method-setting"><label class="payment-method-enable"><input id="payment_zelle_enabled" type="checkbox"><span>Zelle</span></label><input id="payment_zelle_detail" placeholder="Email or phone"></div>
+        <div class="payment-method-setting"><label class="payment-method-enable"><input id="payment_cash_enabled" type="checkbox"><span>Cash at pickup</span></label><input id="payment_cash_detail" placeholder="Optional note, e.g. Exact cash preferred"></div>
+      </div>
+      <button class="primary" id="savePaymentMethodsBtn" type="button">Save payment methods</button>
+      <p class="muted tiny-note">Only enabled methods appear when you prepare a quote.</p>
     </section>
     <section class="settings-section">
       <div class="section-heading">

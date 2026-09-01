@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.16.0";
+window.PRINTBOOK_BUILD="5.17.0";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -46,7 +46,7 @@ const defaultPresets=[
 const defaultSettings={
   supabaseUrl:"",supabaseKey:"",defaultPresetId:"normal",
   browserNotifications:false,pushEnabled:false,lowFilamentPct:15,
-  customerModePin:""
+  customerModePin:"",paymentMethods:{}
 };
 
 function migrateArray(newKey,oldKeys,fallback=[]){
@@ -121,7 +121,7 @@ const PUBLIC_BRANDING_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1
 let publicVisitorMode=false;
 let publicStoreLoaded=false;
 let publicStoreLoading=false;
-let storeAvailability={status:"open",turnaround:"3–5 days",notice:"",reopen_date:null,capacity_limit:null,auto_pause_at_capacity:false,active_orders:0,at_capacity:false,accepting_requests:true,store_name:"Karcen\'s Prints",tagline:"Made layer by layer.",about:"Custom prints, useful parts, desk stuff, gifts, and whatever else looks fun to make.",accent_color:"#8b5cf6",logo_url:"",hero_url:""};
+let storeAvailability={status:"open",turnaround:"3–5 days",notice:"",reopen_date:null,capacity_limit:null,auto_pause_at_capacity:false,active_orders:0,at_capacity:false,accepting_requests:true,store_name:"Karcen\'s Prints",tagline:"Made layer by layer.",about:"Custom prints, useful parts, desk stuff, gifts, and whatever else looks fun to make.",accent_color:"#8b5cf6",logo_url:"",hero_url:"",payment_methods:{}};
 let publicStoreLastDiagnostic="";
 let photoRepairInFlight=null;
 const photoRepairAttempts=new Set();
@@ -1551,6 +1551,14 @@ async function saveSale(){if(!requireOnlineAdminSave())return;
 function openSalesHistory(){const sorted=[...sales].sort((a,b)=>String(b.date).localeCompare(String(a.date)));$("salesHistoryList").innerHTML=sorted.map(s=>{const i=items.find(x=>x.id===s.print_id),v=(i?.variants||[]).find(x=>x.id===s.variant_id);return `<article class="order-card"><div class="order-main"><h4>${safe(i?.name||"Deleted print")}${v?` · ${safe(v.name)}`:""}</h4><p>${safe(s.date)} · Qty ${s.quantity}${s.channel?` · ${safe(s.channel)}`:""}${Number(s.discount_amount)>0?` · ${money(s.discount_amount)} off`:""}</p></div><div class="order-side"><strong>${money(s.total ?? Number(s.unit_price)*Number(s.quantity))}</strong><p class="muted">Profit ${money(saleProfit(s))}</p></div></article>`}).join("")||`<div class="empty-state"><p>No sales yet.</p></div>`;$("salesHistoryDialog").showModal()}
 
 const PAYMENT_NOTE_PREFIX="Payment instructions:";
+const PAYMENT_METHOD_DEFS={cashapp:{label:"Cash App",placeholder:"$YourCashtag"},venmo:{label:"Venmo",placeholder:"@YourVenmo"},zelle:{label:"Zelle",placeholder:"Email or phone"},cash:{label:"Cash at pickup",placeholder:"Optional note"}};
+function normalizedPaymentMethods(raw={}){const out={};for(const [key,def] of Object.entries(PAYMENT_METHOD_DEFS)){const v=raw?.[key]||{};out[key]={enabled:!!v.enabled,detail:String(v.detail||"").trim(),label:def.label}}return out}
+function activePaymentMethods(){return normalizedPaymentMethods(storeAvailability.payment_methods||settings.paymentMethods||{})}
+function paymentMethodInstructions(keys=[]){const methods=activePaymentMethods();return keys.filter(k=>methods[k]?.enabled).map(k=>{const m=methods[k];return m.detail?`${m.label} — ${m.detail}`:m.label}).join("\n")}
+function renderOrderPaymentMethodChoices(selected=[]){const wrap=$("orderPaymentMethodChoices");if(!wrap)return;const methods=activePaymentMethods(),picked=new Set(selected||[]);wrap.innerHTML=Object.entries(methods).filter(([,m])=>m.enabled).map(([key,m])=>`<label class="quote-payment-choice"><input type="checkbox" value="${key}" ${picked.has(key)?"checked":""}><span><strong>${safe(m.label)}</strong><small>${safe(m.detail||"Available")}</small></span></label>`).join("")||`<div class="muted tiny-note">No payment methods are enabled yet. Add them in Settings → Storefront.</div>`;wrap.querySelectorAll('input[type="checkbox"]').forEach(i=>i.onchange=syncOrderPaymentInstructionsFromChoices);syncOrderPaymentInstructionsFromChoices()}
+function selectedOrderPaymentMethods(){return [...document.querySelectorAll('#orderPaymentMethodChoices input[type="checkbox"]:checked')].map(i=>i.value)}
+function syncOrderPaymentInstructionsFromChoices(){const selected=selectedOrderPaymentMethods(),generated=paymentMethodInstructions(selected),box=$("orderPaymentInstructions");if(box)box.value=generated;const preview=$("orderPaymentInstructionsPreview");if(preview)preview.textContent=generated||"No payment method selected"}
+
 function splitOrderPaymentInstructions(notes){
   const lines=String(notes||"").split("\n"),paymentLine=lines.find(line=>line.trim().toLowerCase().startsWith(PAYMENT_NOTE_PREFIX.toLowerCase()));
   const instructions=paymentLine?paymentLine.slice(paymentLine.indexOf(":")+1).trim():"";
@@ -1561,7 +1569,7 @@ function joinOrderPaymentInstructions(notes,instructions){
   const clean=splitOrderPaymentInstructions(notes).cleanNotes,inst=String(instructions||"").trim();
   return [clean,inst?`${PAYMENT_NOTE_PREFIX} ${inst}`:""].filter(Boolean).join("\n");
 }
-function resetOrder(){editingOrderId=null;["orderCustomer","orderCustomerEmail","orderItem","orderPrice","orderDue","orderNotes","orderPaymentInstructions","orderPaymentLink"].forEach(id=>{if($(id))$(id).value=""});$("orderQty").value=1;$("orderStatus").value="Requested";$("orderPrint").value="";if($("orderVariant"))$("orderVariant").innerHTML=`<option value="">Standard / no variant</option>`;$("orderPaymentStatus").value="unpaid";$("orderPaymentAmount").value=0;$("orderDepositAmount").value=0;$("orderPaymentMethod").value="";$("deleteOrderBtn").style.visibility="hidden";if($("orderPaymentSection"))$("orderPaymentSection").open=false;if($("orderNotesSection"))$("orderNotesSection").open=false;updateOrderPaymentButtons();updateOrderEditorSummary()}
+function resetOrder(){editingOrderId=null;["orderCustomer","orderCustomerEmail","orderItem","orderPrice","orderDue","orderNotes","orderPaymentInstructions","orderPaymentLink"].forEach(id=>{if($(id))$(id).value=""});$("orderQty").value=1;$("orderStatus").value="Requested";$("orderPrint").value="";if($("orderVariant"))$("orderVariant").innerHTML=`<option value="">Standard / no variant</option>`;$("orderPaymentStatus").value="unpaid";$("orderPaymentAmount").value=0;$("orderDepositAmount").value=0;$("orderPaymentMethod").value="";$("deleteOrderBtn").style.visibility="hidden";if($("orderPaymentSection"))$("orderPaymentSection").open=false;if($("orderNotesSection"))$("orderNotesSection").open=false;renderOrderPaymentMethodChoices([]);updateOrderPaymentButtons();updateOrderEditorSummary()}
 function orderPaymentLabel(o){return ({unpaid:"Unpaid",deposit_paid:"Deposit paid",paid:"Paid",refunded:"Refunded"})[o?.payment_status]||"Unpaid"}
 function updateOrderEditorSummary(){
   const paymentSummary=$("orderPaymentSummary");
@@ -1587,10 +1595,10 @@ window.openOrder=id=>{
     if(d?.open){try{d.close()}catch{}}
     return;
   }
-  resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;const paymentParts=splitOrderPaymentInstructions(o.notes);editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderCustomerEmail").value=o.customer_email||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";{const linked=items.find(i=>i.id===o.print_id),inferred=orderVariantForReservation(o,linked);populateOrderVariants(o.variant_id||inferred?.id||"")}$("orderNotes").value=paymentParts.cleanNotes;$("orderPaymentInstructions").value=o.payment_instructions||paymentParts.instructions||"";$("orderPaymentStatus").value=o.payment_status||"unpaid";$("orderPaymentAmount").value=Number(o.payment_amount||0);$("orderDepositAmount").value=Number(o.deposit_amount||0);$("orderPaymentMethod").value=o.payment_method==="Stripe"?"":(o.payment_method||"");$("orderPaymentLink").value=o.payment_link||"";$("deleteOrderBtn").style.visibility="visible";updateOrderPaymentButtons();updateOrderEditorSummary();renderOrderLineItemsPanel(o);renderCustomerHistory()}else{$("orderTitle").textContent="New order";renderOrderLineItemsPanel(null);renderCustomerHistory()}$("orderDialog").showModal()}
+  resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;const paymentParts=splitOrderPaymentInstructions(o.notes);editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderCustomerEmail").value=o.customer_email||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";{const linked=items.find(i=>i.id===o.print_id),inferred=orderVariantForReservation(o,linked);populateOrderVariants(o.variant_id||inferred?.id||"")}$("orderNotes").value=paymentParts.cleanNotes;$("orderPaymentInstructions").value=o.payment_instructions||paymentParts.instructions||"";renderOrderPaymentMethodChoices(Array.isArray(o.payment_methods_selected)?o.payment_methods_selected:[]);$("orderPaymentStatus").value=o.payment_status||"unpaid";$("orderPaymentAmount").value=Number(o.payment_amount||0);$("orderDepositAmount").value=Number(o.deposit_amount||0);$("orderPaymentMethod").value=o.payment_method==="Stripe"?"":(o.payment_method||"");$("orderPaymentLink").value=o.payment_link||"";$("deleteOrderBtn").style.visibility="visible";updateOrderPaymentButtons();updateOrderEditorSummary();renderOrderLineItemsPanel(o);renderCustomerHistory()}else{$("orderTitle").textContent="New order";renderOrderPaymentMethodChoices(Object.entries(activePaymentMethods()).filter(([,m])=>m.enabled).map(([k])=>k));renderOrderLineItemsPanel(null);renderCustomerHistory()}$("orderDialog").showModal()}
 async function saveOrder(){if(!requireOnlineAdminSave())return;
   const item=$("orderItem").value.trim();if(!item)return toast("Describe the order");
-  const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},editedLineItems=collectQuotedLineItems(),paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount")?.value||0)),o={id,...(prev.order_number?{order_number:prev.order_number}:{}),customer:$("orderCustomer").value.trim(),customer_email:$("orderCustomerEmail").value.trim().toLowerCase()||null,status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",variant_id:$("orderVariant")?.value||null,notes:joinOrderPaymentInstructions($("orderNotes").value,$("orderPaymentInstructions").value),payment_status:paymentStatus,payment_amount:paymentAmount,deposit_amount:Math.max(0,Number($("orderDepositAmount").value||0)),payment_method:$("orderPaymentMethod").value||null,payment_instructions:$("orderPaymentInstructions").value.trim()||null,payment_provider:prev.payment_provider||null,payment_reference:prev.payment_reference||null,paid_at:paymentStatus==="paid"?(prev.paid_at||nowISO()):null,payment_link:prev.payment_link||null,stripe_checkout_session_id:prev.stripe_checkout_session_id||null,stripe_payment_intent_id:prev.stripe_payment_intent_id||null,quote_email_sent_at:prev.quote_email_sent_at||null,customer_accepted_at:prev.customer_accepted_at||null,customer_accepted_price:prev.customer_accepted_price??null,ready_email_sent_at:prev.ready_email_sent_at||null,line_items:editedLineItems.length?editedLineItems:(Array.isArray(prev.line_items)?prev.line_items:[]),created_at:prev.created_at||nowISO(),updated_at:nowISO()};
+  const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},editedLineItems=collectQuotedLineItems(),paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount")?.value||0)),o={id,...(prev.order_number?{order_number:prev.order_number}:{}),customer:$("orderCustomer").value.trim(),customer_email:$("orderCustomerEmail").value.trim().toLowerCase()||null,status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",variant_id:$("orderVariant")?.value||null,notes:joinOrderPaymentInstructions($("orderNotes").value,$("orderPaymentInstructions").value),payment_status:paymentStatus,payment_amount:paymentAmount,deposit_amount:Math.max(0,Number($("orderDepositAmount").value||0)),payment_method:$("orderPaymentMethod").value||null,payment_methods_selected:selectedOrderPaymentMethods(),payment_instructions:paymentMethodInstructions(selectedOrderPaymentMethods())||$("orderPaymentInstructions").value.trim()||null,payment_provider:prev.payment_provider||null,payment_reference:prev.payment_reference||null,paid_at:paymentStatus==="paid"?(prev.paid_at||nowISO()):null,payment_link:prev.payment_link||null,stripe_checkout_session_id:prev.stripe_checkout_session_id||null,stripe_payment_intent_id:prev.stripe_payment_intent_id||null,quote_email_sent_at:prev.quote_email_sent_at||null,customer_accepted_at:prev.customer_accepted_at||null,customer_accepted_price:prev.customer_accepted_price??null,ready_email_sent_at:prev.ready_email_sent_at||null,line_items:editedLineItems.length?editedLineItems:(Array.isArray(prev.line_items)?prev.line_items:[]),created_at:prev.created_at||nowISO(),updated_at:nowISO()};
 
   if(o.line_items.length){const lineSum=o.line_items.reduce((a,line)=>a+lineItemTotal(line),0),manualTotal=Math.max(0,Number($("orderPrice")?.value||0));o.quote_adjustment=manualTotal-lineSum;o.quoted_price=manualTotal}
 
@@ -2671,7 +2679,7 @@ async function sendTestPush(){
 
 async function loadStoreAvailabilitySettings(){
   if(!supabaseClient||!currentUser)return;
-  const {data,error}=await supabaseClient.from("store_settings").select("availability_status,turnaround_text,storefront_notice,reopen_date,capacity_limit,auto_pause_at_capacity,store_name,storefront_tagline,storefront_about,storefront_accent,storefront_logo_url,storefront_hero_url,featured_product_ids").eq("user_id",currentUser.id).maybeSingle();
+  const {data,error}=await supabaseClient.from("store_settings").select("availability_status,turnaround_text,storefront_notice,reopen_date,capacity_limit,auto_pause_at_capacity,store_name,storefront_tagline,storefront_about,storefront_accent,storefront_logo_url,storefront_hero_url,featured_product_ids,payment_methods").eq("user_id",currentUser.id).maybeSingle();
   if(error){console.error(error);return}
   const d=data||{};
   $("storeAvailabilityStatus").value=d.availability_status||"open";
@@ -2681,7 +2689,7 @@ async function loadStoreAvailabilitySettings(){
   $("storeCapacityInput").value=d.capacity_limit||"";
   $("storeAutoPauseInput").checked=!!d.auto_pause_at_capacity;
   $("storeAvailabilityBadge").textContent=(d.availability_status||"open").toUpperCase();
-  storeAvailability={...storeAvailability,status:d.availability_status||"open",turnaround:d.turnaround_text||"3–5 days",notice:d.storefront_notice||"",reopen_date:d.reopen_date||null,capacity_limit:d.capacity_limit||null,auto_pause_at_capacity:!!d.auto_pause_at_capacity,store_name:d.store_name||"Karcen's Prints",tagline:d.storefront_tagline||"Made layer by layer.",about:d.storefront_about||"",accent_color:normalizeStoreAccent(d.storefront_accent),logo_url:d.storefront_logo_url||"",hero_url:d.storefront_hero_url||"",featured_product_ids:normalizeFeaturedProductIds(d.featured_product_ids)};
+  storeAvailability={...storeAvailability,status:d.availability_status||"open",turnaround:d.turnaround_text||"3–5 days",notice:d.storefront_notice||"",reopen_date:d.reopen_date||null,capacity_limit:d.capacity_limit||null,auto_pause_at_capacity:!!d.auto_pause_at_capacity,store_name:d.store_name||"Karcen's Prints",tagline:d.storefront_tagline||"Made layer by layer.",about:d.storefront_about||"",accent_color:normalizeStoreAccent(d.storefront_accent),logo_url:d.storefront_logo_url||"",hero_url:d.storefront_hero_url||"",payment_methods:normalizedPaymentMethods(d.payment_methods||{}),featured_product_ids:normalizeFeaturedProductIds(d.featured_product_ids)};
   featuredProductIds=normalizeFeaturedProductIds(d.featured_product_ids);
   if($("storeNameInput"))$("storeNameInput").value=storeAvailability.store_name;
   if($("storeTaglineInput"))$("storeTaglineInput").value=storeAvailability.tagline;
@@ -2689,6 +2697,7 @@ async function loadStoreAvailabilitySettings(){
   if($("storeAccentInput"))$("storeAccentInput").value=storeAvailability.accent_color;
   if($("storeLogoUrlInput"))$("storeLogoUrlInput").value=storeAvailability.logo_url;
   if($("storeHeroUrlInput"))$("storeHeroUrlInput").value=storeAvailability.hero_url;
+  const pm=activePaymentMethods();for(const key of Object.keys(PAYMENT_METHOD_DEFS)){const en=$(`payment_${key}_enabled`),detail=$(`payment_${key}_detail`);if(en)en.checked=!!pm[key]?.enabled;if(detail)detail.value=pm[key]?.detail||""}
   updateStoreBrandPreview();
   renderStoreBranding();
 }
@@ -2719,6 +2728,15 @@ async function saveStoreBranding(){
     toast("Storefront branding updated");
   }catch(error){console.error(error);toast(error?.message||"Couldn't save storefront branding")}
   finally{if(btn){btn.disabled=false;btn.textContent=oldLabel;delete btn.dataset.busy}}
+}
+
+async function savePaymentMethods(){
+  if(!supabaseClient||!currentUser)return toast("Sign in to save payment methods");
+  const payment_methods={};for(const key of Object.keys(PAYMENT_METHOD_DEFS)){payment_methods[key]={enabled:!!$(`payment_${key}_enabled`)?.checked,detail:$(`payment_${key}_detail`)?.value.trim()||""}}
+  const btn=$("savePaymentMethodsBtn"),old=btn?.textContent||"Save payment methods";if(btn){btn.disabled=true;btn.textContent="Saving…"}
+  try{const {error}=await supabaseClient.from("store_settings").upsert({user_id:currentUser.id,payment_methods,updated_at:nowISO()});if(error)throw error;storeAvailability={...storeAvailability,payment_methods:normalizedPaymentMethods(payment_methods)};settings.paymentMethods=storeAvailability.payment_methods;localStorage.setItem(K.settings,JSON.stringify(settings));toast("Payment methods saved")}
+  catch(err){console.error(err);toast(err?.message||"Couldn't save payment methods")}
+  finally{if(btn){btn.disabled=false;btn.textContent=old}}
 }
 
 async function saveStoreAvailability(){
@@ -3322,3 +3340,6 @@ window.addEventListener("online",()=>{if(currentUser&&!publicVisitorMode)pullClo
 window.addEventListener("offline",()=>{if(currentUser)setSyncState("offline","Offline — viewing cached data")});
 
 safeUiInit("startup-qr-stock",()=>{if($("orderPrint"))$("orderPrint").onchange=()=>populateOrderVariants();if($("copyStoreLinkBtn"))$("copyStoreLinkBtn").onclick=copyPublicStoreLink;if($("openStoreLinkBtn"))$("openStoreLinkBtn").onclick=openPublicStoreLink;});
+
+// v5.17 payment methods settings
+document.addEventListener("click",e=>{if(e.target?.id==="savePaymentMethodsBtn"){e.preventDefault();savePaymentMethods()}});

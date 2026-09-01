@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.16.0-tracking2";
+const CACHE="printbook-v5.17.0-payment-methods";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
