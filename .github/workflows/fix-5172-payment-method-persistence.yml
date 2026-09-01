@@ -1,0 +1,28 @@
+name: PrintBook 5.17.2 payment method persistence fix
+on:
+  push:
+    paths: ['.github/workflows/fix-5172-payment-method-persistence.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .github/scripts/fix_5172_payment_method_persistence.py
+      - name: Validate JavaScript
+        run: node --check app.js
+      - name: Verify safe scope
+        run: |
+          grep -q 'PRINTBOOK_BUILD="5.17.2"' app.js
+          grep -q 'cloudHasData' app.js
+          grep -q 'settings.paymentMethods=storeAvailability.payment_methods' app.js
+          test -s index.html
+          grep -q '<!doctype html>' index.html
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js sw.js
+          git commit -m "Fix saved payment methods in order quotes"
+          git push
