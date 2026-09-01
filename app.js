@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.13.0";
+window.PRINTBOOK_BUILD="5.13.1";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -947,6 +947,27 @@ function orderVariantForReservation(o,item){
   return null;
 }
 function approvalStockCheck(o){
+  const lines=Array.isArray(o?.line_items)&&o.line_items.length?o.line_items:null;
+  if(lines){
+    const grouped=new Map();
+    for(const line of lines){
+      const item=items.find(i=>String(i.id)===String(line?.print_id||""));
+      if(!item||isMadeToOrder(item))continue;
+      const qty=Math.max(1,Number(line?.quantity||1));
+      const variantId=String(line?.variant_id||"");
+      const variant=variantId?(item.variants||[]).find(v=>String(v.id)===variantId):null;
+      if((item.variants||[]).length&&!variant)return {ok:false,message:`Choose a variant for ${item.name} before approving this stocked order.`};
+      const key=`${item.id}::${variantId}`;
+      const previous=grouped.get(key)||{item,variant,qty:0};
+      previous.qty+=qty;
+      grouped.set(key,previous);
+    }
+    for(const {item,variant,qty} of grouped.values()){
+      const available=variant?Number(variant.stock||0):itemStock(item);
+      if(available<qty)return {ok:false,message:`Only ${available} finished ${variant?`${item.name} · ${variant.name}`:item.name} in stock, but this order needs ${qty}. Make more first or set the print to Made to order.`};
+    }
+    return {ok:true};
+  }
   const item=items.find(i=>i.id===o?.print_id);
   if(!item||isMadeToOrder(item))return {ok:true};
   const qty=Math.max(1,Number(o?.quantity||1)),variant=orderVariantForReservation(o,item);
@@ -1747,11 +1768,15 @@ function openCustomerOrderCart(){
   if($("customerCartNotes"))$("customerCartNotes").value=customerOrderDraft.notes||"";
   $("customerCartDialog")?.showModal();
 }
+function isValidCustomerEmail(value){
+  const email=String(value||"").trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
 function addCurrentRequestToCustomerCart(){
   const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
   if(storeAvailability.accepting_requests===false)return toast(storeAvailability.at_capacity?"The store is at order capacity right now":"New print requests are temporarily paused");
   const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
-  const email=$("requestCustomerEmail").value.trim().toLowerCase();if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))return toast("Enter a valid email so you can recover your order");
+  const email=$("requestCustomerEmail").value.trim().toLowerCase();if(!isValidCustomerEmail(email))return toast("Enter a valid email so you can recover your order");
   const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,filamentId=$("requestFilament").value,userNotes=$("requestNotes").value.trim();
   const wantsMulticolor=!!item.multicolor_capable&&$("requestColorMode").value==="multi",colorIds=wantsMulticolor?selectedRequestColorIds():[],maxColors=productMaxColors(item);
   if(wantsMulticolor&&colorIds.length<2)return toast("Choose at least 2 colors");
@@ -1767,7 +1792,7 @@ async function submitCustomerOrderCart(){
   if(!customerOrderCart.length)return toast("Add at least one print");
   const customer=$("customerCartName")?.value.trim()||"",email=$("customerCartEmail")?.value.trim().toLowerCase()||"",contact=$("customerCartContact")?.value.trim()||"",orderNotes=$("customerCartNotes")?.value.trim()||"";
   if(!customer)return toast("Enter your name");
-  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))return toast("Enter a valid email");
+  if(!isValidCustomerEmail(email))return toast("Enter a valid email");
   customerOrderDraft={customer,email,contact,notes:orderNotes};
   const btn=$("submitCustomerCartBtn"),old=btn?.textContent||"Submit Order";if(btn){btn.disabled=true;btn.textContent="Submitting…"}
   try{
@@ -1830,7 +1855,7 @@ async function submitPrintRequest(){
   const item=items.find(i=>i.id===currentRequestPrintId);if(!item)return toast("That product could not be found");
   if((publicVisitorMode||customerMode)&&storeAvailability.accepting_requests===false)return toast(storeAvailability.at_capacity?"The store is at order capacity right now":"New print requests are temporarily paused");
   const customer=$("requestCustomerName").value.trim();if(!customer)return toast("Enter your name");
-  const email=$("requestCustomerEmail").value.trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return toast("Enter a valid email so you can recover your order");
+  const email=$("requestCustomerEmail").value.trim().toLowerCase();if(!isValidCustomerEmail(email))return toast("Enter a valid email so you can recover your order");
   const qty=Math.max(1,Number($("requestQty").value||1)),variantId=$("requestVariant").value,variant=(item.variants||[]).find(v=>v.id===variantId),filamentId=$("requestFilament").value,filament=getFilament(filamentId),contact=$("requestContact").value.trim(),userNotes=$("requestNotes").value.trim();
   const wantsMulticolor=!!item.multicolor_capable && $("requestColorMode").value==="multi";
   const colorIds=wantsMulticolor?selectedRequestColorIds():[],maxColors=productMaxColors(item);
@@ -1956,7 +1981,7 @@ function openFindCustomerOrder(){
   const last=list.find(x=>x.email);$("customerOrderRecoveryEmail").value=last?.email||"";$("customerOrderRecoveryStatus").textContent="";$("findCustomerOrderDialog").showModal()
 }
 async function recoverCustomerOrders(){
-  const email=$("customerOrderRecoveryEmail").value.trim().toLowerCase();if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))return toast("Enter the email used for your order");
+  const email=$("customerOrderRecoveryEmail").value.trim().toLowerCase();if(!isValidCustomerEmail(email))return toast("Enter the email used for your order");
   const btn=$("sendCustomerOrderRecoveryBtn"),old=btn.textContent;btn.disabled=true;btn.textContent="Sending…";$("customerOrderRecoveryStatus").textContent="";
   try{const r=await fetch(CUSTOMER_ORDERS_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"recover",email})});let d={};try{d=await r.json()}catch{};if(!r.ok)throw new Error(d.error||"Couldn't request recovery");$("customerOrderRecoveryStatus").textContent=d.email_recovery_configured===false?"Order recovery is ready, but email delivery still needs to be connected by the shop owner.":"If that email matches an order, check your inbox for a private link."}
   catch(err){$("customerOrderRecoveryStatus").textContent=err?.message||"Couldn't request recovery right now."}finally{btn.disabled=false;btn.textContent=old}
