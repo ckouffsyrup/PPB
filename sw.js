@@ -1,5 +1,5 @@
-const CACHE="printbook-v5.17.3-payment-method-persist";
-const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
+const CACHE="printbook-v5.18.0-cart-edit";
+const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./cart-edit.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
   event.waitUntil((async()=>{
@@ -23,6 +23,30 @@ self.addEventListener("activate",event=>{
   })());
 });
 
+async function buildCombinedAppResponse(request){
+  const addonUrl=new URL("./cart-edit.js",self.registration.scope).href;
+  try{
+    const [core,addon]=await Promise.all([
+      fetch(new Request(request,{cache:"no-store"})),
+      fetch(new Request(addonUrl,{cache:"no-store"}))
+    ]);
+    if(!core.ok)return core;
+    if(!addon.ok)return core;
+    const source=(await core.text())+"\n;\n"+(await addon.text());
+    const headers=new Headers(core.headers);
+    headers.set("Content-Type","application/javascript; charset=utf-8");
+    headers.delete("Content-Length");
+    headers.delete("content-length");
+    const combined=new Response(source,{status:core.status,statusText:core.statusText,headers});
+    const cache=await caches.open(CACHE);
+    cache.put(request,combined.clone()).catch(()=>{});
+    return combined;
+  }catch{
+    const cached=await caches.match(request,{ignoreSearch:true});
+    return cached||new Response("",{status:504,statusText:"Offline"});
+  }
+}
+
 self.addEventListener("fetch",event=>{
   if(event.request.method!=="GET")return;
   const url=new URL(event.request.url);
@@ -44,10 +68,15 @@ self.addEventListener("fetch",event=>{
     return;
   }
 
+  if(/\/app\.js$/.test(url.pathname)){
+    event.respondWith(buildCombinedAppResponse(event.request));
+    return;
+  }
+
   event.respondWith((async()=>{
     // Critical app files are network-first so a newly deployed PrintBook build
     // cannot be trapped behind an older service-worker cache.
-    const critical=/\/(app\.js|styles\.css|storefront-v55\.css)$/.test(url.pathname);
+    const critical=/\/(styles\.css|storefront-v55\.css|cart-edit\.js)$/.test(url.pathname);
     if(critical){
       try{
         const fresh=await fetch(new Request(event.request,{cache:"no-store"}));
