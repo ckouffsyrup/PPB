@@ -1,0 +1,27 @@
+name: PrintBook 5.16 customer tracking 2.0
+on:
+  push:
+    paths: ['.github/workflows/update-5160-tracking2.yml']
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .github/scripts/update_5160_tracking2.py
+      - name: Validate JS
+        run: node --check app.js
+      - name: Verify tracking UI
+        run: |
+          grep -q 'customerPortalStatusHero' index.html
+          grep -q 'customerPortalActivityList' index.html
+          grep -q 'CUSTOMER_STATUS_COPY' app.js
+          grep -q 'PRINTBOOK_BUILD="5.16.0"' app.js
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js index.html storefront-v55.css sw.js
+          git commit -m "PrintBook 5.16 customer order tracking 2.0"
+          git push
