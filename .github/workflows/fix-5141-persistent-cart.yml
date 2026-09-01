@@ -1,0 +1,30 @@
+name: Fix persistent customer cart
+on:
+  push:
+    paths: ['.github/workflows/fix-5141-persistent-cart.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .github/scripts/fix_5141_persistent_cart.py
+      - name: Validate JS
+        run: node --check app.js
+      - name: Verify cart key loads before restore
+        run: |
+          python - <<'PY'
+          s=open('app.js').read()
+          key=s.index('const CUSTOMER_CART_KEY="printbook_customer_cart_v1";')
+          load=s.index('loadCustomerCart();')
+          assert key < load, 'cart key is still declared after loadCustomerCart()'
+          print('persistent cart startup order OK')
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js sw.js
+          git commit -m "Fix persistent customer cart reload"
+          git push
