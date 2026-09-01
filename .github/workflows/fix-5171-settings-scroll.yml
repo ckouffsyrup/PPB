@@ -1,0 +1,28 @@
+name: PrintBook 5.17.1 settings scroll fix
+on:
+  push:
+    paths: ['.github/workflows/fix-5171-settings-scroll.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .github/scripts/fix_5171_settings_scroll.py
+      - name: Validate JavaScript
+        run: node --check app.js
+      - name: Verify site shell still intact
+        run: |
+          test $(wc -c < index.html) -gt 20000
+          grep -q '<dialog id="settingsDialog">' index.html
+          grep -q '</html>' index.html
+          grep -q 'v5.17.1 settings scroll fix' styles.css
+          grep -q 'PRINTBOOK_BUILD="5.17.1"' app.js
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add styles.css app.js sw.js
+          git commit -m "Fix settings scrolling without touching site shell"
+          git push
