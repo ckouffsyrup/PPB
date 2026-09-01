@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.12.0-trending-products";
+const CACHE="printbook-v5.13.0-multi-item-orders";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{

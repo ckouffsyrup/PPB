@@ -12,7 +12,7 @@
   <link rel="icon" href="assets/icon.svg?v=3" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="assets/icon.svg?v=3" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="storefront-v55.css?v=5.11.0" />
+  <link rel="stylesheet" href="storefront-v55.css?v=5.13.0" />
 <style id="mobilePublicOrderSafety">
 #orderDialog:not([open]){display:none!important}
 body.public-visitor #orderDialog{display:none!important}
@@ -213,6 +213,10 @@ body.public-visitor #orderDialog{display:none!important}
         <h3>No products yet</h3>
         <p>Add your first print and it'll show up here.</p>
       </div>
+      <button class="customer-cart-button customer-only hidden" id="customerCartBtn" type="button">
+        <span>Order</span><strong id="customerCartCount">0</strong>
+      </button>
+
     </section>
 
     <!-- DASHBOARD -->
@@ -580,6 +584,7 @@ body.public-visitor #orderDialog{display:none!important}
           <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
           <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label>
           <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Accepted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
+          <div class="full order-line-items-panel hidden" id="orderLineItemsPanel"><div class="order-line-items-head"><span>ORDER ITEMS</span><small>Submitted together by the customer</small></div><div id="orderLineItemsList" class="order-line-items-list"></div></div>
           <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
           <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
           <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
@@ -807,10 +812,34 @@ body.public-visitor #orderDialog{display:none!important}
       <small id="requestPricingBreakdown">This is an estimate. Final price can be confirmed before printing.</small>
     </div>
 
-    <button class="primary full-width" id="submitPrintRequestBtn" type="button">Submit Print Request</button>
+    <button class="primary full-width" id="submitPrintRequestBtn" type="button">Add to Order</button>
   </div>
 </dialog>
 
+
+
+<!-- CUSTOMER MULTI-ITEM ORDER CART -->
+<dialog id="customerCartDialog">
+  <div class="sheet customer-cart-sheet">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-header">
+      <div><p class="eyebrow">YOUR ORDER</p><h2>Review your prints</h2><p class="muted">Add as many different prints as you want before sending one request.</p></div>
+      <button class="icon-btn" id="closeCustomerCart" type="button">✕</button>
+    </div>
+    <div id="customerCartList" class="customer-cart-list"></div>
+    <div class="customer-cart-checkout">
+      <div class="form-grid">
+        <label>Your name<input id="customerCartName" placeholder="Name / nickname" autocomplete="name" /></label>
+        <label>Email<input id="customerCartEmail" type="email" placeholder="you@example.com" autocomplete="email" /></label>
+        <label class="full">Other contact info <span class="muted">optional</span><input id="customerCartContact" placeholder="Phone, Discord, etc." /></label>
+        <label class="full">Order notes <span class="muted">optional</span><textarea id="customerCartNotes" placeholder="Anything that applies to the whole order"></textarea></label>
+      </div>
+      <div class="customer-cart-total"><span>Estimated order total</span><strong id="customerCartTotal">$0</strong></div>
+      <div class="customer-cart-actions"><button class="secondary" id="keepShoppingCartBtn" type="button">+ Add Another Print</button><button class="primary" id="submitCustomerCartBtn" type="button">Submit Order</button></div>
+      <small class="muted">You will receive one order number and one quote for the whole order.</small>
+    </div>
+  </div>
+</dialog>
 
 <!-- CUSTOMER ORDER CONFIRMATION -->
 <dialog id="customerOrderConfirmationDialog">
@@ -855,6 +884,7 @@ body.public-visitor #orderDialog{display:none!important}
         <div><small>PAYMENT</small><strong id="customerPortalPayment">Unpaid</strong></div>
         <div><small>DUE DATE</small><strong id="customerPortalDue">Not set</strong></div>
       </div>
+      <div class="customer-portal-line-items hidden" id="customerPortalLineItems"><small>PRINTS IN THIS ORDER</small><div id="customerPortalLineItemsList"></div></div>
       <div class="customer-order-notes hidden" id="customerPortalNotesWrap"><small>ORDER DETAILS</small><div id="customerPortalNotes"></div></div>
       <div class="customer-order-payment-box" id="customerPortalPaymentBox">
         <div><small id="customerPortalPaymentHint">PAYMENT</small><strong id="customerPortalPaymentMessage">Waiting for your final quote.</strong></div>
