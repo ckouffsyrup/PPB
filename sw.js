@@ -1,5 +1,5 @@
-const CACHE="printbook-v5.18.0-cart-edit";
-const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./cart-edit.js","./store-qr.png"];
+const CACHE="printbook-v5.18.3-quotes-restored";
+const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./cart-edit.js","./quote-restore.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
   event.waitUntil((async()=>{
@@ -24,15 +24,19 @@ self.addEventListener("activate",event=>{
 });
 
 async function buildCombinedAppResponse(request){
-  const addonUrl=new URL("./cart-edit.js",self.registration.scope).href;
+  const cartAddonUrl=new URL("./cart-edit.js",self.registration.scope).href;
+  const quoteAddonUrl=new URL("./quote-restore.js",self.registration.scope).href;
   try{
-    const [core,addon]=await Promise.all([
+    const [core,cartAddon,quoteAddon]=await Promise.all([
       fetch(new Request(request,{cache:"no-store"})),
-      fetch(new Request(addonUrl,{cache:"no-store"}))
+      fetch(new Request(cartAddonUrl,{cache:"no-store"})),
+      fetch(new Request(quoteAddonUrl,{cache:"no-store"}))
     ]);
     if(!core.ok)return core;
-    if(!addon.ok)return core;
-    const source=(await core.text())+"\n;\n"+(await addon.text());
+    const pieces=[await core.text()];
+    if(cartAddon.ok)pieces.push(await cartAddon.text());
+    if(quoteAddon.ok)pieces.push(await quoteAddon.text());
+    const source=pieces.join("\n;\n");
     const headers=new Headers(core.headers);
     headers.set("Content-Type","application/javascript; charset=utf-8");
     headers.delete("Content-Length");
@@ -74,9 +78,7 @@ self.addEventListener("fetch",event=>{
   }
 
   event.respondWith((async()=>{
-    // Critical app files are network-first so a newly deployed PrintBook build
-    // cannot be trapped behind an older service-worker cache.
-    const critical=/\/(styles\.css|storefront-v55\.css|cart-edit\.js)$/.test(url.pathname);
+    const critical=/\/(styles\.css|storefront-v55\.css|cart-edit\.js|quote-restore\.js)$/.test(url.pathname);
     if(critical){
       try{
         const fresh=await fetch(new Request(event.request,{cache:"no-store"}));
