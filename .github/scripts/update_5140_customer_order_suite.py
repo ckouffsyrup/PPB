@@ -1,0 +1,30 @@
+from pathlib import Path
+import re
+p=Path('app.js'); s=p.read_text()
+# Persistent cart
+s=s.replace('const CUSTOMER_SAVED_ORDERS_KEY="printbook_customer_orders_v1";','const CUSTOMER_SAVED_ORDERS_KEY="printbook_customer_orders_v1";\nconst CUSTOMER_CART_KEY="printbook_customer_cart_v1";')
+s=s.replace('let customerOrderCart=[];\nlet customerOrderDraft={customer:"",email:"",contact:"",notes:""};','let customerOrderCart=[];\nlet customerOrderDraft={customer:"",email:"",contact:"",notes:""};\nfunction saveCustomerCart(){try{localStorage.setItem(CUSTOMER_CART_KEY,JSON.stringify({cart:customerOrderCart,draft:customerOrderDraft,updated_at:nowISO()}))}catch{}}\nfunction loadCustomerCart(){try{const d=JSON.parse(localStorage.getItem(CUSTOMER_CART_KEY)||"null");if(d&&Array.isArray(d.cart)){customerOrderCart=d.cart;customerOrderDraft={customer:"",email:"",contact:"",notes:"",...(d.draft||{})}}}catch{}}\nfunction clearCustomerCart(){customerOrderCart=[];customerOrderDraft={customer:"",email:"",contact:"",notes:""};try{localStorage.removeItem(CUSTOMER_CART_KEY)}catch{}}\nloadCustomerCart();')
+# Save whenever cart renderer runs, which is called after add/remove/draft updates.
+needle='function renderCustomerOrderCart(){'
+s=s.replace(needle,needle+'\n  saveCustomerCart();',1)
+# Replace successful clear assignment occurrences after submit with durable clear, conservative exact sequence
+s=s.replace('customerOrderCart=[];customerOrderDraft={customer:"",email:"",contact:"",notes:""};renderCustomerOrderCart();','clearCustomerCart();renderCustomerOrderCart();')
+# Rich line-item helpers for emails/admin quote
+insert='''\nfunction orderLineItems(o){return Array.isArray(o?.line_items)&&o.line_items.length?o.line_items:[{name:o?.item||"Print",quantity:Number(o?.quantity||1),unit_price:Number(o?.quoted_price||0)/Math.max(1,Number(o?.quantity||1)),line_total:Number(o?.quoted_price||0),variant_name:"",colors:[]}]}\nfunction lineItemUnitPrice(li){const q=Math.max(1,Number(li?.quantity||1));return Number(li?.unit_price??li?.price??(Number(li?.line_total||0)/q)||0)}\nfunction lineItemTotal(li){return Number(li?.line_total??lineItemUnitPrice(li)*Math.max(1,Number(li?.quantity||1)))}\nfunction orderItemsEmailHtml(o){return `<table style="width:100%;border-collapse:collapse;margin:14px 0"><thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #ddd">Print</th><th style="text-align:center;padding:8px;border-bottom:1px solid #ddd">Qty</th><th style="text-align:right;padding:8px;border-bottom:1px solid #ddd">Price</th></tr></thead><tbody>${orderLineItems(o).map(li=>`<tr><td style="padding:9px 8px;border-bottom:1px solid #eee"><strong>${safe(li.name||li.item||"Print")}</strong>${li.variant_name?`<br><small>${safe(li.variant_name)}</small>`:""}${Array.isArray(li.colors)&&li.colors.length?`<br><small>${safe(li.colors.join(", "))}</small>`:""}</td><td style="text-align:center;padding:9px 8px;border-bottom:1px solid #eee">${Math.max(1,Number(li.quantity||1))}</td><td style="text-align:right;padding:9px 8px;border-bottom:1px solid #eee">${money(lineItemTotal(li))}</td></tr>`).join("")}</tbody></table>`}\nfunction recalcOrderFromLineItems(o){if(!Array.isArray(o?.line_items)||!o.line_items.length)return o;const total=o.line_items.reduce((a,li)=>a+lineItemTotal(li),0);o.quoted_price=total;return o}\n'''
+idx=s.find('function orderStatusClass(')
+if idx!=-1:s=s[:idx]+insert+s[idx:]
+# Make save recalc total when line items exist
+s=s.replace('if(o.status==="Approved"&&prev.status!=="Approved"', 'recalcOrderFromLineItems(o);\n\n  if(o.status==="Approved"&&prev.status!=="Approved"',1)
+# Build tracking timeline helper and expose in portal render paths by replacing common status display if found
+track='''\nfunction customerOrderTimeline(o){const stages=["Requested","Quoted","Accepted","Approved","Printing","Ready","Completed"],cur=Math.max(0,stages.indexOf(o?.status||"Requested"));return `<div class="customer-order-timeline">${stages.map((st,i)=>`<div class="customer-order-step ${i<cur?"done":i===cur?"current":""}"><span>${i<cur?"✓":i+1}</span><small>${safe(st)}</small></div>`).join("")}</div>`}\nfunction customerLineItemProgress(o){const items=orderLineItems(o);if(items.length<2)return "";return `<div class="customer-item-progress">${items.map(li=>`<div><strong>${safe(li.name||li.item||"Print")}</strong><span>${safe(li.status||o.status||"Requested")}</span></div>`).join("")}</div>`}\n'''
+idx=s.find('function orderLineItems(')
+if idx!=-1:s=s[:idx]+track+s[idx:]
+# bump build
+s=re.sub(r'window\.PRINTBOOK_BUILD="[^"]+";', 'window.PRINTBOOK_BUILD="5.14.0";', s, count=1)
+p.write_text(s)
+# CSS additions
+cssp=Path('storefront-v55.css'); css=cssp.read_text()
+css+='''\n/* v5.14 customer order suite */\n.customer-order-timeline{display:flex;gap:4px;align-items:flex-start;margin:14px 0;overflow-x:auto;padding:4px 0}.customer-order-step{min-width:62px;text-align:center;opacity:.45;position:relative}.customer-order-step span{display:grid;place-items:center;width:28px;height:28px;margin:0 auto 5px;border-radius:50%;background:rgba(139,92,246,.18);font-weight:800}.customer-order-step.done,.customer-order-step.current{opacity:1}.customer-order-step.done span{background:#22c55e;color:#07130b}.customer-order-step.current span{background:#8b5cf6;color:white;box-shadow:0 0 0 4px rgba(139,92,246,.16)}.customer-order-step small{font-size:10px;white-space:nowrap}.customer-item-progress{display:grid;gap:7px;margin:12px 0}.customer-item-progress>div{display:flex;justify-content:space-between;gap:12px;padding:9px 11px;border:1px solid rgba(139,92,246,.18);border-radius:10px;background:rgba(139,92,246,.06)}\n'''
+cssp.write_text(css)
+# cache bump
+swp=Path('sw.js'); sw=swp.read_text(); sw=re.sub(r'const CACHE="[^"]+";', 'const CACHE="printbook-v5.14.0-customer-order-suite";',sw,count=1); swp.write_text(sw)
