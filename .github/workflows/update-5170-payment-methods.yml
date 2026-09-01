@@ -10,6 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python .github/scripts/update_5170_payment_methods.py
+      - run: python .github/scripts/fix_5170_generated_js.py
       - name: Validate JS
         run: node --check app.js
       - name: Verify payment method UI
@@ -25,4 +26,4 @@ jobs:
           git add app.js index.html storefront-v55.css sw.js
           git commit -m "PrintBook 5.17 payment methods"
           git push
-# retry after settings marker fix
+# retry with generated JS newline repair
