@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.14.1-persistent-cart-fix";
+const CACHE="printbook-v5.15.0-multi-quote";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{

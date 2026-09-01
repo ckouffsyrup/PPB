@@ -584,7 +584,7 @@ body.public-visitor #orderDialog{display:none!important}
           <label>Customer<input id="orderCustomer" placeholder="Name / nickname" /></label>
           <label>Customer email<input id="orderCustomerEmail" type="email" placeholder="customer@example.com" /></label>
           <label>Status<select id="orderStatus"><option>Requested</option><option>Quoted</option><option>Accepted</option><option>Approved</option><option>Printing</option><option>Ready</option><option>Completed</option><option>Cancelled</option></select></label>
-          <div class="full order-line-items-panel hidden" id="orderLineItemsPanel"><div class="order-line-items-head"><span>ORDER ITEMS</span><small>Submitted together by the customer</small></div><div id="orderLineItemsList" class="order-line-items-list"></div></div>
+          <div class="full order-line-items-panel hidden" id="orderLineItemsPanel"><div class="order-line-items-head"><div><span>ORDER ITEMS</span><small>Set each item's price. The quote total updates automatically.</small></div><button type="button" class="secondary small" id="resetLineItemPricesBtn" onclick="resetLineItemPricesToEstimate()">Reset estimates</button></div><div id="orderLineItemsList" class="order-line-items-list"></div><div class="order-line-items-quote-summary"><span>Items subtotal</span><strong id="orderLineItemsQuoteTotal">$0.00</strong></div></div>
           <label class="full">What they want<input id="orderItem" placeholder="Blue + black articulated dragon" /></label>
           <label>Quantity<input id="orderQty" type="number" min="1" value="1" /></label>
           <label>Quoted price<div class="money-input"><span>$</span><input id="orderPrice" type="number" min="0" step="0.01" /></div></label>
