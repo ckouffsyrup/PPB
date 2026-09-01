@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.18.4-customer-quote-card";
+const CACHE="printbook-v5.18.5-payment-method-display";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./cart-edit.js","./quote-restore.js","./customer-quote-card.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{
@@ -24,26 +24,20 @@ self.addEventListener("activate",event=>{
 });
 
 async function buildCombinedAppResponse(request){
-  const cartAddonUrl=new URL("./cart-edit.js",self.registration.scope).href;
-  const quoteAddonUrl=new URL("./quote-restore.js",self.registration.scope).href;
-  const customerQuoteAddonUrl=new URL("./customer-quote-card.js",self.registration.scope).href;
+  const addonUrls=["./cart-edit.js","./quote-restore.js","./customer-quote-card.js"].map(x=>new URL(x,self.registration.scope).href);
   try{
-    const [core,cartAddon,quoteAddon,customerQuoteAddon]=await Promise.all([
+    const responses=await Promise.all([
       fetch(new Request(request,{cache:"no-store"})),
-      fetch(new Request(cartAddonUrl,{cache:"no-store"})),
-      fetch(new Request(quoteAddonUrl,{cache:"no-store"})),
-      fetch(new Request(customerQuoteAddonUrl,{cache:"no-store"}))
+      ...addonUrls.map(url=>fetch(new Request(url,{cache:"no-store"})))
     ]);
+    const core=responses.shift();
     if(!core.ok)return core;
     const pieces=[await core.text()];
-    if(cartAddon.ok)pieces.push(await cartAddon.text());
-    if(quoteAddon.ok)pieces.push(await quoteAddon.text());
-    if(customerQuoteAddon.ok)pieces.push(await customerQuoteAddon.text());
+    for(const addon of responses)if(addon.ok)pieces.push(await addon.text());
     const source=pieces.join("\n;\n");
     const headers=new Headers(core.headers);
     headers.set("Content-Type","application/javascript; charset=utf-8");
-    headers.delete("Content-Length");
-    headers.delete("content-length");
+    headers.delete("Content-Length");headers.delete("content-length");
     const combined=new Response(source,{status:core.status,statusText:core.statusText,headers});
     const cache=await caches.open(CACHE);
     cache.put(request,combined.clone()).catch(()=>{});
@@ -67,9 +61,7 @@ self.addEventListener("fetch",event=>{
         cache.put("./index.html",fresh.clone()).catch(()=>{});
         return fresh;
       }catch{
-        return (await caches.match(event.request))||
-               (await caches.match("./index.html"))||
-               new Response("PrintBook is offline.",{status:503,headers:{"Content-Type":"text/plain"}});
+        return (await caches.match(event.request))||(await caches.match("./index.html"))||new Response("PrintBook is offline.",{status:503,headers:{"Content-Type":"text/plain"}});
       }
     })());
     return;
@@ -85,10 +77,7 @@ self.addEventListener("fetch",event=>{
     if(critical){
       try{
         const fresh=await fetch(new Request(event.request,{cache:"no-store"}));
-        if(fresh.ok){
-          const cache=await caches.open(CACHE);
-          cache.put(event.request,fresh.clone()).catch(()=>{});
-        }
+        if(fresh.ok){const cache=await caches.open(CACHE);cache.put(event.request,fresh.clone()).catch(()=>{})}
         return fresh;
       }catch{
         const cached=await caches.match(event.request,{ignoreSearch:true});
@@ -99,14 +88,9 @@ self.addEventListener("fetch",event=>{
     if(cached)return cached;
     try{
       const fresh=await fetch(event.request);
-      if(fresh.ok){
-        const cache=await caches.open(CACHE);
-        cache.put(event.request,fresh.clone()).catch(()=>{});
-      }
+      if(fresh.ok){const cache=await caches.open(CACHE);cache.put(event.request,fresh.clone()).catch(()=>{})}
       return fresh;
-    }catch{
-      return new Response("",{status:504,statusText:"Offline"});
-    }
+    }catch{return new Response("",{status:504,statusText:"Offline"})}
   })());
 });
 
@@ -116,11 +100,8 @@ self.addEventListener("push",event=>{
   catch{try{payload.body=event.data.text()}catch{}}
   const url=new URL(payload.url||"./",self.registration.scope).href;
   event.waitUntil(self.registration.showNotification(payload.title||"PrintBook",{
-    body:payload.body||"",
-    icon:new URL("./assets/icon-180.png",self.registration.scope).href,
-    badge:new URL("./assets/icon-180.png",self.registration.scope).href,
-    tag:payload.tag||"printbook",renotify:payload.renotify!==false,
-    requireInteraction:payload.requireInteraction===true,
+    body:payload.body||"",icon:new URL("./assets/icon-180.png",self.registration.scope).href,badge:new URL("./assets/icon-180.png",self.registration.scope).href,
+    tag:payload.tag||"printbook",renotify:payload.renotify!==false,requireInteraction:payload.requireInteraction===true,
     data:{url,order_id:payload.order_id||null,type:payload.type||"general"}
   }));
 });
@@ -131,10 +112,7 @@ self.addEventListener("notificationclick",event=>{
   event.waitUntil((async()=>{
     const windows=await clients.matchAll({type:"window",includeUncontrolled:true});
     for(const client of windows){
-      if("focus" in client){
-        try{if("navigate" in client)await client.navigate(target)}catch{}
-        return client.focus();
-      }
+      if("focus" in client){try{if("navigate" in client)await client.navigate(target)}catch{}return client.focus()}
     }
     return clients.openWindow(target);
   })());
