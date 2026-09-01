@@ -877,6 +877,7 @@ body.public-visitor #orderDialog{display:none!important}
         <div><small>STATUS</small><strong id="customerPortalStatus">Requested</strong></div>
         <div class="customer-portal-price"><small>ORDER TOTAL</small><strong id="customerPortalPrice">$0.00</strong></div>
       </div>
+      <section class="customer-status-hero" id="customerPortalStatusHero"><div class="customer-status-hero-copy"><small>WHAT'S HAPPENING</small><strong id="customerPortalStatusHeroTitle">Request received</strong><p id="customerPortalStatusHeroText">Your order request is waiting for review.</p></div><div class="customer-status-meter"><div><span>ORDER PROGRESS</span><strong id="customerPortalStatusPercent">0%</strong></div><div class="customer-status-meter-track"><i id="customerPortalStatusBar"></i></div></div></section>
       <div class="customer-order-progress" id="customerPortalProgress"></div>
       <div class="customer-order-details">
         <div><small>PRINT</small><strong id="customerPortalItem">—</strong></div>
@@ -886,6 +887,7 @@ body.public-visitor #orderDialog{display:none!important}
       </div>
       <div class="customer-portal-line-items hidden" id="customerPortalLineItems"><small>PRINTS IN THIS ORDER</small><div id="customerPortalLineItemsList"></div></div>
       <div class="customer-order-notes hidden" id="customerPortalNotesWrap"><small>ORDER DETAILS</small><div id="customerPortalNotes"></div></div>
+      <section class="customer-order-activity hidden" id="customerPortalActivity"><div class="customer-order-activity-head"><small>ORDER ACTIVITY</small><span>Newest first</span></div><div id="customerPortalActivityList" class="customer-order-activity-list"></div></section>
       <div class="customer-order-payment-box" id="customerPortalPaymentBox">
         <div><small id="customerPortalPaymentHint">PAYMENT</small><strong id="customerPortalPaymentMessage">Waiting for your final quote.</strong></div>
         <button class="primary hidden" id="customerPortalPayBtn" type="button">Open payment link</button>

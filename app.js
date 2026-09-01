@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.15.0";
+window.PRINTBOOK_BUILD="5.16.0";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -1935,12 +1935,19 @@ function showCustomerOrderConfirmation(result,itemName){
   $("customerOrderConfirmationDialog").showModal();
 }
 function customerPaymentLabel(status){return ({unpaid:"Unpaid",deposit_paid:"Deposit paid",paid:"Paid",refunded:"Refunded"})[status]||"Unpaid"}
-function customerOrderProgress(status){
-  const steps=["Requested","Quoted","Accepted","Approved","Printing","Ready","Completed"];
-  const current=Math.max(0,steps.indexOf(status));
-  if(status==="Cancelled")return `<div class="customer-order-cancelled">Order cancelled</div>`;
-  return steps.map((step,i)=>`<div class="customer-order-progress-step ${i<=current?"done":""} ${i===current?"current":""}"><i></i><span>${safe(step)}</span></div>`).join("")
+const CUSTOMER_ORDER_STEPS=["Requested","Quoted","Accepted","Approved","Printing","Ready","Completed"];
+const CUSTOMER_STATUS_COPY={Requested:["Request received","Your order request is waiting for review."],Quoted:["Quote ready","Your final price is ready to review."],Accepted:["Quote accepted","Your quote was accepted and the order is moving forward."],Approved:["Order approved","Everything is confirmed and your print is in the production queue."],Printing:["Printing now","Your order is actively being made."],Ready:["Ready for you","Your order is finished and ready for pickup or delivery."],Completed:["Order complete","This order has been completed. Thank you!"],Cancelled:["Order cancelled","This order is no longer active."]};
+function customerOrderProgress(status){const current=Math.max(0,CUSTOMER_ORDER_STEPS.indexOf(status));if(status==="Cancelled")return `<div class="customer-order-cancelled">Order cancelled</div>`;return CUSTOMER_ORDER_STEPS.map((step,i)=>`<div class="customer-order-progress-step ${i<=current?"done":""} ${i===current?"current":""}"><i></i><span>${safe(step)}</span></div>`).join("")}
+function customerStatusMeta(status){const copy=CUSTOMER_STATUS_COPY[status]||[status||"Order update","Check back for the latest progress."];const index=CUSTOMER_ORDER_STEPS.indexOf(status);return {title:copy[0],detail:copy[1],percent:status==="Cancelled"?0:index<0?0:Math.round((index/(CUSTOMER_ORDER_STEPS.length-1))*100)}}
+function customerOrderActivity(o){
+  const rows=[];
+  const history=Array.isArray(o.status_history)?o.status_history:Array.isArray(o.history)?o.history:[];
+  history.forEach(x=>{if(!x)return;rows.push({status:x.status||x.label||"Update",at:x.at||x.created_at||x.updated_at||"",detail:x.detail||x.note||""})});
+  if(!rows.length){rows.push({status:"Requested",at:o.created_at||"",detail:"Order request submitted"});if(o.status&&o.status!=="Requested")rows.push({status:o.status,at:o.updated_at||"",detail:CUSTOMER_STATUS_COPY[o.status]?.[1]||"Order updated"})}
+  return rows.sort((a,b)=>String(b.at||"").localeCompare(String(a.at||""))).slice(0,8)
 }
+function renderCustomerOrderActivity(o){const wrap=$("customerPortalActivity"),list=$("customerPortalActivityList");if(!wrap||!list)return;const rows=customerOrderActivity(o);wrap.classList.toggle("hidden",!rows.length);list.innerHTML=rows.map((x,i)=>`<div class="customer-activity-row ${i===0?"latest":""}"><i></i><div><strong>${safe(x.status)}</strong><small>${safe(x.detail||"")}</small></div><time>${x.at?safe(new Date(x.at).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})):""}</time></div>`).join("")}
+
 function renderCustomerPortalOrder(o){
   $("customerPortalNumber").textContent=o.order_number||"—";
   $("customerPortalStatus").textContent=o.status||"Requested";
@@ -1951,6 +1958,9 @@ function renderCustomerPortalOrder(o){
   $("customerPortalPayment").textContent=customerPaymentLabel(o.payment_status);
   $("customerPortalDue").textContent=o.due_date||"Not set";
   $("customerPortalProgress").innerHTML=customerOrderProgress(o.status);
+  const statusMeta=customerStatusMeta(o.status),hero=$("customerPortalStatusHero");
+  if(hero){hero.classList.toggle("cancelled",o.status==="Cancelled");$("customerPortalStatusHeroTitle").textContent=statusMeta.title;$("customerPortalStatusHeroText").textContent=statusMeta.detail;$("customerPortalStatusBar").style.width=`${statusMeta.percent}%`;$("customerPortalStatusPercent").textContent=o.status==="Cancelled"?"—":`${statusMeta.percent}%`}
+  renderCustomerOrderActivity(o);
   const rawNotes=Array.isArray(o.notes)?o.notes.filter(Boolean):[];
   const paymentNote=rawNotes.find(n=>String(n).trim().toLowerCase().startsWith(PAYMENT_NOTE_PREFIX.toLowerCase()));
   const paymentInstructions=paymentNote?String(paymentNote).slice(String(paymentNote).indexOf(":")+1).trim():"";
