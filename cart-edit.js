@@ -1,4 +1,4 @@
-/* PrintBook 5.18.1 — customer cart editing, durable payment methods, simpler no-quote order flow. */
+/* PrintBook 5.18.2 — customer cart editing, durable payment methods, simpler order flow. */
 (() => {
   let editingCustomerCartId = null;
 
@@ -143,7 +143,6 @@
 
   $("requestPrintDialog")?.addEventListener("close", () => resetCustomerCartEditState());
 
-  /* Payment methods: cloud is authoritative, local storage is a repair cache. */
   function paymentMethodsHaveData(methods){
     return !!methods && typeof methods === "object" && Object.values(methods).some(v => v && (v.enabled || String(v.detail || "").trim()));
   }
@@ -161,20 +160,14 @@
     const local = normalizedPaymentMethods(settings?.paymentMethods || {});
     if(!supabaseClient || !currentUser) return activePaymentMethods();
     try{
-      const {data,error} = await supabaseClient
-        .from("store_settings")
-        .select("payment_methods")
-        .eq("user_id", currentUser.id)
-        .maybeSingle();
+      const {data,error} = await supabaseClient.from("store_settings").select("payment_methods").eq("user_id", currentUser.id).maybeSingle();
       if(error) throw error;
 
       const cloudRaw = data?.payment_methods || {};
       if(paymentMethodsHaveData(cloudRaw)) return cachePaymentMethods(cloudRaw);
 
       if(paymentMethodsHaveData(local)){
-        const {error:repairError} = await supabaseClient
-          .from("store_settings")
-          .upsert({user_id:currentUser.id,payment_methods:local,updated_at:nowISO()});
+        const {error:repairError} = await supabaseClient.from("store_settings").upsert({user_id:currentUser.id,payment_methods:local,updated_at:nowISO()});
         if(repairError) throw repairError;
         return cachePaymentMethods(local);
       }
@@ -201,9 +194,7 @@
     const old = btn?.textContent || "Save payment methods";
     if(btn){btn.disabled=true;btn.textContent="Saving…";}
     try{
-      const {error} = await supabaseClient
-        .from("store_settings")
-        .upsert({user_id:currentUser.id,payment_methods,updated_at:nowISO()});
+      const {error} = await supabaseClient.from("store_settings").upsert({user_id:currentUser.id,payment_methods,updated_at:nowISO()});
       if(error) throw error;
 
       paymentMethodsCloudLoaded = false;
@@ -222,7 +213,6 @@
     }
   };
 
-  /* Quotes are now removed from the normal flow: Request -> Approved -> Printing -> Ready. */
   function simplifyOrderStatusUI(){
     const status = $("orderStatus");
     if(status){
@@ -230,6 +220,12 @@
         if(option.value === "Quoted" || option.value === "Accepted") option.remove();
       });
       if(status.value === "Quoted" || status.value === "Accepted") status.value = "Approved";
+    }
+
+    document.querySelectorAll('#orderFilter [data-status="Quoted"], #orderFilter [data-status="Approved"]').forEach(button => button.remove());
+    if(orderStatusFilter === "Quoted" || orderStatusFilter === "Approved"){
+      orderStatusFilter = "";
+      document.querySelectorAll("#orderFilter button").forEach(button => button.classList.toggle("active", button.dataset.status === ""));
     }
 
     const price = $("orderPrice")?.closest("label");
@@ -269,50 +265,15 @@
 
   const style = document.createElement("style");
   style.textContent = `
-    .customer-cart-line-price{
-      display:grid!important;
-      grid-template-columns:1fr 1fr;
-      gap:10px 12px!important;
-      min-width:180px;
-      align-items:center;
-    }
-    .customer-cart-line-price>strong{
-      grid-column:1/-1;
-      text-align:right;
-      margin-bottom:2px;
-      font-size:1.05rem;
-    }
-    .customer-cart-line-price button{
-      min-height:44px!important;
-      min-width:78px;
-      padding:10px 14px!important;
-      border-radius:12px!important;
-      font-weight:850!important;
-      font-size:.9rem!important;
-      border:1px solid rgba(255,255,255,.12)!important;
-    }
-    .customer-cart-line-price .customer-cart-edit-btn{
-      color:#fff!important;
-      background:color-mix(in srgb,var(--store-accent,#8b5cf6) 28%,#18131f)!important;
-      border-color:color-mix(in srgb,var(--store-accent,#8b5cf6) 55%,transparent)!important;
-    }
-    .customer-cart-line-price .customer-cart-remove-btn{
-      color:#ffb3bc!important;
-      background:rgba(255,80,105,.11)!important;
-      border-color:rgba(255,105,125,.28)!important;
-    }
-    @media(max-width:560px){
-      .customer-cart-line-price{
-        grid-column:1/-1;
-        width:100%;
-        min-width:0;
-      }
-      .customer-cart-line-price>strong{text-align:left;}
-      .customer-cart-line-price button{width:100%;}
-    }
+    .customer-cart-line-price{display:grid!important;grid-template-columns:1fr 1fr;gap:10px 12px!important;min-width:180px;align-items:center;}
+    .customer-cart-line-price>strong{grid-column:1/-1;text-align:right;margin-bottom:2px;font-size:1.05rem;}
+    .customer-cart-line-price button{min-height:44px!important;min-width:78px;padding:10px 14px!important;border-radius:12px!important;font-weight:850!important;font-size:.9rem!important;border:1px solid rgba(255,255,255,.12)!important;}
+    .customer-cart-line-price .customer-cart-edit-btn{color:#fff!important;background:color-mix(in srgb,var(--store-accent,#8b5cf6) 28%,#18131f)!important;border-color:color-mix(in srgb,var(--store-accent,#8b5cf6) 55%,transparent)!important;}
+    .customer-cart-line-price .customer-cart-remove-btn{color:#ffb3bc!important;background:rgba(255,80,105,.11)!important;border-color:rgba(255,105,125,.28)!important;}
+    @media(max-width:560px){.customer-cart-line-price{grid-column:1/-1;width:100%;min-width:0;}.customer-cart-line-price>strong{text-align:left;}.customer-cart-line-price button{width:100%;}}
   `;
   document.head.appendChild(style);
 
-  window.PRINTBOOK_BUILD = "5.18.1";
+  window.PRINTBOOK_BUILD = "5.18.2";
   renderCustomerOrderCart();
 })();
