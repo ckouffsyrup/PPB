@@ -2,40 +2,27 @@ from pathlib import Path
 import re
 
 app=Path('app.js'); s=app.read_text()
-# defaults + store availability payment_methods
 s=s.replace('''  customerModePin:""\n};''','''  customerModePin:"",paymentMethods:{}\n};''',1)
 s=s.replace('''hero_url:""};''','''hero_url:"",payment_methods:{}};''',1)
-
-# helpers near payment prefix
 needle='''const PAYMENT_NOTE_PREFIX="Payment instructions:";'''
 insert='''const PAYMENT_NOTE_PREFIX="Payment instructions:";
-const PAYMENT_METHOD_DEFS={
-  cashapp:{label:"Cash App",placeholder:"$YourCashtag"},
-  venmo:{label:"Venmo",placeholder:"@YourVenmo"},
-  zelle:{label:"Zelle",placeholder:"Email or phone"},
-  cash:{label:"Cash at pickup",placeholder:"Optional note"}
-};
+const PAYMENT_METHOD_DEFS={cashapp:{label:"Cash App",placeholder:"$YourCashtag"},venmo:{label:"Venmo",placeholder:"@YourVenmo"},zelle:{label:"Zelle",placeholder:"Email or phone"},cash:{label:"Cash at pickup",placeholder:"Optional note"}};
 function normalizedPaymentMethods(raw={}){const out={};for(const [key,def] of Object.entries(PAYMENT_METHOD_DEFS)){const v=raw?.[key]||{};out[key]={enabled:!!v.enabled,detail:String(v.detail||"").trim(),label:def.label}}return out}
 function activePaymentMethods(){return normalizedPaymentMethods(storeAvailability.payment_methods||settings.paymentMethods||{})}
-function paymentMethodInstructions(keys=[]){const methods=activePaymentMethods();return keys.filter(k=>methods[k]?.enabled).map(k=>{const m=methods[k];if(k==="cash")return m.detail?`${m.label} — ${m.detail}`:m.label;return m.detail?`${m.label} — ${m.detail}`:m.label}).join("\n")}
+function paymentMethodInstructions(keys=[]){const methods=activePaymentMethods();return keys.filter(k=>methods[k]?.enabled).map(k=>{const m=methods[k];return m.detail?`${m.label} — ${m.detail}`:m.label}).join("\n")}
 function renderOrderPaymentMethodChoices(selected=[]){const wrap=$("orderPaymentMethodChoices");if(!wrap)return;const methods=activePaymentMethods(),picked=new Set(selected||[]);wrap.innerHTML=Object.entries(methods).filter(([,m])=>m.enabled).map(([key,m])=>`<label class="quote-payment-choice"><input type="checkbox" value="${key}" ${picked.has(key)?"checked":""}><span><strong>${safe(m.label)}</strong><small>${safe(m.detail||"Available")}</small></span></label>`).join("")||`<div class="muted tiny-note">No payment methods are enabled yet. Add them in Settings → Storefront.</div>`;wrap.querySelectorAll('input[type="checkbox"]').forEach(i=>i.onchange=syncOrderPaymentInstructionsFromChoices);syncOrderPaymentInstructionsFromChoices()}
 function selectedOrderPaymentMethods(){return [...document.querySelectorAll('#orderPaymentMethodChoices input[type="checkbox"]:checked')].map(i=>i.value)}
 function syncOrderPaymentInstructionsFromChoices(){const selected=selectedOrderPaymentMethods(),generated=paymentMethodInstructions(selected),box=$("orderPaymentInstructions");if(box)box.value=generated;const preview=$("orderPaymentInstructionsPreview");if(preview)preview.textContent=generated||"No payment method selected"}
 '''
 if needle not in s: raise SystemExit('payment prefix not found')
 s=s.replace(needle,insert,1)
-
-# load store settings select + hydration
 s=s.replace('''featured_product_ids").eq("user_id"''','''featured_product_ids,payment_methods").eq("user_id"''',1)
 s=s.replace('''hero_url:d.storefront_hero_url||"",featured_product_ids:''','''hero_url:d.storefront_hero_url||"",payment_methods:normalizedPaymentMethods(d.payment_methods||{}),featured_product_ids:''',1)
-# fill payment inputs after branding inputs
 marker='''  if($("storeHeroUrlInput"))$("storeHeroUrlInput").value=storeAvailability.hero_url;'''
 addition='''  if($("storeHeroUrlInput"))$("storeHeroUrlInput").value=storeAvailability.hero_url;
   const pm=activePaymentMethods();for(const key of Object.keys(PAYMENT_METHOD_DEFS)){const en=$(`payment_${key}_enabled`),detail=$(`payment_${key}_detail`);if(en)en.checked=!!pm[key]?.enabled;if(detail)detail.value=pm[key]?.detail||""}'''
 if marker not in s: raise SystemExit('store hero marker not found')
 s=s.replace(marker,addition,1)
-
-# add saver before availability saver
 marker='''async function saveStoreAvailability(){'''
 saver='''async function savePaymentMethods(){
   if(!supabaseClient||!currentUser)return toast("Sign in to save payment methods");
@@ -49,38 +36,26 @@ saver='''async function savePaymentMethods(){
 async function saveStoreAvailability(){'''
 if marker not in s: raise SystemExit('availability saver not found')
 s=s.replace(marker,saver,1)
-
-# reset/open order choices
-s=s.replace('''resetOrder(){editingOrderId=null;''','''resetOrder(){editingOrderId=null;''',1)
-# append rendering into reset just before buttons update
 s=s.replace('''if($("orderNotesSection"))$("orderNotesSection").open=false;updateOrderPaymentButtons();updateOrderEditorSummary()}''','''if($("orderNotesSection"))$("orderNotesSection").open=false;renderOrderPaymentMethodChoices([]);updateOrderPaymentButtons();updateOrderEditorSummary()}''',1)
-# in open order after payment instructions set, render selected methods
 open_marker='''$("orderPaymentInstructions").value=o.payment_instructions||paymentParts.instructions||"";$("orderPaymentStatus")'''
 open_repl='''$("orderPaymentInstructions").value=o.payment_instructions||paymentParts.instructions||"";renderOrderPaymentMethodChoices(Array.isArray(o.payment_methods_selected)?o.payment_methods_selected:[]);$("orderPaymentStatus")'''
 if open_marker not in s: raise SystemExit('open order payment marker not found')
 s=s.replace(open_marker,open_repl,1)
-# new order default to all enabled methods
 s=s.replace('''}else{$("orderTitle").textContent="New order";renderOrderLineItemsPanel(null);renderCustomerHistory()}''','''}else{$("orderTitle").textContent="New order";renderOrderPaymentMethodChoices(Object.entries(activePaymentMethods()).filter(([,m])=>m.enabled).map(([k])=>k));renderOrderLineItemsPanel(null);renderCustomerHistory()}''',1)
-# save selected + compiled instructions
 s=s.replace('''payment_method:$("orderPaymentMethod").value||null,payment_instructions:$("orderPaymentInstructions").value.trim()||null,''','''payment_method:$("orderPaymentMethod").value||null,payment_methods_selected:selectedOrderPaymentMethods(),payment_instructions:paymentMethodInstructions(selectedOrderPaymentMethods())||$("orderPaymentInstructions").value.trim()||null,''',1)
-
-# bind button near generic event bindings by direct delegated safe listener
 s += '''\n// v5.17 payment methods settings\ndocument.addEventListener("click",e=>{if(e.target?.id==="savePaymentMethodsBtn"){e.preventDefault();savePaymentMethods()}});\n'''
-s=re.sub(r'window\.PRINTBOOK_BUILD="[^"]+";','window.PRINTBOOK_BUILD="5.17.0";',s,count=1)
-app.write_text(s)
+s=re.sub(r'window\.PRINTBOOK_BUILD="[^"]+";','window.PRINTBOOK_BUILD="5.17.0";',s,count=1);app.write_text(s)
 
 html=Path('index.html'); h=html.read_text()
-# replace payment instructions textarea block in order dialog with choices + preview hidden textarea kept for compatibility
 old='''          <label class="full">How should they pay?<textarea id="orderPaymentInstructions" placeholder="Example: Cash App — $YourCashtag"></textarea></label>
           <p class="full muted tiny-note">Shown in the customer portal with their order total and KP order number reminder.</p>'''
 new='''          <div class="full order-payment-method-picker"><div class="order-payment-picker-head"><strong>Payment options for this quote</strong><small>Choose from the methods saved in Settings → Storefront.</small></div><div id="orderPaymentMethodChoices" class="quote-payment-choices"></div><div class="order-payment-preview"><small>CUSTOMER WILL SEE</small><span id="orderPaymentInstructionsPreview">No payment method selected</span></div><textarea id="orderPaymentInstructions" class="hidden" aria-hidden="true"></textarea></div>
           <p class="full muted tiny-note">These instructions are included with the quote and shown in the customer's private order page.</p>'''
 if old not in h: raise SystemExit('order payment html not found')
 h=h.replace(old,new,1)
-# insert storefront payment section before availability section by marker
 marker='''    <section class="settings-section">
       <div class="section-heading">
-        <div><h3>Store availability</h3>'''
+        <div><h3>Store Availability</h3>'''
 payment='''    <section class="settings-section payment-methods-settings">
       <div class="section-heading"><div><h3>Payment Methods</h3><p class="muted">Enter these once, then choose which ones to include on each quote.</p></div></div>
       <div class="payment-method-settings-list">
