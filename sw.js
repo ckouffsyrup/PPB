@@ -1,4 +1,4 @@
-const CACHE="printbook-v5.17.2-payment-method-persistence";
+const CACHE="printbook-v5.17.3-payment-method-persist";
 const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./store-qr.png"];
 
 self.addEventListener("install",event=>{

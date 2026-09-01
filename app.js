@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.17.2";
+window.PRINTBOOK_BUILD="5.17.3";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -1563,6 +1563,23 @@ function activePaymentMethods(){
   const localHasData=local&&typeof local==="object"&&Object.values(local).some(v=>v&&(v.enabled||String(v.detail||"").trim()));
   return normalizedPaymentMethods(cloudHasData?cloud:(localHasData?local:(cloud||local||{})));
 }
+let paymentMethodsCloudLoaded=false;
+async function ensurePaymentMethodsLoaded(){
+  if(paymentMethodsCloudLoaded||!supabaseClient||!currentUser)return activePaymentMethods();
+  try{
+    const {data,error}=await supabaseClient.from("store_settings").select("payment_methods").eq("user_id",currentUser.id).maybeSingle();
+    if(error)throw error;
+    const normalized=normalizedPaymentMethods(data?.payment_methods||{});
+    storeAvailability={...storeAvailability,payment_methods:normalized};
+    settings.paymentMethods=normalized;
+    localStorage.setItem(K.settings,JSON.stringify(settings));
+    paymentMethodsCloudLoaded=true;
+    return normalized;
+  }catch(err){
+    console.error("Payment methods load failed",err);
+    return activePaymentMethods();
+  }
+}
 function paymentMethodInstructions(keys=[]){const methods=activePaymentMethods();return keys.filter(k=>methods[k]?.enabled).map(k=>{const m=methods[k];return m.detail?`${m.label} — ${m.detail}`:m.label}).join("\n")}
 function renderOrderPaymentMethodChoices(selected=[]){const wrap=$("orderPaymentMethodChoices");if(!wrap)return;const methods=activePaymentMethods(),picked=new Set(selected||[]);wrap.innerHTML=Object.entries(methods).filter(([,m])=>m.enabled).map(([key,m])=>`<label class="quote-payment-choice"><input type="checkbox" value="${key}" ${picked.has(key)?"checked":""}><span><strong>${safe(m.label)}</strong><small>${safe(m.detail||"Available")}</small></span></label>`).join("")||`<div class="muted tiny-note">No payment methods are enabled yet. Add them in Settings → Storefront.</div>`;wrap.querySelectorAll('input[type="checkbox"]').forEach(i=>i.onchange=syncOrderPaymentInstructionsFromChoices);syncOrderPaymentInstructionsFromChoices()}
 function selectedOrderPaymentMethods(){return [...document.querySelectorAll('#orderPaymentMethodChoices input[type="checkbox"]:checked')].map(i=>i.value)}
@@ -1598,12 +1615,13 @@ function updateOrderEditorSummary(){
   }
 }
 function updateOrderPaymentButtons(){const quote=Math.max(0,Number($("orderPrice")?.value||0)),paid=Math.max(0,Number($("orderPaymentAmount")?.value||0)),deposit=Math.max(0,Number($("orderDepositAmount")?.value||0)),remaining=Math.max(0,quote-paid),createBtn=$("createPaymentLinkBtn"),copyBtn=$("copyPaymentLinkBtn");if(createBtn){const needsDeposit=deposit>paid;createBtn.textContent=needsDeposit?`Create deposit link (${money(Math.max(0,Math.min(quote,deposit)-paid))})`:`Create payment link (${money(remaining)})`;createBtn.disabled=!editingOrderId||remaining<=0}if(copyBtn)copyBtn.disabled=!$("orderPaymentLink")?.value;if($("markOrderPaidBtn"))$("markOrderPaidBtn").disabled=!editingOrderId||quote<=0||paid>=quote}
-window.openOrder=id=>{
+window.openOrder=async id=>{
   if(publicVisitorMode||customerMode||!currentUser){
     const d=$("orderDialog");
     if(d?.open){try{d.close()}catch{}}
     return;
   }
+  await ensurePaymentMethodsLoaded();
   resetOrder();populatePrintSelects();if(id){const o=orders.find(x=>x.id===id);if(!o)return;const paymentParts=splitOrderPaymentInstructions(o.notes);editingOrderId=id;$("orderTitle").textContent="Edit order";$("orderCustomer").value=o.customer||"";$("orderCustomerEmail").value=o.customer_email||"";$("orderStatus").value=o.status||"Requested";$("orderItem").value=o.item||"";$("orderQty").value=o.quantity||1;$("orderPrice").value=o.quoted_price??"";$("orderDue").value=o.due_date||"";$("orderPrint").value=o.print_id||"";{const linked=items.find(i=>i.id===o.print_id),inferred=orderVariantForReservation(o,linked);populateOrderVariants(o.variant_id||inferred?.id||"")}$("orderNotes").value=paymentParts.cleanNotes;$("orderPaymentInstructions").value=o.payment_instructions||paymentParts.instructions||"";renderOrderPaymentMethodChoices(Array.isArray(o.payment_methods_selected)?o.payment_methods_selected:[]);$("orderPaymentStatus").value=o.payment_status||"unpaid";$("orderPaymentAmount").value=Number(o.payment_amount||0);$("orderDepositAmount").value=Number(o.deposit_amount||0);$("orderPaymentMethod").value=o.payment_method==="Stripe"?"":(o.payment_method||"");$("orderPaymentLink").value=o.payment_link||"";$("deleteOrderBtn").style.visibility="visible";updateOrderPaymentButtons();updateOrderEditorSummary();renderOrderLineItemsPanel(o);renderCustomerHistory()}else{$("orderTitle").textContent="New order";renderOrderPaymentMethodChoices(Object.entries(activePaymentMethods()).filter(([,m])=>m.enabled).map(([k])=>k));renderOrderLineItemsPanel(null);renderCustomerHistory()}$("orderDialog").showModal()}
 async function saveOrder(){if(!requireOnlineAdminSave())return;
   const item=$("orderItem").value.trim();if(!item)return toast("Describe the order");
@@ -2699,7 +2717,7 @@ async function loadStoreAvailabilitySettings(){
   $("storeAutoPauseInput").checked=!!d.auto_pause_at_capacity;
   $("storeAvailabilityBadge").textContent=(d.availability_status||"open").toUpperCase();
   storeAvailability={...storeAvailability,status:d.availability_status||"open",turnaround:d.turnaround_text||"3–5 days",notice:d.storefront_notice||"",reopen_date:d.reopen_date||null,capacity_limit:d.capacity_limit||null,auto_pause_at_capacity:!!d.auto_pause_at_capacity,store_name:d.store_name||"Karcen's Prints",tagline:d.storefront_tagline||"Made layer by layer.",about:d.storefront_about||"",accent_color:normalizeStoreAccent(d.storefront_accent),logo_url:d.storefront_logo_url||"",hero_url:d.storefront_hero_url||"",payment_methods:normalizedPaymentMethods(d.payment_methods||{}),featured_product_ids:normalizeFeaturedProductIds(d.featured_product_ids)};
-  settings.paymentMethods=storeAvailability.payment_methods;localStorage.setItem(K.settings,JSON.stringify(settings));
+  settings.paymentMethods=storeAvailability.payment_methods;paymentMethodsCloudLoaded=true;localStorage.setItem(K.settings,JSON.stringify(settings));
   featuredProductIds=normalizeFeaturedProductIds(d.featured_product_ids);
   if($("storeNameInput"))$("storeNameInput").value=storeAvailability.store_name;
   if($("storeTaglineInput"))$("storeTaglineInput").value=storeAvailability.tagline;
@@ -2744,7 +2762,7 @@ async function savePaymentMethods(){
   if(!supabaseClient||!currentUser)return toast("Sign in to save payment methods");
   const payment_methods={};for(const key of Object.keys(PAYMENT_METHOD_DEFS)){payment_methods[key]={enabled:!!$(`payment_${key}_enabled`)?.checked,detail:$(`payment_${key}_detail`)?.value.trim()||""}}
   const btn=$("savePaymentMethodsBtn"),old=btn?.textContent||"Save payment methods";if(btn){btn.disabled=true;btn.textContent="Saving…"}
-  try{const {error}=await supabaseClient.from("store_settings").upsert({user_id:currentUser.id,payment_methods,updated_at:nowISO()});if(error)throw error;storeAvailability={...storeAvailability,payment_methods:normalizedPaymentMethods(payment_methods)};settings.paymentMethods=storeAvailability.payment_methods;localStorage.setItem(K.settings,JSON.stringify(settings));if($("orderDialog")?.open)renderOrderPaymentMethodChoices(selectedOrderPaymentMethods());toast("Payment methods saved")}
+  try{const {error}=await supabaseClient.from("store_settings").upsert({user_id:currentUser.id,payment_methods,updated_at:nowISO()});if(error)throw error;storeAvailability={...storeAvailability,payment_methods:normalizedPaymentMethods(payment_methods)};settings.paymentMethods=storeAvailability.payment_methods;paymentMethodsCloudLoaded=true;localStorage.setItem(K.settings,JSON.stringify(settings));if($("orderDialog")?.open)renderOrderPaymentMethodChoices(selectedOrderPaymentMethods());toast("Payment methods saved")}
   catch(err){console.error(err);toast(err?.message||"Couldn't save payment methods")}
   finally{if(btn){btn.disabled=false;btn.textContent=old}}
 }
