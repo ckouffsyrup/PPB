@@ -1,10 +1,51 @@
-/* PrintBook 5.18.4 — make ready quotes impossible to miss in My Order. */
+/* PrintBook 5.18.5 — make ready quotes impossible to miss and show every selected payment method. */
 (() => {
-  function quotePaymentText(order){
-    if(order?.payment_instructions) return String(order.payment_instructions).trim();
-    const rawNotes=Array.isArray(order?.notes)?order.notes.filter(Boolean):[];
-    const paymentNote=rawNotes.find(n=>String(n).trim().toLowerCase().startsWith(PAYMENT_NOTE_PREFIX.toLowerCase()));
-    return paymentNote?String(paymentNote).slice(String(paymentNote).indexOf(":")+1).trim():"";
+  function paymentMethodSource(order){
+    const orderMethods=order?.payment_methods;
+    if(orderMethods&&typeof orderMethods==="object")return normalizedPaymentMethods(orderMethods);
+    const storeMethods=storeAvailability?.payment_methods;
+    if(storeMethods&&typeof storeMethods==="object")return normalizedPaymentMethods(storeMethods);
+    return activePaymentMethods();
+  }
+
+  function notePaymentText(order){
+    const notes=Array.isArray(order?.notes)
+      ? order.notes.filter(Boolean).map(String)
+      : String(order?.notes||"").split("\n").filter(Boolean);
+    const prefix=PAYMENT_NOTE_PREFIX.toLowerCase();
+    const start=notes.findIndex(n=>n.trim().toLowerCase().startsWith(prefix));
+    if(start<0)return "";
+    const first=notes[start].slice(notes[start].indexOf(":")+1).trim();
+    const following=[];
+    for(let i=start+1;i<notes.length;i++){
+      const line=notes[i].trim();
+      if(!line)continue;
+      // Saved payment instructions can span multiple newline-delimited methods.
+      following.push(line);
+    }
+    return [first,...following].filter(Boolean).join("\n");
+  }
+
+  function quotePaymentLines(order){
+    const selected=Array.isArray(order?.payment_methods_selected)
+      ? order.payment_methods_selected.map(String).filter(Boolean)
+      : [];
+    const methods=paymentMethodSource(order);
+
+    if(selected.length){
+      const rows=selected.map(key=>{
+        const method=methods?.[key];
+        if(!method)return "";
+        const label=method.label||PAYMENT_METHOD_DEFS?.[key]?.label||key;
+        const detail=String(method.detail||"").trim();
+        return detail?`${label} — ${detail}`:label;
+      }).filter(Boolean);
+      if(rows.length)return rows;
+    }
+
+    const direct=String(order?.payment_instructions||"").trim();
+    const fallback=direct||notePaymentText(order);
+    return fallback.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   }
 
   function ensureCustomerQuoteCard(){
@@ -46,11 +87,11 @@
     if(!quoted)return;
 
     $("customerQuoteReadyPrice").textContent=money(order?.quoted_price||0);
-    const payment=quotePaymentText(order);
+    const paymentLines=quotePaymentLines(order);
     const paymentBox=$("customerQuoteReadyPayment");
     if(paymentBox){
-      paymentBox.innerHTML=payment
-        ? payment.split("\n").filter(Boolean).map(line=>`<div>${safe(line)}</div>`).join("")
+      paymentBox.innerHTML=paymentLines.length
+        ? paymentLines.map(line=>`<div class="customer-quote-payment-method"><span>${safe(line)}</span></div>`).join("")
         : `<div class="customer-quote-payment-missing">Payment instructions are being prepared. Check back shortly.</div>`;
     }
 
@@ -86,13 +127,10 @@
   const style=document.createElement("style");
   style.textContent=`
     .customer-quote-ready-card{
-      margin:18px 0 22px;
-      padding:22px;
+      margin:18px 0 22px;padding:22px;
       border:1px solid color-mix(in srgb,var(--store-accent,#8b5cf6) 48%,rgba(255,255,255,.10));
       border-radius:20px;
-      background:
-        radial-gradient(circle at 92% 8%,color-mix(in srgb,var(--store-accent,#8b5cf6) 18%,transparent),transparent 44%),
-        linear-gradient(145deg,#171220,#100d17);
+      background:radial-gradient(circle at 92% 8%,color-mix(in srgb,var(--store-accent,#8b5cf6) 18%,transparent),transparent 44%),linear-gradient(145deg,#171220,#100d17);
       box-shadow:0 18px 48px rgba(0,0,0,.26);
     }
     .customer-quote-ready-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding-bottom:17px;border-bottom:1px solid rgba(255,255,255,.08)}
@@ -102,7 +140,8 @@
     .customer-quote-ready-price small,.customer-quote-ready-payment>small{display:block;color:#92899f;font-size:.68rem;font-weight:900;letter-spacing:.12em}
     .customer-quote-ready-price strong{display:block;margin-top:4px;color:#fff;font-size:2rem;line-height:1;font-weight:950;letter-spacing:-.04em}
     .customer-quote-ready-payment{margin-top:17px;padding:16px;border-radius:15px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
-    #customerQuoteReadyPayment{display:grid;gap:7px;margin-top:9px;color:#f0ebf6;font-size:.95rem;line-height:1.45;font-weight:650;white-space:normal;overflow-wrap:anywhere}
+    #customerQuoteReadyPayment{display:grid;gap:9px;margin-top:9px;color:#f0ebf6;font-size:.95rem;line-height:1.45;font-weight:650;white-space:normal;overflow-wrap:anywhere}
+    .customer-quote-payment-method{padding:10px 12px;border-radius:11px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.065)}
     .customer-quote-payment-missing{color:#aaa2b2;font-weight:550}
     .customer-quote-ready-help{margin:14px 0 0;color:#9e96aa;font-size:.8rem;line-height:1.5}
     .customer-quote-ready-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:17px}
@@ -117,5 +156,5 @@
     }
   `;
   document.head.appendChild(style);
-  window.PRINTBOOK_BUILD="5.18.4";
+  window.PRINTBOOK_BUILD="5.18.5";
 })();
