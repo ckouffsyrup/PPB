@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.13.1";
+window.PRINTBOOK_BUILD="5.14.0";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -109,9 +109,14 @@ let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=nu
 let currentRequestPrintId=null;
 let customerOrderCart=[];
 let customerOrderDraft={customer:"",email:"",contact:"",notes:""};
+function saveCustomerCart(){try{localStorage.setItem(CUSTOMER_CART_KEY,JSON.stringify({cart:customerOrderCart,draft:customerOrderDraft,updated_at:nowISO()}))}catch{}}
+function loadCustomerCart(){try{const d=JSON.parse(localStorage.getItem(CUSTOMER_CART_KEY)||"null");if(d&&Array.isArray(d.cart)){customerOrderCart=d.cart;customerOrderDraft={customer:"",email:"",contact:"",notes:"",...(d.draft||{})}}}catch{}}
+function clearCustomerCart(){customerOrderCart=[];customerOrderDraft={customer:"",email:"",contact:"",notes:""};try{localStorage.removeItem(CUSTOMER_CART_KEY)}catch{}}
+loadCustomerCart();
 const PUBLIC_STOREFRONT_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-storefront";
 const CUSTOMER_ORDERS_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/customer-orders";
 const CUSTOMER_SAVED_ORDERS_KEY="printbook_customer_orders_v1";
+const CUSTOMER_CART_KEY="printbook_customer_cart_v1";
 const PUBLIC_BRANDING_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/store-branding";
 let publicVisitorMode=false;
 let publicStoreLoaded=false;
@@ -938,6 +943,15 @@ function renderColorways(){
   }).join("");
   $("colorwayEmpty").classList.toggle("hidden",!!colorways.length)
 }
+
+
+function customerOrderTimeline(o){const stages=["Requested","Quoted","Accepted","Approved","Printing","Ready","Completed"],cur=Math.max(0,stages.indexOf(o?.status||"Requested"));return `<div class="customer-order-timeline">${stages.map((st,i)=>`<div class="customer-order-step ${i<cur?"done":i===cur?"current":""}"><span>${i<cur?"✓":i+1}</span><small>${safe(st)}</small></div>`).join("")}</div>`}
+function customerLineItemProgress(o){const its=orderLineItems(o);if(its.length<2)return "";return `<div class="customer-item-progress">${its.map(li=>`<div><strong>${safe(li.name||li.item||"Print")}</strong><span>${safe(li.status||o.status||"Requested")}</span></div>`).join("")}</div>`}
+function orderLineItems(o){return Array.isArray(o?.line_items)&&o.line_items.length?o.line_items:[{name:o?.item||"Print",quantity:Number(o?.quantity||1),unit_price:Number(o?.quoted_price||0)/Math.max(1,Number(o?.quantity||1)),line_total:Number(o?.quoted_price||0),variant_name:"",colors:[]}]}
+function lineItemUnitPrice(li){const q=Math.max(1,Number(li?.quantity||1));const raw=li?.unit_price??li?.price??(Number(li?.line_total||0)/q);return Number(raw||0)}
+function lineItemTotal(li){const raw=li?.line_total??(lineItemUnitPrice(li)*Math.max(1,Number(li?.quantity||1)));return Number(raw||0)}
+function orderItemsEmailHtml(o){return `<table style="width:100%;border-collapse:collapse;margin:14px 0"><thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #ddd">Print</th><th style="text-align:center;padding:8px;border-bottom:1px solid #ddd">Qty</th><th style="text-align:right;padding:8px;border-bottom:1px solid #ddd">Price</th></tr></thead><tbody>${orderLineItems(o).map(li=>`<tr><td style="padding:9px 8px;border-bottom:1px solid #eee"><strong>${safe(li.name||li.item||"Print")}</strong>${li.variant_name?`<br><small>${safe(li.variant_name)}</small>`:""}${Array.isArray(li.colors)&&li.colors.length?`<br><small>${safe(li.colors.join(", "))}</small>`:""}</td><td style="text-align:center;padding:9px 8px;border-bottom:1px solid #eee">${Math.max(1,Number(li.quantity||1))}</td><td style="text-align:right;padding:9px 8px;border-bottom:1px solid #eee">${money(lineItemTotal(li))}</td></tr>`).join("")}</tbody></table>`}
+function recalcOrderFromLineItems(o){if(!Array.isArray(o?.line_items)||!o.line_items.length)return o;const total=o.line_items.reduce((a,li)=>a+lineItemTotal(li),0);o.quoted_price=total;return o}
 function orderStatusClass(status){return `status-${String(status||"requested").toLowerCase().replace(/[^a-z]+/g,"-")}`}
 function orderVariantForReservation(o,item){
   if(!item)return null;
@@ -1578,6 +1592,8 @@ async function saveOrder(){if(!requireOnlineAdminSave())return;
   const item=$("orderItem").value.trim();if(!item)return toast("Describe the order");
   const id=editingOrderId||uid(),prev=orders.find(x=>x.id===id)||{},paymentStatus=$("orderPaymentStatus").value||"unpaid",paymentAmount=Math.max(0,Number($("orderPaymentAmount").value||0)),o={id,...(prev.order_number?{order_number:prev.order_number}:{}),customer:$("orderCustomer").value.trim(),customer_email:$("orderCustomerEmail").value.trim().toLowerCase()||null,status:$("orderStatus").value,item,quantity:Number($("orderQty").value||1),quoted_price:Number($("orderPrice").value||0),due_date:$("orderDue").value,print_id:$("orderPrint").value||"",variant_id:$("orderVariant")?.value||null,notes:joinOrderPaymentInstructions($("orderNotes").value,$("orderPaymentInstructions").value),payment_status:paymentStatus,payment_amount:paymentAmount,deposit_amount:Math.max(0,Number($("orderDepositAmount").value||0)),payment_method:$("orderPaymentMethod").value||null,payment_instructions:$("orderPaymentInstructions").value.trim()||null,payment_provider:prev.payment_provider||null,payment_reference:prev.payment_reference||null,paid_at:paymentStatus==="paid"?(prev.paid_at||nowISO()):null,payment_link:prev.payment_link||null,stripe_checkout_session_id:prev.stripe_checkout_session_id||null,stripe_payment_intent_id:prev.stripe_payment_intent_id||null,quote_email_sent_at:prev.quote_email_sent_at||null,customer_accepted_at:prev.customer_accepted_at||null,customer_accepted_price:prev.customer_accepted_price??null,ready_email_sent_at:prev.ready_email_sent_at||null,line_items:Array.isArray(prev.line_items)?prev.line_items:[],created_at:prev.created_at||nowISO(),updated_at:nowISO()};
 
+  recalcOrderFromLineItems(o);
+
   if(o.status==="Approved"&&prev.status!=="Approved"&&!prev.inventory_reserved_at){const check=approvalStockCheck(o);if(!check.ok)return toast(check.message)}
 
   let synced=false;
@@ -1734,6 +1750,7 @@ function customerCartVariantName(line,item){
   return v?.name||"Standard";
 }
 function renderCustomerOrderCart(){
+  saveCustomerCart();
   const list=$("customerCartList"),count=$("customerCartCount"),button=$("customerCartBtn");
   const qty=customerOrderCart.reduce((n,x)=>n+Math.max(1,Number(x.quantity||1)),0);
   const total=customerOrderCart.reduce((n,x)=>n+Number(x.estimated_total||0),0);
