@@ -9,7 +9,7 @@ const nowISO=()=>new Date().toISOString();
 const money=v=>"$"+Number(v||0).toFixed(2).replace(".00","");
 const safe=s=>String(s??"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const $=id=>document.getElementById(id);
-window.PRINTBOOK_BUILD="5.14.0";
+window.PRINTBOOK_BUILD="5.14.1";
 const paymentReturn=new URLSearchParams(location.search).get("payment");
 if(paymentReturn==="success")setTimeout(()=>{toast("Payment completed — syncing order status…");refreshOrdersFromCloud().catch(()=>{})},900);
 else if(paymentReturn==="cancelled")setTimeout(()=>toast("Payment was cancelled"),500);
@@ -107,6 +107,7 @@ let supabaseClient=null,currentUser=null,realtimeChannel=null,realtimeTimer=null
 let syncState="local",lastSyncAt=null,syncMessage="Local only",customerMode=false,currentMakePrintId=null;
 let customerStoreTab="products",customerTitleTapCount=0,customerTitleTapTimer=null;
 let currentRequestPrintId=null;
+const CUSTOMER_CART_KEY="printbook_customer_cart_v1";
 let customerOrderCart=[];
 let customerOrderDraft={customer:"",email:"",contact:"",notes:""};
 function saveCustomerCart(){try{localStorage.setItem(CUSTOMER_CART_KEY,JSON.stringify({cart:customerOrderCart,draft:customerOrderDraft,updated_at:nowISO()}))}catch{}}
@@ -116,7 +117,6 @@ loadCustomerCart();
 const PUBLIC_STOREFRONT_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-storefront";
 const CUSTOMER_ORDERS_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/customer-orders";
 const CUSTOMER_SAVED_ORDERS_KEY="printbook_customer_orders_v1";
-const CUSTOMER_CART_KEY="printbook_customer_cart_v1";
 const PUBLIC_BRANDING_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/store-branding";
 let publicVisitorMode=false;
 let publicStoreLoaded=false;
