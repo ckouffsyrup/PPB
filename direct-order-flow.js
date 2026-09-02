@@ -1,4 +1,4 @@
-/* PrintBook 5.21.0 — direct order flow, no quote stage. */
+/* PrintBook 5.21.1 — direct order flow, no quote stage + centered editor with returning-customer sidecar. */
 (() => {
   const legacyStatus = status => (status === "Quoted" || status === "Accepted") ? "Approved" : (status || "Requested");
 
@@ -198,7 +198,43 @@
 
   const style=document.createElement('style');
   style.textContent=`
-    #orderDialog[open] > .sheet{position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;margin:0!important;}
+    /* The main Edit Order sheet always stays centered in the viewport. */
+    #orderDialog[open] > .sheet{
+      position:fixed!important;
+      left:50%!important;
+      top:50%!important;
+      transform:translate(-50%,-50%)!important;
+      margin:0!important;
+    }
+
+    /* Returning-customer info is independently positioned beside the centered sheet. */
+    @media(min-width:1300px){
+      #orderDialog[open] > .order-history-float{
+        position:fixed!important;
+        left:calc(50% + 398px)!important;
+        right:auto!important;
+        top:50%!important;
+        transform:translateY(-50%)!important;
+        width:255px!important;
+        margin:0!important;
+        z-index:3!important;
+      }
+    }
+
+    /* On narrower screens, keep the reminder usable without shifting the main editor. */
+    @media(min-width:1051px) and (max-width:1299px){
+      #orderDialog[open] > .order-history-float{
+        position:fixed!important;
+        left:18px!important;
+        right:auto!important;
+        top:50%!important;
+        transform:translateY(-50%)!important;
+        width:230px!important;
+        margin:0!important;
+        z-index:3!important;
+      }
+    }
+
     #customerQuoteAcceptWrap,[data-status="Quoted"],[data-status="Accepted"]{display:none!important;}
   `;
   document.head.appendChild(style);
@@ -206,5 +242,5 @@
   patchNoQuoteUI();
   renderOrders();
   renderDashboard();
-  window.PRINTBOOK_BUILD = "5.21.0";
+  window.PRINTBOOK_BUILD = "5.21.1";
 })();
