@@ -1,4 +1,4 @@
-/* PrintBook 5.19.6 — permanent no-quote workflow, centered order editor, safe submit watchdog. */
+/* PrintBook 5.19.7 — no-quote workflow + safe submit watchdog, original order editor layout restored. */
 (() => {
   const DIRECT_ORDER_FLOW={Requested:["Approved","Approve order"],Quoted:["Approved","Approve order"],Accepted:["Approved","Approve order"],Approved:["Printing","Start printing"],Printing:["Ready","Mark ready"],Ready:["Completed","Complete"]};
   try{orderNextStep=function(status){return DIRECT_ORDER_FLOW[status]||null}}catch{}
@@ -29,8 +29,6 @@
   }
   try{const originalConfirmation=showCustomerOrderConfirmation;showCustomerOrderConfirmation=function(result,itemName){const out=originalConfirmation(result,itemName);paymentReferenceReminder(result?.order_number||$("customerOrderConfirmNumber")?.textContent);return out}}catch{}
 
-  // Take ownership of the actual checkout button after app.js has already wired it.
-  // This guarantees the UI can never remain on "Submitting…" forever.
   try{
     const submitBtn=$("submitCustomerCartBtn");
     const originalSubmitCustomerOrderCart=submitCustomerOrderCart;
@@ -62,10 +60,5 @@
   const style=document.createElement('style');style.textContent=`
     .customer-payment-order-number-reminder{margin:14px 0 18px;padding:16px 17px;border-radius:15px;text-align:center;background:color-mix(in srgb,var(--store-accent,#8b5cf6) 15%,rgba(255,255,255,.025));border:2px solid color-mix(in srgb,var(--store-accent,#8b5cf6) 62%,rgba(255,255,255,.12));box-shadow:0 0 0 3px color-mix(in srgb,var(--store-accent,#8b5cf6) 7%,transparent)}
     .customer-payment-order-number-reminder small{display:block;color:var(--store-accent,#a78bfa);font-size:.68rem;font-weight:950;letter-spacing:.14em;margin-bottom:7px}.customer-payment-order-number-reminder strong{display:block;font-size:1rem;line-height:1.45}.customer-payment-order-number-reminder strong span{color:var(--store-accent,#c4b5fd);font-size:1.15em;white-space:nowrap}.customer-payment-order-number-reminder p{margin:7px 0 0;color:#aaa2b2;font-size:.78rem;line-height:1.4}
-    /* Keep the main Edit Order sheet centered. Returning-customer info is a sidecar and must never shift the sheet. */
-    #orderDialog[open]{width:min(700px,calc(100vw - 32px))!important;max-width:700px!important;margin:auto!important;overflow:visible!important;left:0!important;right:0!important}
-    #orderDialog[open]>.sheet,#orderDialog[open] .sheet{width:100%!important;max-width:700px!important;margin:0!important}
-    #customerHistoryCard:not(.hidden){position:fixed!important;left:calc(50vw + 370px)!important;top:50%!important;transform:translateY(-50%)!important;width:290px!important;max-width:calc(50vw - 390px)!important;z-index:2147483000!important;margin:0!important}
-    @media(max-width:1100px){#customerHistoryCard:not(.hidden){position:static!important;transform:none!important;width:auto!important;max-width:none!important;margin:14px 0 0!important}#orderDialog[open]{overflow:auto!important}}
-  `;document.head.appendChild(style);window.PRINTBOOK_BUILD='5.19.6';
+  `;document.head.appendChild(style);window.PRINTBOOK_BUILD='5.19.7';
 })();
