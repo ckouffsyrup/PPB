@@ -1,0 +1,22 @@
+name: Restore PrintBook index
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-index-5198.yml'
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore index from pre-layout commit
+        run: |
+          git checkout 51e80d9647cbdb64f6084aef2bfbe5aa8e8e6337 -- index.html
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "Restore PrintBook index after layout-only change"
+          git push
