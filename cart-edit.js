@@ -1,4 +1,4 @@
-/* PrintBook 5.18.2 — customer cart editing, durable payment methods, simpler order flow. */
+/* PrintBook 5.20.1 — customer cart editing, durable payment methods, simpler order flow. */
 (() => {
   let editingCustomerCartId = null;
 
@@ -120,6 +120,7 @@
       unit_price: unitPrice,
       estimated_total: unitPrice * qty
     };
+    saveCustomerCart();
 
     $("requestPrintDialog").close();
     renderCustomerOrderCart();
@@ -274,6 +275,6 @@
   `;
   document.head.appendChild(style);
 
-  window.PRINTBOOK_BUILD = "5.18.2";
+  window.PRINTBOOK_BUILD = "5.20.1";
   renderCustomerOrderCart();
 })();
