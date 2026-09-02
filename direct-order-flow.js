@@ -1,4 +1,4 @@
-/* PrintBook 5.19.7 — no-quote workflow + safe submit watchdog, original order editor layout restored. */
+/* PrintBook 5.19.8 — no-quote workflow + safe submit watchdog + centered main order editor. */
 (() => {
   const DIRECT_ORDER_FLOW={Requested:["Approved","Approve order"],Quoted:["Approved","Approve order"],Accepted:["Approved","Approve order"],Approved:["Printing","Start printing"],Printing:["Ready","Mark ready"],Ready:["Completed","Complete"]};
   try{orderNextStep=function(status){return DIRECT_ORDER_FLOW[status]||null}}catch{}
@@ -60,5 +60,7 @@
   const style=document.createElement('style');style.textContent=`
     .customer-payment-order-number-reminder{margin:14px 0 18px;padding:16px 17px;border-radius:15px;text-align:center;background:color-mix(in srgb,var(--store-accent,#8b5cf6) 15%,rgba(255,255,255,.025));border:2px solid color-mix(in srgb,var(--store-accent,#8b5cf6) 62%,rgba(255,255,255,.12));box-shadow:0 0 0 3px color-mix(in srgb,var(--store-accent,#8b5cf6) 7%,transparent)}
     .customer-payment-order-number-reminder small{display:block;color:var(--store-accent,#a78bfa);font-size:.68rem;font-weight:950;letter-spacing:.14em;margin-bottom:7px}.customer-payment-order-number-reminder strong{display:block;font-size:1rem;line-height:1.45}.customer-payment-order-number-reminder strong span{color:var(--store-accent,#c4b5fd);font-size:1.15em;white-space:nowrap}.customer-payment-order-number-reminder p{margin:7px 0 0;color:#aaa2b2;font-size:.78rem;line-height:1.4}
-  `;document.head.appendChild(style);window.PRINTBOOK_BUILD='5.19.7';
+    /* Only center the main editor sheet. Do not resize it or alter the returning-customer sidecar. */
+    #orderDialog[open] > .sheet{position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;margin:0!important}
+  `;document.head.appendChild(style);window.PRINTBOOK_BUILD='5.19.8';
 })();
