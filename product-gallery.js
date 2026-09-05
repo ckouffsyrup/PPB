@@ -1,4 +1,4 @@
-/* PrintBook 5.22.0 — additional listing photos without changing the existing main photo path. */
+/* PrintBook 5.22.1 — listing galleries + mobile swipe/arrow navigation. */
 (() => {
   const MAX_GALLERY_IMAGES=8;
   const PUBLIC_GALLERY_URL="https://dljauobtomijmtaxvkvv.supabase.co/functions/v1/public-product-gallery";
@@ -7,6 +7,11 @@
   let galleryEditorProductId="";
   let galleryDirty=false;
   let galleryLoadPromise=null;
+
+  let customerGalleryImages=[];
+  let customerGalleryIndex=0;
+  let customerGalleryProductId="";
+  let customerGalleryTouchStart=null;
 
   const cleanGalleryUrls=value=>Array.isArray(value)?[...new Set(value.map(x=>String(x||"").trim()).filter(Boolean))].slice(0,MAX_GALLERY_IMAGES):[];
 
@@ -179,27 +184,92 @@
 
   function ensureCustomerGalleryUI(){
     let wrap=$("customerProductGalleryThumbs");
-    if(wrap)return wrap;
     const media=document.querySelector("#customerProductDialog .storefront-product-media");
     if(!media)return null;
-    wrap=document.createElement("div");wrap.id="customerProductGalleryThumbs";wrap.className="customer-product-gallery-thumbs hidden";
-    media.appendChild(wrap);return wrap;
+    if(!wrap){
+      wrap=document.createElement("div");wrap.id="customerProductGalleryThumbs";wrap.className="customer-product-gallery-thumbs hidden";
+      media.appendChild(wrap);
+    }
+
+    if(!$("customerProductGalleryPrev")){
+      const prev=document.createElement("button");
+      prev.id="customerProductGalleryPrev";prev.type="button";prev.className="customer-product-gallery-arrow prev hidden";prev.setAttribute("aria-label","Previous product photo");prev.innerHTML="‹";
+      prev.onclick=e=>{e.preventDefault();e.stopPropagation();stepCustomerGallery(-1)};
+      media.appendChild(prev);
+    }
+    if(!$("customerProductGalleryNext")){
+      const next=document.createElement("button");
+      next.id="customerProductGalleryNext";next.type="button";next.className="customer-product-gallery-arrow next hidden";next.setAttribute("aria-label","Next product photo");next.innerHTML="›";
+      next.onclick=e=>{e.preventDefault();e.stopPropagation();stepCustomerGallery(1)};
+      media.appendChild(next);
+    }
+    if(!$("customerProductGalleryCounter")){
+      const counter=document.createElement("div");counter.id="customerProductGalleryCounter";counter.className="customer-product-gallery-counter hidden";
+      media.appendChild(counter);
+    }
+
+    const hero=$("customerProductPhoto");
+    if(hero&&!hero.dataset.gallerySwipeBound){
+      hero.dataset.gallerySwipeBound="1";
+      hero.addEventListener("touchstart",e=>{
+        const t=e.touches?.[0];if(!t)return;
+        customerGalleryTouchStart={x:t.clientX,y:t.clientY,time:Date.now()};
+      },{passive:true});
+      hero.addEventListener("touchend",e=>{
+        if(!customerGalleryTouchStart||customerGalleryImages.length<=1)return;
+        const t=e.changedTouches?.[0];if(!t){customerGalleryTouchStart=null;return}
+        const dx=t.clientX-customerGalleryTouchStart.x;
+        const dy=t.clientY-customerGalleryTouchStart.y;
+        const elapsed=Date.now()-customerGalleryTouchStart.time;
+        customerGalleryTouchStart=null;
+        if(elapsed>800||Math.abs(dx)<42||Math.abs(dx)<=Math.abs(dy)*1.15)return;
+        stepCustomerGallery(dx<0?1:-1);
+      },{passive:true});
+    }
+    return wrap;
+  }
+
+  function setCustomerGalleryIndex(index){
+    if(!customerGalleryImages.length)return;
+    const count=customerGalleryImages.length;
+    customerGalleryIndex=((Number(index)||0)%count+count)%count;
+    const url=customerGalleryImages[customerGalleryIndex];
+    const hero=$("customerProductPhoto");
+    if(hero){hero.src=url;hero.classList.remove("hidden");$("customerProductPhotoFallback")?.classList.add("hidden")}
+    const wrap=$("customerProductGalleryThumbs");
+    wrap?.querySelectorAll("button").forEach((btn,i)=>btn.classList.toggle("active",i===customerGalleryIndex));
+    const counter=$("customerProductGalleryCounter");
+    if(counter){counter.textContent=`${customerGalleryIndex+1} / ${count}`;counter.classList.toggle("hidden",count<=1)}
+    $("customerProductGalleryPrev")?.classList.toggle("hidden",count<=1);
+    $("customerProductGalleryNext")?.classList.toggle("hidden",count<=1);
+  }
+
+  function stepCustomerGallery(direction){
+    if(customerGalleryImages.length<=1)return;
+    setCustomerGalleryIndex(customerGalleryIndex+(direction<0?-1:1));
   }
 
   function renderCustomerGallery(item,galleryUrls){
     const wrap=ensureCustomerGalleryUI();if(!wrap)return;
     const all=[...new Set([item?.photo_url,...cleanGalleryUrls(galleryUrls)].map(x=>String(x||"").trim()).filter(Boolean))];
+    customerGalleryProductId=String(item?.id||"");
+    customerGalleryImages=all;
+    customerGalleryIndex=0;
     wrap.innerHTML="";
     wrap.classList.toggle("hidden",all.length<=1);
-    const hero=$("customerProductPhoto");
-    if(all.length&&hero&&(!hero.src||hero.classList.contains("hidden"))){hero.src=all[0];hero.alt=item?.name||"Product photo";hero.classList.remove("hidden");$("customerProductPhotoFallback")?.classList.add("hidden")}
-    if(all.length<=1)return;
+    if(!all.length){
+      $("customerProductGalleryPrev")?.classList.add("hidden");
+      $("customerProductGalleryNext")?.classList.add("hidden");
+      $("customerProductGalleryCounter")?.classList.add("hidden");
+      return;
+    }
     all.forEach((url,index)=>{
       const btn=document.createElement("button");btn.type="button";btn.className="customer-product-gallery-thumb"+(index===0?" active":"");btn.setAttribute("aria-label",`View photo ${index+1}`);
       const img=document.createElement("img");img.src=url;img.alt="";btn.appendChild(img);
-      btn.onclick=()=>{if(hero){hero.src=url;hero.classList.remove("hidden");$("customerProductPhotoFallback")?.classList.add("hidden")};wrap.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===btn))};
+      btn.onclick=()=>setCustomerGalleryIndex(index);
       wrap.appendChild(btn);
     });
+    setCustomerGalleryIndex(0);
   }
 
   async function loadPublicGallery(productId){
@@ -217,7 +287,7 @@
     const item=items.find(x=>x.id===id);if(!item)return out;
     const localGallery=cleanGalleryUrls(item.gallery_urls);
     renderCustomerGallery(item,localGallery);
-    loadPublicGallery(id).then(urls=>{if(currentRequestPrintId===id)renderCustomerGallery(item,urls.length?urls:localGallery)}).catch(()=>{});
+    loadPublicGallery(id).then(urls=>{if(currentRequestPrintId===id&&customerGalleryProductId===String(id))renderCustomerGallery(item,urls.length?urls:localGallery)}).catch(()=>{});
     return out;
   };
 
@@ -230,9 +300,11 @@
     .product-gallery-editor-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:11px}.product-gallery-editor-head strong{display:block;font-size:.9rem}.product-gallery-editor-head small{display:block;margin-top:3px;color:var(--muted);font-size:.72rem;line-height:1.4}.product-gallery-add{cursor:pointer;white-space:nowrap;margin:0}
     .product-gallery-editor-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.product-gallery-editor-empty{grid-column:1/-1;padding:15px;text-align:center;border:1px dashed var(--line);border-radius:12px;color:var(--muted);font-size:.75rem}
     .product-gallery-editor-thumb{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#0e0b13}.product-gallery-editor-thumb img{width:100%;height:100%;object-fit:cover}.product-gallery-editor-thumb button{position:absolute;right:5px;top:5px;width:28px;height:28px;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(12,9,17,.82);color:#fff;font-size:18px;line-height:1}.product-gallery-editor-thumb span{position:absolute;left:6px;bottom:6px;padding:4px 6px;border-radius:7px;background:rgba(12,9,17,.82);font-size:.55rem;font-weight:900;letter-spacing:.08em;color:var(--purpleSoft)}
+    #customerProductDialog .storefront-product-media{position:relative}
     .customer-product-gallery-thumbs{display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding:2px 1px 5px;scrollbar-width:thin}.customer-product-gallery-thumb{flex:0 0 68px;width:68px;height:68px;padding:0;border-radius:12px;overflow:hidden;border:2px solid transparent;background:#0d0b12;opacity:.7}.customer-product-gallery-thumb.active{border-color:var(--store-accent,var(--purple));opacity:1}.customer-product-gallery-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-    @media(max-width:560px){.product-gallery-editor-head{align-items:flex-start;flex-direction:column}.product-gallery-add{width:100%}.product-gallery-editor-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.customer-product-gallery-thumb{flex-basis:58px;width:58px;height:58px}}
+    .customer-product-gallery-arrow{position:absolute;z-index:5;top:42%;transform:translateY(-50%);width:42px;height:50px;padding:0;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:rgba(10,8,14,.68);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font-size:34px;line-height:42px;display:grid;place-items:center;box-shadow:0 5px 20px rgba(0,0,0,.28)}.customer-product-gallery-arrow.prev{left:10px}.customer-product-gallery-arrow.next{right:10px}.customer-product-gallery-counter{position:absolute;z-index:5;top:10px;right:10px;padding:6px 9px;border-radius:999px;background:rgba(10,8,14,.72);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:.7rem;font-weight:850;letter-spacing:.04em;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    @media(max-width:560px){.product-gallery-editor-head{align-items:flex-start;flex-direction:column}.product-gallery-add{width:100%}.product-gallery-editor-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.customer-product-gallery-thumbs{display:none!important}.customer-product-gallery-arrow{display:grid;width:44px;height:54px;top:50%;border-radius:15px;font-size:36px;background:rgba(10,8,14,.62)}#customerProductPhoto{touch-action:pan-y;user-select:none;-webkit-user-select:none}.customer-product-gallery-counter{top:9px;right:9px}}
   `;
   document.head.appendChild(style);
-  window.PRINTBOOK_BUILD="5.22.0";
+  window.PRINTBOOK_BUILD="5.22.1";
 })();
