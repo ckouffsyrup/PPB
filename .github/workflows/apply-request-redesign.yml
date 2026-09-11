@@ -1,147 +1,17 @@
 name: Apply request dialog redesign
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/apply-request-redesign.yml'
-
+on: [push]
 permissions:
   contents: write
-
 jobs:
-  rewrite-request-dialog:
+  rewrite:
+    if: contains(github.event.head_commit.message, 'Simplify request dialog rewrite workflow')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Rewrite request dialog markup only
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          p=Path('index.html')
-          text=p.read_text()
-
-          new_block=r'''<!-- CUSTOMER REQUEST A PRINT -->
-<dialog id="requestPrintDialog">
-  <div class="sheet request-print-sheet">
-    <div class="sheet-grabber"></div>
-
-    <div class="request-redesign-scroll">
-      <div class="request-redesign-head">
-        <div><p class="eyebrow">PRINT REQUEST</p><h2 id="requestPrintTitle">Request this print</h2></div>
-        <button class="icon-btn" id="closeRequestPrint" type="button">✕</button>
-      </div>
-
-      <div class="request-product-summary" id="requestProductSummary"></div>
-
-      <section class="request-step">
-        <div class="request-step-heading"><span class="request-step-number">1</span><div><strong>Quantity</strong><small>How many would you like?</small></div></div>
-        <div class="request-qty-row">
-          <button class="request-qty-btn" id="requestQtyMinus" type="button" aria-label="Decrease quantity">−</button>
-          <input id="requestQty" type="number" min="1" step="1" value="1" />
-          <button class="request-qty-btn" id="requestQtyPlus" type="button" aria-label="Increase quantity">+</button>
-          <div class="request-price-mini">Estimated each<strong id="requestMiniPrice">$0</strong></div>
-        </div>
-      </section>
-
-      <section class="request-step">
-        <div class="request-step-heading"><span class="request-step-number">2</span><div><strong>Choose a version</strong><small>Pick the style you want.</small></div></div>
-        <label class="request-version-native">Version<select id="requestVariant"><option value="">Standard</option></select></label>
-        <div class="request-version-cards" id="requestVersionCards"></div>
-      </section>
-
-      <section class="request-step">
-        <div class="request-step-heading"><span class="request-step-number">3</span><div><strong>Colors</strong><small>Premade versions already include their colors.</small></div></div>
-        <div id="requestPresetColorsUI" class="hidden">
-          <div class="request-colors-top"><span class="request-preset-badge">✦ Preset colors included</span></div>
-          <div class="request-preset-color-list" id="requestPresetColorList"></div>
-          <p class="request-included-copy" id="requestIncludedCopy"></p>
-        </div>
-        <button class="request-custom-toggle" id="requestCustomColorsToggle" type="button"><span>🎨 Want something different?</span><span>›</span></button>
-        <div class="request-custom-panel collapsed" id="requestCustomPanel">
-          <label id="requestSingleColorField">Preferred filament/color
-            <select id="requestFilament"><option value="">No preference</option></select>
-          </label>
-          <label id="requestColorModeField">Color setup
-            <select id="requestColorMode">
-              <option value="single">Single color</option>
-              <option value="multi">Multicolor — choose my colors</option>
-            </select>
-          </label>
-          <div class="request-multicolor hidden" id="requestMulticolorSection">
-            <div class="request-multicolor-head">
-              <div><strong>Choose your colorway</strong><small id="requestColorHelp">Select 2 colors.</small></div>
-              <span id="requestColorCount" class="badge">0 selected</span>
-            </div>
-            <div class="request-color-grid" id="requestColorGrid"></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="request-step">
-        <div class="request-step-heading"><span class="request-step-number">4</span><div><strong>Your details</strong><small>So your order can be matched back to you.</small></div></div>
-        <div class="request-details-grid">
-          <label>Your name<input id="requestCustomerName" placeholder="Name / nickname" autocomplete="name" /></label>
-          <label>Email for your order<input id="requestCustomerEmail" type="email" placeholder="you@example.com" autocomplete="email" /></label>
-        </div>
-        <button class="request-optional-toggle" id="requestContactToggle" type="button">＋ Add phone / other contact (optional)</button>
-        <div class="request-optional-panel collapsed" id="requestContactPanel">
-          <label>Other contact <span class="muted">(optional)</span><input id="requestContact" placeholder="Phone, Discord, Instagram, etc." /></label>
-        </div>
-      </section>
-
-      <section class="request-step">
-        <div class="request-step-heading"><span class="request-step-number">5</span><div><strong>Special instructions</strong><small>Optional — only if you need something changed.</small></div></div>
-        <button class="request-optional-toggle" id="requestNotesToggle" type="button">＋ Add special instructions</button>
-        <div class="request-optional-panel collapsed" id="requestNotesPanel">
-          <label>Notes / changes<textarea id="requestNotes" placeholder="Different colors, size, quantity details, or anything else you want."></textarea></label>
-        </div>
-      </section>
-    </div>
-
-    <div class="request-sticky-footer">
-      <div class="request-estimate">
-        <div><span>Estimated price</span><strong id="requestEstimate">$0</strong></div>
-        <small id="requestPricingBreakdown">This is an estimate. Final price can be confirmed before printing.</small>
-      </div>
-      <button class="primary full-width" id="submitPrintRequestBtn" type="button">Add to Order</button>
-    </div>
-  </div>
-</dialog>
-
-
-
-<!-- CUSTOMER MULTI-ITEM ORDER CART -->'''
-
-          pattern=r'<!-- CUSTOMER REQUEST A PRINT -->.*?<!-- CUSTOMER MULTI-ITEM ORDER CART -->'
-          updated,n=re.subn(pattern,new_block,text,flags=re.S)
-          if n!=1:
-              raise SystemExit(f'Expected 1 request dialog block, replaced {n}')
-
-          css='<link rel="stylesheet" href="request-redesign.css?v=5.24.3" />'
-          if css not in updated:
-              updated=updated.replace('</head>',f'  {css}\n</head>')
-
-          js='<script src="request-redesign.js?v=5.24.3"></script>'
-          if js not in updated:
-              updated=updated.replace('<script src="app.js?v=5.10.0"></script>', '<script src="app.js?v=5.10.0"></script>\n'+js)
-
-          p.write_text(updated)
-
-          sw=Path('sw.js')
-          s=sw.read_text()
-          s=re.sub(r'const CACHE="[^"]+";', 'const CACHE="printbook-v5.24.3-hardcoded-request-ui";', s, count=1)
-          for asset in ['./request-redesign.css','./request-redesign.js']:
-              if asset not in s:
-                  s=s.replace('"./store-qr.png"]', f'"./store-qr.png","{asset}"]')
-          sw.write_text(s)
-          PY
-      - name: Commit rewritten hardcoded UI
-        run: |
+      - run: python tools/apply_request_redesign.py
+      - run: |
           git config user.name "PrintBook UI updater"
           git config user.email "actions@users.noreply.github.com"
           git add index.html sw.js
