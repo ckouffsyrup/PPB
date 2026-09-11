@@ -1,5 +1,5 @@
-const CACHE="printbook-v5.24.2-request-ui-redesign";
-const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./cart-edit.js","./stock-adjust.js","./checkout-payment.js","./direct-order-flow.js","./product-gallery.js","./admin-access.js","./variant-colors.js","./store-qr.png"];
+const CACHE="printbook-v5.24.3-hardcoded-request-ui";
+const CORE_ASSETS=["./","./index.html","./styles.css","./storefront-v55.css","./app.js","./cart-edit.js","./stock-adjust.js","./checkout-payment.js","./direct-order-flow.js","./product-gallery.js","./admin-access.js","./variant-colors.js","./store-qr.png","./request-redesign.css"];
 
 self.addEventListener("install",event=>{event.waitUntil((async()=>{const cache=await caches.open(CACHE);await Promise.allSettled(CORE_ASSETS.map(async asset=>{try{const req=new Request(asset,{cache:"reload"});const res=await fetch(req);if(res.ok)await cache.put(req,res.clone())}catch(err){console.warn("PrintBook cache skipped",asset,err)}}));await self.skipWaiting()})())});
 self.addEventListener("activate",event=>{event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim()})())});
