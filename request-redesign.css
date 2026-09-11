@@ -1,0 +1,67 @@
+/* PrintBook request configurator UI only. Keeps existing request field IDs/logic intact. */
+#requestPrintDialog .request-print-sheet{width:min(920px,calc(100vw - 28px));max-height:min(92vh,940px);padding:0;overflow:hidden;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(17,13,27,.99),rgba(12,10,20,.99));}
+#requestPrintDialog .request-redesign-scroll{padding:18px 20px 112px;overflow:auto;overscroll-behavior:contain;}
+#requestPrintDialog .sheet-grabber{margin:12px auto 2px;flex:0 0 auto;}
+#requestPrintDialog .request-redesign-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:16px;margin-bottom:12px;}
+#requestPrintDialog .request-redesign-head .eyebrow{margin:0 0 4px;}
+#requestPrintDialog .request-redesign-head h2{margin:0;font-size:clamp(1.45rem,3vw,2rem);}
+#requestPrintDialog .request-product-summary{margin:0 0 14px;border-radius:16px;}
+#requestPrintDialog .request-step{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);border-radius:16px;padding:14px;margin-top:10px;}
+#requestPrintDialog .request-step-heading{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
+#requestPrintDialog .request-step-number{display:grid;place-items:center;width:26px;height:26px;flex:0 0 26px;border-radius:50%;background:linear-gradient(145deg,#a26bff,#7443e9);font-size:.77rem;font-weight:950;color:white;box-shadow:0 5px 16px rgba(125,71,235,.28);}
+#requestPrintDialog .request-step-heading strong{font-size:.88rem;letter-spacing:.01em;}
+#requestPrintDialog .request-step-heading small{display:block;color:#9890a8;margin-top:2px;font-size:.68rem;}
+#requestPrintDialog .request-qty-row{display:grid;grid-template-columns:44px 76px 44px 1fr;gap:8px;align-items:center;}
+#requestPrintDialog .request-qty-btn{height:42px;border-radius:11px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.05);color:white;font-size:1.15rem;font-weight:900;cursor:pointer;}
+#requestPrintDialog #requestQty{height:42px;text-align:center;padding:0 8px;font-size:.95rem;font-weight:900;appearance:textfield;}
+#requestPrintDialog #requestQty::-webkit-inner-spin-button,#requestPrintDialog #requestQty::-webkit-outer-spin-button{appearance:none;margin:0;}
+#requestPrintDialog .request-price-mini{justify-self:end;text-align:right;color:#aaa1b7;font-size:.66rem;line-height:1.4;}
+#requestPrintDialog .request-price-mini strong{display:block;color:#f4effa;font-size:.85rem;}
+#requestPrintDialog .request-version-native{display:none!important;}
+#requestPrintDialog .request-version-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;}
+#requestPrintDialog .request-version-card{position:relative;min-height:84px;padding:11px;border-radius:13px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);color:white;text-align:left;cursor:pointer;transition:.16s ease;}
+#requestPrintDialog .request-version-card:hover{transform:translateY(-1px);border-color:rgba(166,111,255,.5);}
+#requestPrintDialog .request-version-card.active{border-color:#9b65ff;background:linear-gradient(180deg,rgba(139,92,246,.18),rgba(139,92,246,.08));box-shadow:0 0 0 1px rgba(139,92,246,.18),0 10px 26px rgba(92,48,180,.16);}
+#requestPrintDialog .request-version-card strong{display:block;font-size:.79rem;line-height:1.2;padding-right:20px;}
+#requestPrintDialog .request-version-card small{display:block;margin-top:7px;color:#9d95ab;font-size:.65rem;}
+#requestPrintDialog .request-version-check{position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;display:none;place-items:center;background:#9862fa;font-size:.65rem;font-weight:950;}
+#requestPrintDialog .request-version-card.active .request-version-check{display:grid;}
+#requestPrintDialog .request-colors-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+#requestPrintDialog .request-preset-badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 8px;background:rgba(139,92,246,.13);border:1px solid rgba(139,92,246,.24);color:#cbb4ff;font-size:.62rem;font-weight:850;}
+#requestPrintDialog .request-preset-color-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+#requestPrintDialog .request-preset-color-chip{display:inline-flex;align-items:center;gap:7px;min-width:98px;padding:9px 10px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);font-size:.72rem;font-weight:800;}
+#requestPrintDialog .request-preset-color-dot{width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,.25);box-shadow:0 0 0 1px rgba(0,0,0,.3);}
+#requestPrintDialog .request-included-copy{font-size:.66rem;color:#a59dac;line-height:1.45;margin:0 0 10px;}
+#requestPrintDialog .request-custom-toggle{width:100%;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;border:1px solid rgba(155,101,255,.38);background:rgba(139,92,246,.07);border-radius:12px;color:#f4effa;font-weight:850;cursor:pointer;}
+#requestPrintDialog .request-custom-toggle span:first-child{display:flex;align-items:center;gap:8px;}
+#requestPrintDialog .request-custom-panel{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07);}
+#requestPrintDialog .request-custom-panel.collapsed{display:none;}
+#requestPrintDialog .request-custom-panel label{margin:0;}
+#requestPrintDialog .request-custom-panel #requestMulticolorSection{grid-column:1/-1;margin:0;}
+#requestPrintDialog .request-details-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+#requestPrintDialog .request-details-grid label{margin:0;}
+#requestPrintDialog .request-optional-toggle{width:100%;margin-top:9px;min-height:38px;text-align:left;padding:0 11px;border-radius:10px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);color:#b6adbf;font:inherit;font-size:.69rem;cursor:pointer;}
+#requestPrintDialog .request-optional-panel{margin-top:9px;}
+#requestPrintDialog .request-optional-panel.collapsed{display:none;}
+#requestPrintDialog .request-optional-panel label{margin:0;}
+#requestPrintDialog .request-optional-panel textarea{min-height:88px;}
+#requestPrintDialog .request-sticky-footer{position:absolute;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:minmax(130px,.6fr) minmax(200px,1fr);gap:12px;align-items:center;padding:13px 20px calc(13px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.09);background:rgba(15,11,24,.96);backdrop-filter:blur(18px);}
+#requestPrintDialog .request-estimate{margin:0;padding:0;border:0;background:transparent;}
+#requestPrintDialog .request-estimate>div{display:block;}
+#requestPrintDialog .request-estimate span{font-size:.62rem;color:#9b92a8;}
+#requestPrintDialog .request-estimate strong{display:block;margin-top:1px;font-size:1.45rem;color:#a96cff;}
+#requestPrintDialog .request-estimate small{font-size:.58rem;color:#8f879b;line-height:1.35;}
+#requestPrintDialog #submitPrintRequestBtn{margin:0;min-height:48px;}
+#requestPrintDialog .hidden-native-label{display:none!important;}
+@media(max-width:720px){
+  #requestPrintDialog .request-print-sheet{width:100%;max-height:96dvh;border-radius:22px 22px 0 0;}
+  #requestPrintDialog .request-redesign-scroll{padding:15px 13px 110px;}
+  #requestPrintDialog .request-version-cards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:3px;}
+  #requestPrintDialog .request-version-card{min-width:132px;scroll-snap-align:start;}
+  #requestPrintDialog .request-details-grid{grid-template-columns:1fr;}
+  #requestPrintDialog .request-custom-panel{grid-template-columns:1fr;}
+  #requestPrintDialog .request-custom-panel #requestMulticolorSection{grid-column:1;}
+  #requestPrintDialog .request-sticky-footer{grid-template-columns:112px 1fr;padding:10px 13px calc(10px + env(safe-area-inset-bottom));}
+  #requestPrintDialog .request-estimate strong{font-size:1.25rem;}
+  #requestPrintDialog .request-qty-row{grid-template-columns:42px 68px 42px 1fr;}
+}
