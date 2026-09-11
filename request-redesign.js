@@ -73,8 +73,27 @@
     const btn=$(buttonId),panel=$(panelId);if(!btn||!panel)return;
     btn.addEventListener("click",()=>{
       panel.classList.toggle("collapsed");
-      if(buttonId==="requestCustomColorsToggle")panel.dataset.userOpened=panel.classList.contains("collapsed")?"":"1";
+      if(buttonId==="requestCustomColorsToggle"){
+        const open=!panel.classList.contains("collapsed");
+        panel.dataset.userOpened=open?"1":"";
+        if(open){
+          const bridge=$("requestCustomColorsBtn");
+          if(bridge&&!bridge.classList.contains("hidden"))bridge.click();
+          $("requestSingleColorField")?.classList.remove("hidden");
+          if(currentItemMulticolor())$("requestColorModeField")?.classList.remove("hidden");
+        }else{
+          const bridge=$("requestUsePresetColorsBtn");
+          if(bridge&&!bridge.classList.contains("hidden"))bridge.click();
+        }
+      }
     });
+  }
+
+  function currentItemMulticolor(){
+    try{
+      const select=$("requestColorModeField");
+      return !!select && !select.dataset.forceSingle;
+    }catch{return false}
   }
 
   openToggle("requestCustomColorsToggle","requestCustomPanel");
