@@ -2831,7 +2831,15 @@ async function syncUpsert(table,row){
   // Postgres DATE/UUID columns reject empty strings. Normalize order rows in one
   // central place so every save path (payments, status changes, bulk sync, etc.)
   // is safe instead of relying on each caller to remember this conversion.
-  if(table==="orders")row={...row,due_date:row?.due_date||null,print_id:row?.print_id||null};
+  if(table==="orders"){
+    // Only send columns that actually belong to public.orders. Older cached/local
+    // order objects can carry UI-only fields; PostgREST rejects the entire write
+    // when even one unknown key is present, which previously surfaced only as
+    // "Couldn't sync orders".
+    const ORDER_COLUMNS=new Set(["id","user_id","customer","status","item","quantity","quoted_price","due_date","print_id","notes","created_at","updated_at","payment_status","payment_amount","deposit_amount","payment_method","payment_provider","payment_reference","paid_at","payment_link","stripe_checkout_session_id","stripe_payment_intent_id","order_number","customer_email","payment_instructions","variant_id","inventory_reserved_at","inventory_reserved_quantity","inventory_reserved_variant_id","quote_email_sent_at","customer_accepted_at","customer_accepted_price","ready_email_sent_at","line_items","inventory_reserved_items","payment_methods_selected","quote_adjustment"]);
+    row=Object.fromEntries(Object.entries(row||{}).filter(([key])=>ORDER_COLUMNS.has(key)));
+    row={...row,due_date:row?.due_date||null,print_id:row?.print_id||null,variant_id:row?.variant_id||null,payment_methods_selected:Array.isArray(row?.payment_methods_selected)?row.payment_methods_selected:[],line_items:Array.isArray(row?.line_items)?row.line_items:[],inventory_reserved_items:Array.isArray(row?.inventory_reserved_items)?row.inventory_reserved_items:[]};
+  }
   setSyncState("syncing","Syncing…");
   let error=null;
   if(table==="orders"&&row?.id){
