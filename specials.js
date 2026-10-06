@@ -1,6 +1,6 @@
 /* PrintBook Specials v1 — seasonal storefront collections. UI-only integration; order flow untouched. */
 (() => {
-  if(!document.querySelector('link[data-printbook-specials]')){const l=document.createElement("link");l.rel="stylesheet";l.href="./specials.css?v=5.25.2";l.dataset.printbookSpecials="1";document.head.appendChild(l);}
+  if(!document.querySelector('link[data-printbook-specials]')){const l=document.createElement("link");l.rel="stylesheet";l.href="./specials.css?v=5.25.3";l.dataset.printbookSpecials="1";document.head.appendChild(l);}
   let specials = [];
   let editingSpecialId = null;
   const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
