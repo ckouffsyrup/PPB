@@ -1,6 +1,6 @@
 /* PrintBook Specials v1 — seasonal storefront collections. UI-only integration; order flow untouched. */
 (() => {
-  if(!document.querySelector('link[data-printbook-specials]')){const l=document.createElement("link");l.rel="stylesheet";l.href="./specials.css?v=5.25.0";l.dataset.printbookSpecials="1";document.head.appendChild(l);}
+  if(!document.querySelector('link[data-printbook-specials]')){const l=document.createElement("link");l.rel="stylesheet";l.href="./specials.css?v=5.25.2";l.dataset.printbookSpecials="1";document.head.appendChild(l);}
   let specials = [];
   let editingSpecialId = null;
   const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
@@ -17,8 +17,12 @@
     }
     const grid=document.getElementById("shopGrid");
     if(grid && !document.getElementById("storefrontSpecials")){
-      const section=document.createElement("section"); section.id="storefrontSpecials"; section.className="storefront-specials hidden";
-      grid.parentNode.insertBefore(section,grid);
+      const section=document.createElement("section"); section.id="storefrontSpecials"; section.className="storefront-specials hidden customer-only";
+      // Specials are the first product content customers see: after the hero/perks,
+      // before Featured Prints on both desktop and mobile.
+      const featured=document.getElementById("customerFeaturedSection");
+      if(featured?.parentNode) featured.parentNode.insertBefore(section,featured);
+      else grid.parentNode.insertBefore(section,grid);
     }
     if(!document.getElementById("specialsDialog")){
       document.body.insertAdjacentHTML("beforeend",`
